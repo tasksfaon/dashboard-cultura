@@ -1,44 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  BarChart, Bar, Legend, PieChart, Pie, Cell, LineChart, Line
-} from 'recharts';
-import { 
   TrendingUp, Users, DollarSign, Activity, Focus,
-  ArrowUpRight, ArrowDownRight, Filter, CalendarDays, Loader2, KeyRound
+  ArrowUpRight, ArrowDownRight, Filter, CalendarDays, Loader2, KeyRound, ChevronDown
 } from 'lucide-react';
 
 // --- MOCK DATA ---
-const mockPerformanceData = [
-  { date: '01/05', organic: 120, meta: 80, google: 150 },
-  { date: '02/05', organic: 132, meta: 95, google: 160 },
-  { date: '03/05', organic: 141, meta: 110, google: 140 },
-  { date: '04/05', organic: 158, meta: 130, google: 180 },
-  { date: '05/05', organic: 145, meta: 140, google: 175 },
-  { date: '06/05', organic: 160, meta: 165, google: 210 },
-  { date: '07/05', organic: 175, meta: 180, google: 230 },
-  { date: '08/05', organic: 182, meta: 195, google: 250 },
-  { date: '09/05', organic: 190, meta: 210, google: 240 },
-  { date: '10/05', organic: 210, meta: 190, google: 270 },
-  { date: '11/05', organic: 225, meta: 230, google: 290 },
-  { date: '12/05', organic: 240, meta: 250, google: 310 },
-  { date: '13/05', organic: 255, meta: 280, google: 325 },
-  { date: '14/05', organic: 270, meta: 310, google: 350 },
-];
-
-const mockSourceDistribution = [
-  { name: 'Organic Search', value: 35, color: '#10B981' }, // Emerald
-  { name: 'Meta Ads', value: 25, color: '#3B82F6' }, // Blue
-  { name: 'Google Ads', value: 40, color: '#F43F5E' }, // Rose
-];
-
-const mockCampaignData = [
-  { id: 1, name: 'Retargeting_LAL_30D', platform: 'Meta', conversions: 342, cpa: 12.50, roas: 4.2, spend: 4275 },
-  { id: 2, name: 'Search_Brand_Exact', platform: 'Google', conversions: 512, cpa: 8.20, roas: 5.8, spend: 4198 },
-  { id: 3, name: 'Cold_Broad_Interest', platform: 'Meta', conversions: 185, cpa: 24.30, roas: 2.1, spend: 4495 },
-  { id: 4, name: 'PMax_Bestsellers', platform: 'Google', conversions: 420, cpa: 15.10, roas: 3.5, spend: 6342 },
-];
-
 const mockKpis = [
   { title: 'Total Conversions', value: '4,842', trend: '+14.5%', isUp: true, icon: TrendingUp },
   { title: 'Blended CPA', value: 'R$ 14,20', trend: '-2.4%', isUp: true, icon: Focus }, 
@@ -47,24 +13,72 @@ const mockKpis = [
 ];
 
 // --- COMPONENTS ---
-const Card = ({ children, className = '' }: { children: React.ReactNode, className?: string }) => (
-  <div className={`bg-[#111113] border border-[#222225] rounded-2xl p-6 ${className}`}>
+const Card = ({ children, className = '', ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div className={`bg-[#111113] border border-[#222225] rounded-2xl p-6 ${className}`} {...props}>
     {children}
   </div>
 );
 
 export default function App() {
   const [dataStatus, setDataStatus] = useState<'loading' | 'needs_setup' | 'logged_out' | 'success' | 'error'>('loading');
-  const [performanceData, setPerformanceData] = useState(mockPerformanceData);
-  const [sourceDistribution, setSourceDistribution] = useState(mockSourceDistribution);
-  const [campaignData, setCampaignData] = useState(mockCampaignData);
+  const [channelData, setChannelData] = useState<any>({
+    meta: { revenue: 0, sales: 0, leads: 0, sessions: 0, cost: 0, products: [] },
+    google: { revenue: 0, sales: 0, leads: 0, sessions: 0, cost: 0, products: [] },
+    organic: { revenue: 0, sales: 0, leads: 0, sessions: 0, cost: 0, products: [] },
+    total: { revenue: 0, sales: 0, leads: 0, sessions: 0, cost: 0 }
+  });
   const [kpis, setKpis] = useState(mockKpis);
   const [errorMessage, setErrorMessage] = useState('');
+  const companies = [
+    {
+      id: "g7",
+      name: "Dashboard G7",
+      propertyId: "326638842",
+      logo: "https://www.g7juridico.com.br/imagens/simbolo.jpg",
+    },
+    {
+      id: "cultura",
+      name: "Dashboard Cultura",
+      propertyId: "299236151",
+      logo: "https://www.culturajuridica.com.br/imagens/novo/logo-topo.svg",
+    }
+  ];
+
+  const [selectedCompanyId, setSelectedCompanyId] = useState(companies[0].id);
+
+  const selectedCompany = companies.find(c => c.id === selectedCompanyId) || companies[0];
+  const propertyId = selectedCompany.propertyId;
+
+  const [dateRange, setDateRange] = useState('7days');
+  const [isDateDropdownOpen, setIsDateDropdownOpen] = useState(false);
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
+  const [appliedCustomDate, setAppliedCustomDate] = useState({ start: '', end: '' });
+
+  const dateRangeLabels: Record<string, string> = {
+      today: 'Hoje',
+      yesterday: 'Ontem',
+      '7days': 'Últimos 7 dias',
+      '14days': 'Últimos 14 dias',
+      '30days': 'Últimos 30 dias',
+      '60days': 'Últimos 60 dias',
+      '90days': 'Últimos 90 dias',
+      '180days': 'Últimos 180 dias',
+      custom: 'Personalizado'
+  };
+
   const [tokens, setTokens] = useState<any>(() => {
     const saved = localStorage.getItem('ga4_tokens');
     return saved ? JSON.parse(saved) : null;
   });
-  const [propertyId] = useState('326638842');
+
+  useEffect(() => {
+    document.title = selectedCompany.name;
+    const link: any = document.querySelector("link[rel~='icon']");
+    if (link) {
+      link.href = selectedCompany.logo;
+    }
+  }, [selectedCompany]);
 
   useEffect(() => {
     if (!tokens) {
@@ -78,10 +92,16 @@ export default function App() {
       setTokens(null);
       return;
     }
+    
+    setDataStatus('loading');
 
     const fetchAnalytics = async () => {
       try {
-        const res = await fetch(`/api/analytics?propertyId=${propertyId}`, {
+        let url = `/api/analytics?propertyId=${propertyId}&dateRange=${dateRange}`;
+        if (dateRange === 'custom') {
+          url += `&customStart=${appliedCustomDate.start}&customEnd=${appliedCustomDate.end}`;
+        }
+        const res = await fetch(url, {
             headers: { 'Authorization': `Bearer ${JSON.stringify(tokens)}` }
         });
         const data = await res.json();
@@ -90,77 +110,115 @@ export default function App() {
           setDataStatus('success');
           console.log("Real GA4 Data received:", data.data);
 
-          if (data.data && data.data.rows) {
-            const rawRows = data.data.rows;
+            if (data.data && data.data.sources && data.data.sources.rows) {
+              const srcRows = data.data.sources.rows;
+              const itmRows = data.data.items?.rows || [];
 
-            const dateMap = new Map<string, { date: string; organic: number; meta: number; google: number }>();
-            let totalSessions = 0;
-            let totalConversions = 0;
-            const sourceMap = new Map<string, number>();
+              const agg = {
+                meta: { revenue: 0, sales: 0, leads: 0, sessions: 0, cost: 0, products: new Map<string, {qty: number, rev: number}>() },
+                google: { revenue: 0, sales: 0, leads: 0, sessions: 0, cost: 0, products: new Map<string, {qty: number, rev: number}>() },
+                organic: { revenue: 0, sales: 0, leads: 0, sessions: 0, cost: 0, products: new Map<string, {qty: number, rev: number}>() },
+                total: { revenue: 0, sales: 0, leads: 0, sessions: 0, cost: 0 }
+              };
 
-            rawRows.forEach((row: any) => {
-              const dateVal = row.dimensionValues?.[0]?.value || '';
-              const formattedDate = dateVal.length === 8 ? `${dateVal.substring(6,8)}/${dateVal.substring(4,6)}` : dateVal;
-              const sourceVal = row.dimensionValues?.[1]?.value || 'direct';
-              
-              const sessions = parseInt(row.metricValues?.[0]?.value || '0', 10);
-              const conversions = parseInt(row.metricValues?.[1]?.value || '0', 10);
+              // Process Sources
+              console.log("Raw Sources from GA4:", srcRows.map((r: any) => ({
+                source: r.dimensionValues?.[0]?.value,
+                sessions: r.metricValues?.[0]?.value,
+                revenue: r.metricValues?.[3]?.value,
+                cost: r.metricValues?.[4]?.value
+              })));
 
-              totalSessions += sessions;
-              totalConversions += conversions;
+              srcRows.forEach((row: any) => {
+                const source = (row.dimensionValues?.[0]?.value || 'direct').toLowerCase();
+                const sessions = parseInt(row.metricValues?.[0]?.value || '0', 10);
+                const conversions = parseInt(row.metricValues?.[1]?.value || '0', 10);
+                const sales = parseInt(row.metricValues?.[2]?.value || '0', 10);
+                const revenue = parseFloat(row.metricValues?.[3]?.value || '0');
+                const cost = parseFloat(row.metricValues?.[4]?.value || '0');
+                
+                let leads = Math.max(0, conversions - sales);
+                if (leads === 0 && conversions > 0 && sales === 0) leads = conversions; 
 
-              if (!dateMap.has(formattedDate)) {
-                dateMap.set(formattedDate, { date: formattedDate, organic: 0, meta: 0, google: 0 });
-              }
-              const dateEntry = dateMap.get(formattedDate)!;
-              
-              const lsSource = sourceVal.toLowerCase();
-              if (lsSource.includes('google') || lsSource.includes('cpc')) dateEntry.google += sessions;
-              else if (lsSource.includes('fb') || lsSource.includes('meta') || lsSource.includes('ig') || lsSource.includes('instagram')) dateEntry.meta += sessions;
-              else dateEntry.organic += sessions;
+                let cat = 'organic';
+                // Detect Google Ads
+                if (source.includes('google') || source.includes('cpc') || source.includes('ads') || source.includes('gclid')) {
+                  cat = 'google';
+                } 
+                // Detect Meta Ads (Facebook/Instagram) - Including common referral patterns
+                else if (
+                  source.includes('fb') || 
+                  source.includes('meta') || 
+                  source.includes('ig') || 
+                  source.includes('instagram') || 
+                  source.includes('facebook') || 
+                  source.includes('messenger')
+                ) {
+                  cat = 'meta';
+                }
 
-              let pieKey = 'Organic / Direct';
-              if (lsSource.includes('google') || lsSource.includes('cpc')) { pieKey = 'Google Ads'; }
-              else if (lsSource.includes('fb') || lsSource.includes('meta') || lsSource.includes('ig')) { pieKey = 'Meta Ads'; }
-              
-              if (!sourceMap.has(pieKey)) {
-                sourceMap.set(pieKey, 0);
-              }
-              sourceMap.set(pieKey, sourceMap.get(pieKey)! + sessions);
-            });
+                const target = agg[cat as keyof typeof agg] as any;
+                target.revenue += revenue;
+                target.sales += sales;
+                target.leads += leads;
+                target.sessions += sessions;
+                target.cost += cost;
 
-            const newPerformanceData = Array.from(dateMap.values()).sort((a,b) => {
-               // roughly sort by date string DD/MM, assuming same year spanning
-               const [d1, m1] = a.date.split('/');
-               const [d2, m2] = b.date.split('/');
-               if (m1 !== m2) return (m1 || '').localeCompare(m2 || '');
-               return (d1 || '').localeCompare(d2 || '');
-            });
-            
-            if (newPerformanceData.length > 0) {
-              setPerformanceData(newPerformanceData);
+                agg.total.revenue += revenue;
+                agg.total.sales += sales;
+                agg.total.leads += leads;
+                agg.total.sessions += sessions;
+                agg.total.cost += cost;
+              });
+
+              // Process Items
+              itmRows.forEach((row: any) => {
+                const source = (row.dimensionValues?.[0]?.value || 'direct').toLowerCase();
+                const itemName = row.dimensionValues?.[1]?.value || 'Unknown Product';
+                if (itemName === '(not set)') return;
+
+                const qty = parseInt(row.metricValues?.[0]?.value || '0', 10);
+                const rev = parseFloat(row.metricValues?.[1]?.value || '0');
+
+                if (qty === 0 && rev === 0) return;
+
+                let cat = 'organic';
+                if (source.includes('google') || source.includes('cpc') || source.includes('ads')) cat = 'google';
+                else if (source.includes('fb') || source.includes('meta') || source.includes('ig') || source.includes('instagram')) cat = 'meta';
+
+                const pMap = (agg[cat as keyof typeof agg] as any).products;
+                if (!pMap.has(itemName)) {
+                  pMap.set(itemName, { qty: 0, rev: 0 });
+                }
+                const p = pMap.get(itemName);
+                p.qty += qty;
+                p.rev += rev;
+              });
+
+              // Convert product maps to sorted arrays
+              const formatProducts = (map: Map<string, any>) => Array.from(map.entries())
+                  .map(([name, data]) => ({ name, ...data }))
+                  .sort((a, b) => b.rev - a.rev);
+
+              setChannelData({
+                meta: { ...agg.meta, products: formatProducts(agg.meta.products) },
+                google: { ...agg.google, products: formatProducts(agg.google.products) },
+                organic: { ...agg.organic, products: formatProducts(agg.organic.products) },
+                total: agg.total
+              });
+
+              const totalCR = agg.total.sessions > 0 ? (agg.total.sales + agg.total.leads) / agg.total.sessions * 100 : 0;
+              const totalROAS = agg.total.cost > 0 ? agg.total.revenue / agg.total.cost : 0;
+              const totalCPL = agg.total.leads > 0 ? agg.total.cost / agg.total.leads : 0;
+
+              setKpis([
+                { title: 'Receita Total', value: `R$ ${agg.total.revenue.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, trend: 'Exato', isUp: true, icon: DollarSign },
+                { title: 'ROAS Geral', value: `${totalROAS.toFixed(2)}x`, trend: 'Baseado no GA4', isUp: totalROAS > 2, icon: Activity },
+                { title: 'Leads Totais', value: agg.total.leads.toString(), trend: 'Todas as origens', isUp: true, icon: Users },
+                { title: 'Custo por Lead (CPL)', value: `R$ ${totalCPL.toFixed(2)}`, trend: 'Média Geral', isUp: false, icon: Focus },
+                { title: 'Taxa Conv. Geral', value: `${totalCR.toFixed(2)}%`, trend: `de ${agg.total.sessions} sessões`, isUp: true, icon: TrendingUp },
+              ]);
             }
-
-            const newSourceData = Array.from(sourceMap.entries()).map(([name, value]) => {
-              let color = '#10B981';
-              if (name === 'Google Ads') color = '#F43F5E';
-              if (name === 'Meta Ads') color = '#3B82F6';
-              return { name, value, color };
-            });
-            if (newSourceData.length > 0) {
-               setSourceDistribution(newSourceData);
-            }
-
-            setKpis([
-              { title: 'Sessões Totais', value: totalSessions.toString(), trend: '-', isUp: true, icon: Users },
-              { title: 'Conversões', value: totalConversions.toString(), trend: '-', isUp: true, icon: TrendingUp },
-              { title: 'Taxa de Conv.', value: totalSessions > 0 ? ((totalConversions/totalSessions)*100).toFixed(2) + '%' : '0%', trend: '-', isUp: true, icon: Activity },
-              { title: 'Origem de Dados', value: 'GA4 API', trend: 'Live', isUp: true, icon: KeyRound },
-            ]);
-            
-            // clear out mock campaign data
-            setCampaignData([]);
-          }
 
         } else {
           setDataStatus('error');
@@ -174,7 +232,7 @@ export default function App() {
     };
 
     fetchAnalytics();
-  }, [tokens]);
+  }, [tokens, propertyId, dateRange, appliedCustomDate.start, appliedCustomDate.end]);
 
   const handleConnect = async () => {
     try {
@@ -204,21 +262,92 @@ export default function App() {
       {/* Top Navigation / Header */}
       <header className="border-b border-[#222225] bg-[#0A0A0A]/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img src="https://www.g7juridico.com.br/imagens/simbolo.jpg" alt="Logo" className="w-10 h-10 rounded-full object-cover shadow-lg" />
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight">Dashboard G7</h1>
+          <div className="relative group">
+            <button className="flex items-center gap-3 hover:opacity-80 transition-opacity focus:outline-none">
+              <img src={selectedCompany.logo} alt="Logo" className="w-10 h-10 rounded-full border border-[#222225] object-cover" />
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-semibold tracking-tight">{selectedCompany.name}</h1>
+                <ChevronDown className="w-4 h-4 text-[#8E9299]" />
+              </div>
+            </button>
+            <div className="absolute top-12 left-0 w-64 bg-[#111113] border border-[#222225] rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 overflow-hidden z-50">
+              {companies.map(company => (
+                 <button
+                   key={company.id}
+                   onClick={() => setSelectedCompanyId(company.id)}
+                   className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-[#222225] transition-colors focus:outline-none ${selectedCompanyId === company.id ? 'bg-[#1A1A1D]' : ''}`}
+                 >
+                   <img src={company.logo} alt={company.name} className="w-8 h-8 object-cover rounded-full border border-[#222225]" />
+                   <span className="text-sm font-medium">{company.name}</span>
+                 </button>
+              ))}
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
-            <button className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#222225] bg-[#111113] hover:bg-[#1A1A1D] transition-colors text-sm font-medium">
-              <CalendarDays className="w-4 h-4 text-[#8E9299]" />
-              <span>Last 14 Days</span>
-            </button>
-            <button className="flex items-center gap-2 px-4 py-2 rounded-full bg-white text-black hover:bg-gray-200 transition-colors text-sm font-medium">
-              <Filter className="w-4 h-4" />
-              <span>Filters</span>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <button 
+                  onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#222225] bg-[#111113] hover:bg-[#1A1A1D] transition-colors text-sm font-medium focus:outline-none"
+              >
+                <CalendarDays className="w-4 h-4 text-[#8E9299]" />
+                <span>{dateRangeLabels[dateRange]}</span>
+                <ChevronDown className="w-4 h-4 text-[#8E9299]" />
+              </button>
+              
+              {isDateDropdownOpen && (
+                <div className="absolute top-12 right-0 w-64 bg-[#111113] border border-[#222225] rounded-xl shadow-xl z-50 p-2 text-sm">
+                   {Object.entries(dateRangeLabels).map(([key, label]) => (
+                     <button
+                        key={key}
+                        onClick={() => { 
+                          setDateRange(key); 
+                          if(key !== 'custom') setIsDateDropdownOpen(false); 
+                        }}
+                        className={`w-full text-left px-4 py-2.5 rounded-lg hover:bg-[#222225] transition-colors focus:outline-none ${dateRange === key ? 'bg-[#1A1A1D] font-medium text-white' : 'text-[#8E9299]'}`}
+                     >
+                       {label}
+                     </button>
+                   ))}
+
+                   {dateRange === 'custom' && (
+                     <div className="mt-2 pt-3 border-t border-[#222225] flex flex-col gap-3 px-2 pb-1">
+                       <div className="flex flex-col gap-1">
+                         <label className="text-xs text-[#8E9299]">Data de Início</label>
+                         <input 
+                           type="date" 
+                           value={customStart} 
+                           onChange={e => setCustomStart(e.target.value)} 
+                           className="bg-[#050505] border border-[#222225] text-white px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-[#8E9299]" 
+                         />
+                       </div>
+                       <div className="flex flex-col gap-1">
+                         <label className="text-xs text-[#8E9299]">Data de Fim</label>
+                         <input 
+                           type="date" 
+                           value={customEnd} 
+                           onChange={e => setCustomEnd(e.target.value)} 
+                           className="bg-[#050505] border border-[#222225] text-white px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-[#8E9299]" 
+                         />
+                       </div>
+                       <button 
+                         onClick={() => {
+                           setAppliedCustomDate({ start: customStart, end: customEnd });
+                           setIsDateDropdownOpen(false);
+                         }}
+                         className="mt-1 bg-white text-black py-2 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors"
+                       >
+                         Aplicar Filtro
+                       </button>
+                     </div>
+                   )}
+                </div>
+              )}
+            </div>
+            
+            <button className="flex items-center gap-2 px-4 py-2 ml-2 rounded-full border border-[#222225] bg-[#111113] hover:bg-[#1A1A1D] transition-colors text-sm font-medium">
+              <Filter className="w-4 h-4 text-[#8E9299]" />
+              <span>Filtros</span>
             </button>
           </div>
         </div>
@@ -232,7 +361,7 @@ export default function App() {
             <div className="flex-1">
               <h3 className="text-xl font-medium mb-2">Conectar Google Analytics</h3>
               <p className="text-sm text-[#8E9299] max-w-2xl mb-4">
-                Para visualizar seus dados reais da propriedade Connect (326638842), conecte sua conta Google. Esta autorização é segura e usada apenas para leitura de dados de relatórios. Ela será salva no seu navegador para que você não precise aprovar toda vez.
+                Para visualizar seus dados reais da propriedade {selectedCompany.name} ({propertyId}), conecte sua conta Google. Esta autorização é segura e usada apenas para leitura de dados de relatórios. Ela será salva no seu navegador para que você não precise aprovar toda vez.
               </p>
             </div>
             <button 
@@ -260,171 +389,116 @@ export default function App() {
         </div>
 
         {/* KPIs Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           {kpis.map((kpi, idx) => (
-            <Card key={idx} className="relative overflow-hidden group hover:border-[#333338] transition-colors">
-              <div className="flex justify-between items-start mb-4">
+            <Card key={idx} className="relative overflow-hidden group hover:border-[#333338] transition-colors p-5">
+              <div className="flex justify-between items-start mb-3">
                 <div className="p-2 bg-[#1A1A1D] rounded-lg group-hover:bg-[#222225] transition-colors">
                   <kpi.icon className="w-5 h-5 text-[#8E9299]" />
                 </div>
-                <div className={`flex items-center gap-1 text-sm font-medium ${kpi.isUp ? 'text-emerald-400' : 'text-rose-400'}`}>
-                  {kpi.isUp ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
-                  {kpi.trend}
-                </div>
               </div>
               <div>
-                <p className="text-sm text-[#8E9299] mb-1 font-medium">{kpi.title}</p>
-                <h3 className="text-3xl font-semibold tracking-tight">{kpi.value}</h3>
+                <p className="text-xs text-[#8E9299] mb-1 font-medium">{kpi.title}</p>
+                <h3 className="text-2xl font-semibold tracking-tight">{kpi.value}</h3>
+                <p className="text-xs text-[#52525B] mt-1">{kpi.trend}</p>
               </div>
               <div className="absolute -right-6 -bottom-6 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
-                <kpi.icon className="w-32 h-32" />
+                <kpi.icon className="w-24 h-24" />
               </div>
             </Card>
           ))}
         </div>
 
-        {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* Main Area Chart */}
-          <Card className="lg:col-span-2">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h3 className="text-lg font-medium">Conversions by Source</h3>
-                <p className="text-sm text-[#8E9299]">Daily progression aggregated from Meta, Google, and Analytics.</p>
-              </div>
-            </div>
-            <div className="h-[320px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={performanceData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorOrganic" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorMeta" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorGoogle" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#F43F5E" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#F43F5E" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#222225" vertical={false} />
-                  <XAxis 
-                    dataKey="date" 
-                    stroke="#8E9299" 
-                    fontSize={12} 
-                    tickLine={false} 
-                    axisLine={false} 
-                    dy={10}
-                  />
-                  <YAxis 
-                    stroke="#8E9299" 
-                    fontSize={12} 
-                    tickLine={false} 
-                    axisLine={false} 
-                    tickFormatter={(value) => `${value}`}
-                  />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#111113', borderColor: '#222225', borderRadius: '12px', color: '#fff' }}
-                    itemStyle={{ color: '#E4E3E0' }}
-                  />
-                  <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '20px' }} />
-                  <Area type="monotone" dataKey="google" name="Google Ads" stroke="#F43F5E" strokeWidth={2} fillOpacity={1} fill="url(#colorGoogle)" />
-                  <Area type="monotone" dataKey="meta" name="Meta Ads" stroke="#3B82F6" strokeWidth={2} fillOpacity={1} fill="url(#colorMeta)" />
-                  <Area type="monotone" dataKey="organic" name="Organic Search" stroke="#10B981" strokeWidth={2} fillOpacity={1} fill="url(#colorOrganic)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </Card>
-
-          {/* Distribution Pie Chart */}
-          <Card>
-            <h3 className="text-lg font-medium mb-1">Source Distribution</h3>
-            <p className="text-sm text-[#8E9299] mb-6">Total conversion split.</p>
-            <div className="h-[240px] w-full flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={sourceDistribution}
-                    innerRadius={70}
-                    outerRadius={100}
-                    paddingAngle={4}
-                    dataKey="value"
-                    stroke="none"
-                  >
-                    {sourceDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#111113', borderColor: '#222225', borderRadius: '12px', color: '#fff' }}
-                    itemStyle={{ color: '#E4E3E0' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+        {/* Channels Breakdown */}
+        {dataStatus === 'success' && (
+          <div className="space-y-6 mt-8">
+            <h2 className="text-2xl font-light tracking-tight mb-4 border-b border-[#222225] pb-2">
+              Detalhamento de Canais
+            </h2>
             
-            <div className="space-y-3 mt-4">
-              {sourceDistribution.map((item, idx) => (
-                <div key={idx} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                    <span className="text-[#E4E3E0]">{item.name}</span>
+            {[
+              { id: 'meta', name: 'Meta Ads', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
+              { id: 'google', name: 'Google Ads', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20' },
+              { id: 'organic', name: 'Tráfego Orgânico / Direto', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' }
+            ].map(channel => {
+              const data = channelData[channel.id];
+              if (!data) return null;
+              
+              const cr = data.sessions > 0 ? (data.sales + data.leads) / data.sessions * 100 : 0;
+              const roas = data.cost > 0 ? data.revenue / data.cost : 0;
+              const cpl = data.leads > 0 ? data.cost / data.leads : 0;
+
+              return (
+                <Card key={channel.id} className="p-0 overflow-hidden border border-[#222225]">
+                  <div className="p-5 border-b border-[#222225] flex justify-between items-center bg-[#0A0A0A]">
+                    <div className="flex items-center gap-3">
+                      <span className={`px-3 py-1 text-xs font-medium rounded-full border ${channel.color}`}>
+                        {channel.name}
+                      </span>
+                      {data.cost === 0 && channel.id !== 'organic' && (
+                        <span className="text-[10px] text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                          ⚠️ Sem dados de custo no GA4
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <span className="font-medium">{item.value}%</span>
-                </div>
-              ))}
-            </div>
-          </Card>
+                  <div className="grid grid-cols-2 md:grid-cols-6 divide-x divide-y md:divide-y-0 divide-[#222225] bg-[#111113]">
+                    <div className="p-4 flex flex-col justify-center">
+                      <span className="text-xs text-[#8E9299] font-medium mb-1">Receita Gerada</span>
+                      <span className="text-lg font-semibold">R$ {data.revenue.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                    </div>
+                    <div className="p-4 flex flex-col justify-center">
+                      <span className="text-xs text-[#8E9299] font-medium mb-1">ROAS</span>
+                      <span className="text-lg font-semibold">{roas.toFixed(2)}x</span>
+                    </div>
+                    <div className="p-4 flex flex-col justify-center">
+                      <span className="text-xs text-[#8E9299] font-medium mb-1">Taxa de Conversão</span>
+                      <span className="text-lg font-semibold">{cr.toFixed(2)}%</span>
+                    </div>
+                    <div className="p-4 flex flex-col justify-center">
+                      <span className="text-xs text-[#8E9299] font-medium mb-1">Leads Gerados</span>
+                      <span className="text-lg font-semibold">{data.leads}</span>
+                    </div>
+                    <div className="p-4 flex flex-col justify-center">
+                      <span className="text-xs text-[#8E9299] font-medium mb-1">Custo por Lead (CPL)</span>
+                      <span className="text-lg font-semibold">R$ {cpl.toFixed(2)}</span>
+                    </div>
+                    <div className="p-4 flex flex-col justify-center">
+                      <span className="text-xs text-[#8E9299] font-medium mb-1">Vendas (Qtd)</span>
+                      <span className="text-lg font-semibold">{data.sales}</span>
+                    </div>
+                  </div>
 
-        </div>
-
-        {/* Data Grid / Campaigns */}
-        <Card className="p-0 overflow-hidden">
-          <div className="p-6 border-b border-[#222225]">
-            <h3 className="text-lg font-medium">Top Active Campaigns</h3>
-            <p className="text-sm text-[#8E9299]">Performance breakdown for the leading acquisition channels.</p>
+                  {data.products && data.products.length > 0 && (
+                    <div className="p-5 bg-[#050505] border-t border-[#222225]">
+                      <h4 className="text-sm font-medium mb-3 text-[#A1A1AA]">Produtos Vendidos</h4>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                          <thead>
+                            <tr>
+                              <th className="text-xs font-medium text-[#52525B] pb-2 uppercase tracking-wide">Produto</th>
+                              <th className="text-xs font-medium text-[#52525B] pb-2 uppercase tracking-wide text-right">Qtd</th>
+                              <th className="text-xs font-medium text-[#52525B] pb-2 uppercase tracking-wide text-right">Receita</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#222225]">
+                            {data.products.map((p: any, i: number) => (
+                              <tr key={i} className="hover:bg-[#111113] transition-colors">
+                                <td className="py-2 text-sm text-[#E4E3E0] max-w-[200px] truncate">{p.name}</td>
+                                <td className="py-2 text-sm text-right font-mono text-[#8E9299]">{p.qty}</td>
+                                <td className="py-2 text-sm text-right font-mono text-[#8E9299]">R$ {p.rev.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-[#0A0A0A]/50">
-                  <th className="font-mono text-xs text-[#8E9299] font-medium uppercase tracking-wider py-4 px-6 border-b border-[#222225]">Campaign Name</th>
-                  <th className="font-mono text-xs text-[#8E9299] font-medium uppercase tracking-wider py-4 px-6 border-b border-[#222225]">Platform</th>
-                  <th className="font-mono text-xs text-[#8E9299] font-medium uppercase tracking-wider py-4 px-6 border-b border-[#222225] text-right">Spend</th>
-                  <th className="font-mono text-xs text-[#8E9299] font-medium uppercase tracking-wider py-4 px-6 border-b border-[#222225] text-right">Convs</th>
-                  <th className="font-mono text-xs text-[#8E9299] font-medium uppercase tracking-wider py-4 px-6 border-b border-[#222225] text-right">CPA</th>
-                  <th className="font-mono text-xs text-[#8E9299] font-medium uppercase tracking-wider py-4 px-6 border-b border-[#222225] text-right">ROAS</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#222225]">
-                {campaignData.map((camp) => (
-                  <tr key={camp.id} className="hover:bg-[#1A1A1D] transition-colors group cursor-pointer text-sm">
-                    <td className="py-4 px-6 font-medium text-[#E4E3E0]">{camp.name}</td>
-                    <td className="py-4 px-6">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-opacity-10 ${
-                        camp.platform === 'Meta' ? 'bg-blue-500 text-blue-400' : 'bg-rose-500 text-rose-400'
-                      }`}>
-                        {camp.platform}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6 text-right font-mono text-[#8E9299]">R$ {camp.spend.toLocaleString()}</td>
-                    <td className="py-4 px-6 text-right font-medium">{camp.conversions}</td>
-                    <td className="py-4 px-6 text-right font-mono text-[#8E9299]">R$ {camp.cpa.toFixed(2)}</td>
-                    <td className="py-4 px-6 text-right">
-                      <span className={`font-mono ${camp.roas > 3 ? 'text-emerald-400' : 'text-[#8E9299]'}`}>
-                        {camp.roas.toFixed(1)}x
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
+        )}
       </main>
     </div>
   );
