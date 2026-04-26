@@ -104,9 +104,16 @@ export default function App() {
         const res = await fetch(url, {
             headers: { 'Authorization': `Bearer ${JSON.stringify(tokens)}` }
         });
-        const data = await res.json();
         
-        if (data.status === 'success') {
+        let data;
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+          data = await res.json();
+        } else {
+          throw new Error('API returned non-JSON response');
+        }
+        
+        if (res.ok && data.status === 'success') {
           setDataStatus('success');
           console.log("Real GA4 Data received:", data.data);
 
@@ -124,6 +131,8 @@ export default function App() {
               // Process Sources
               console.log("Raw Sources from GA4:", srcRows.map((r: any) => ({
                 source: r.dimensionValues?.[0]?.value,
+                medium: r.dimensionValues?.[1]?.value,
+                campaign: r.dimensionValues?.[2]?.value,
                 sessions: r.metricValues?.[0]?.value,
                 revenue: r.metricValues?.[3]?.value,
                 cost: r.metricValues?.[4]?.value
@@ -131,6 +140,9 @@ export default function App() {
 
               srcRows.forEach((row: any) => {
                 const source = (row.dimensionValues?.[0]?.value || 'direct').toLowerCase();
+                const medium = (row.dimensionValues?.[1]?.value || '(none)').toLowerCase();
+                const campaign = (row.dimensionValues?.[2]?.value || '').toLowerCase();
+                
                 const sessions = parseInt(row.metricValues?.[0]?.value || '0', 10);
                 const conversions = parseInt(row.metricValues?.[1]?.value || '0', 10);
                 const sales = parseInt(row.metricValues?.[2]?.value || '0', 10);
@@ -141,18 +153,26 @@ export default function App() {
                 if (leads === 0 && conversions > 0 && sales === 0) leads = conversions; 
 
                 let cat = 'organic';
+                const searchStr = `${source} ${medium} ${campaign}`;
+                
                 // Detect Google Ads
-                if (source.includes('google') || source.includes('cpc') || source.includes('ads') || source.includes('gclid')) {
+                if (
+                    searchStr.includes('google') || 
+                    searchStr.includes('cpc') || 
+                    searchStr.includes('ads') || 
+                    searchStr.includes('gclid') ||
+                    source === 'google' && medium === 'cpc'
+                ) {
                   cat = 'google';
                 } 
                 // Detect Meta Ads (Facebook/Instagram) - Including common referral patterns
                 else if (
-                  source.includes('fb') || 
-                  source.includes('meta') || 
-                  source.includes('ig') || 
-                  source.includes('instagram') || 
-                  source.includes('facebook') || 
-                  source.includes('messenger')
+                  searchStr.includes('fb') || 
+                  searchStr.includes('meta') || 
+                  searchStr.includes('ig') || 
+                  searchStr.includes('instagram') || 
+                  searchStr.includes('facebook') || 
+                  searchStr.includes('messenger')
                 ) {
                   cat = 'meta';
                 }
@@ -174,7 +194,9 @@ export default function App() {
               // Process Items
               itmRows.forEach((row: any) => {
                 const source = (row.dimensionValues?.[0]?.value || 'direct').toLowerCase();
-                const itemName = row.dimensionValues?.[1]?.value || 'Unknown Product';
+                const medium = (row.dimensionValues?.[1]?.value || '(none)').toLowerCase();
+                // itemName is now at index 2
+                const itemName = row.dimensionValues?.[2]?.value || 'Unknown Product';
                 if (itemName === '(not set)') return;
 
                 const qty = parseInt(row.metricValues?.[0]?.value || '0', 10);
@@ -183,8 +205,16 @@ export default function App() {
                 if (qty === 0 && rev === 0) return;
 
                 let cat = 'organic';
-                if (source.includes('google') || source.includes('cpc') || source.includes('ads')) cat = 'google';
-                else if (source.includes('fb') || source.includes('meta') || source.includes('ig') || source.includes('instagram')) cat = 'meta';
+                const searchStr = `${source} ${medium}`;
+                
+                if (searchStr.includes('google') || searchStr.includes('cpc') || searchStr.includes('ads')) cat = 'google';
+                else if (
+                    searchStr.includes('fb') || 
+                    searchStr.includes('meta') || 
+                    searchStr.includes('ig') || 
+                    searchStr.includes('instagram') ||
+                    searchStr.includes('facebook')
+                ) cat = 'meta';
 
                 const pMap = (agg[cat as keyof typeof agg] as any).products;
                 if (!pMap.has(itemName)) {
@@ -222,12 +252,21 @@ export default function App() {
 
         } else {
           setDataStatus('error');
-          setErrorMessage(data.error || 'Failed to load');
+          const errorMsg = data?.error || 'Failed to load';
+          setErrorMessage(errorMsg);
+          
+          if (errorMsg.includes('refresh_token') || errorMsg.includes('Invalud session token') || !res.ok) {
+            handleDisconnect();
+          }
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error(err);
         setDataStatus('error');
         setErrorMessage('Network error connecting to Backend.');
+        
+        if (err.message === 'API returned non-JSON response') {
+           handleDisconnect();
+        }
       }
     };
 
@@ -245,6 +284,7 @@ export default function App() {
         if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
           localStorage.setItem('ga4_tokens', JSON.stringify(event.data.tokens));
           setTokens(event.data.tokens);
+          setDataStatus('loading');
           window.removeEventListener('message', handleMessage);
         }
       };
@@ -253,8 +293,14 @@ export default function App() {
     } catch (error) {
       console.error('OAuth error:', error);
       setDataStatus('error');
-      setErrorMessage('Failed to initiate login');
+      setErrorMessage('Falha ao iniciar login');
     }
+  };
+
+  const handleDisconnect = () => {
+    localStorage.removeItem('ga4_tokens');
+    setTokens(null);
+    setDataStatus('logged_out');
   };
 
   return (
@@ -281,6 +327,17 @@ export default function App() {
                    <span className="text-sm font-medium">{company.name}</span>
                  </button>
               ))}
+              {tokens && (
+                <div className="p-2 border-t border-[#222225]">
+                  <button 
+                    onClick={handleDisconnect}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors"
+                  >
+                    <KeyRound className="w-3 h-3" />
+                    Desconectar Google
+                  </button>
+                </div>
+              )}
             </div>
           </div>
           
@@ -436,9 +493,16 @@ export default function App() {
                         {channel.name}
                       </span>
                       {data.cost === 0 && channel.id !== 'organic' && (
-                        <span className="text-[10px] text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
-                          ⚠️ Sem dados de custo no GA4
-                        </span>
+                        <div className="group relative flex items-center">
+                          <span className="text-[10px] text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 cursor-help">
+                            ⚠️ Sem dados de custo no GA4
+                          </span>
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-64 p-3 bg-gray-900 border border-gray-700 rounded-lg shadow-xl text-xs text-gray-300 z-50">
+                            <p className="font-semibold text-white mb-1">Como enviar o custo da Meta para o GA4?</p>
+                            <p className="mb-2">O GA4 só importa custos automaticamente do Google Ads. Para Facebook/Meta Ads, o GTM não lê essas informações.</p>
+                            <p>Você precisa usar o <b>Data Import do GA4</b> (Admin &gt; Data Import &gt; Cost Data) enviando um CSV (manualmente ou via ferramentas como API, Zapier, Supermetrics, etc).</p>
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>

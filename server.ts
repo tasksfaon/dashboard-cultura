@@ -126,17 +126,29 @@ async function startServer() {
     // Use token for GA4
     try {
       const tokens = JSON.parse(tokenStr);
-      oauth2Client.setCredentials(tokens);
+      console.log("Token structure keys:", Object.keys(tokens));
+
+      if (!tokens.refresh_token) {
+        console.warn("Missing refresh_token in credentials. Forcing re-auth.");
+        return res.status(401).json({ status: "error", error: "refresh_token_missing" });
+      }
+
+      // Re-create client per request to ensure fresh credentials state
+      const requestAuth = new OAuth2Client(
+          process.env.OAUTH_CLIENT_ID,
+          process.env.OAUTH_CLIENT_SECRET
+      );
+      requestAuth.setCredentials(tokens);
 
       const analyticsDataClient = new BetaAnalyticsDataClient({
-        authClient: oauth2Client
+        authClient: requestAuth
       });
 
-      console.log("Running GA4 source report...");
+      console.log("Running GA4 source report for property:", propertyId);
       const [sourceResponse] = await analyticsDataClient.runReport({
         property: `properties/${propertyId}`,
         dateRanges: [{ startDate: startDate, endDate: endDate }],
-        dimensions: [{ name: 'sessionSourceMedium' }],
+        dimensions: [{ name: 'sessionSource' }, { name: 'sessionMedium' }, { name: 'sessionCampaignName' }],
         metrics: [
           { name: 'sessions' }, 
           { name: 'conversions' },
@@ -150,7 +162,7 @@ async function startServer() {
       const [itemResponse] = await analyticsDataClient.runReport({
         property: `properties/${propertyId}`,
         dateRanges: [{ startDate: startDate, endDate: endDate }],
-        dimensions: [{ name: 'sessionSourceMedium' }, { name: 'itemName' }],
+        dimensions: [{ name: 'sessionSource' }, { name: 'sessionMedium' }, { name: 'itemName' }],
         metrics: [
           { name: 'itemsPurchased' },
           { name: 'itemRevenue' }
