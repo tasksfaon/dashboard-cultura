@@ -1,8 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import { 
   TrendingUp, Users, DollarSign, Activity, Focus,
-  ArrowUpRight, ArrowDownRight, Filter, CalendarDays, Loader2, KeyRound, ChevronDown
+  ArrowUpRight, ArrowDownRight, Filter, CalendarDays, Loader2, KeyRound, ChevronDown, ChevronRight, PieChart as PieChartIcon, BarChart2,
+  Zap, Target, ShoppingCart, Award
 } from 'lucide-react';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell, AreaChart, Area
+} from 'recharts';
+
+const COLORS = {
+  meta: '#3b82f6', // blue-500
+  google: '#f43f5e', // rose-500
+  organic: '#10b981', // emerald-500
+};
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-[#111113] border border-[#222225] p-3 rounded-lg shadow-xl outline-none">
+        <p className="text-[#FAFAFA] font-medium mb-2">{label}</p>
+        {payload.map((entry: any, index: number) => (
+           <div key={index} className="flex items-center justify-between gap-4 text-sm mb-1">
+             <div className="flex items-center gap-2">
+               <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+               <span className="text-[#8E9299]">{entry.name}</span>
+             </div>
+             <span className="font-mono text-white">R$ {Number(entry.value).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+           </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
 
 // --- MOCK DATA ---
 const mockKpis = [
@@ -18,6 +49,53 @@ const Card = ({ children, className = '', ...props }: React.HTMLAttributes<HTMLD
     {children}
   </div>
 );
+
+const ProductRow: React.FC<{ p: any }> = ({ p }) => {
+  const [expanded, setExpanded] = useState(false);
+  const roas = p.cost > 0 ? p.rev / p.cost : 0;
+  return (
+    <React.Fragment>
+      <tr onClick={() => setExpanded(!expanded)} className="hover:bg-[#111113] transition-colors cursor-pointer group border-b border-[#222225]/50">
+        <td className="p-4 text-xs text-[#E4E3E0] max-w-[200px] truncate" title={p.name}>
+          <div className="flex items-center gap-2">
+            <ChevronRight className={`w-3 h-3 shrink-0 text-gray-500 transition-transform ${expanded ? 'rotate-90' : ''}`} />
+            <div className="flex flex-col">
+              <span className="truncate font-medium">{p.name}</span>
+              <span className="text-[10px] text-[#52525B]">Sessões: {p.sessions || 0}</span>
+            </div>
+          </div>
+        </td>
+        <td className="p-4 text-xs text-right font-mono text-[#8E9299]">{p.qty}</td>
+        <td className="p-4 text-xs text-right font-mono">
+           <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${roas > 3 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-gray-500/10 text-gray-400'}`}>
+             {roas > 0 ? `${roas.toFixed(1)}x` : '-'}
+           </span>
+        </td>
+        <td className="p-4 text-xs text-right font-mono text-emerald-400 font-semibold">R$ {p.rev.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+      </tr>
+      {expanded && p.campaigns && p.campaigns.length > 0 && (
+        <tr className="bg-[#0f0f11]">
+          <td colSpan={4} className="p-0">
+            <div className="px-4 py-3 border-l-2 border-[#333] ml-4 bg-[#0a0a0a]">
+              <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-2 font-medium">Vendas por Campanha/Origem</div>
+              <div className="space-y-2">
+                {p.campaigns.map((c: any, idx: number) => (
+                  <div key={idx} className="flex justify-between items-center text-xs">
+                    <span className="text-gray-400 truncate pr-2 max-w-[180px]" title={c.name}>{c.name}</span>
+                    <div className="flex space-x-4 shrink-0 text-right">
+                      <span className="font-mono text-gray-500 w-8">{c.qty} un</span>
+                      <span className="font-mono text-emerald-500/80 w-20">R$ {c.rev.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+    </React.Fragment>
+  );
+};
 
 export default function App() {
   const [dataStatus, setDataStatus] = useState<'loading' | 'needs_setup' | 'logged_out' | 'success' | 'error'>('loading');
@@ -118,30 +196,22 @@ export default function App() {
           console.log("Real GA4 Data received:", data.data);
 
             if (data.data && data.data.sources && data.data.sources.rows) {
-              const srcRows = data.data.sources.rows;
+              const srcRows = data.data.sources.rows || [];
+              const campRows = data.data.campaigns?.rows || [];
               const itmRows = data.data.items?.rows || [];
+              const winningAds: any[] = [];
 
               const agg = {
-                meta: { revenue: 0, sales: 0, leads: 0, sessions: 0, cost: 0, products: new Map<string, {qty: number, rev: number}>() },
-                google: { revenue: 0, sales: 0, leads: 0, sessions: 0, cost: 0, products: new Map<string, {qty: number, rev: number}>() },
-                organic: { revenue: 0, sales: 0, leads: 0, sessions: 0, cost: 0, products: new Map<string, {qty: number, rev: number}>() },
+                meta: { revenue: 0, sales: 0, leads: 0, sessions: 0, cost: 0, products: new Map<string, {qty: number, rev: number, sessions: number, cost: number, campaigns: any[]}>(), campaigns: new Map<string, {sales: number, rev: number, leads: number}>() },
+                google: { revenue: 0, sales: 0, leads: 0, sessions: 0, cost: 0, products: new Map<string, {qty: number, rev: number, sessions: number, cost: number, campaigns: any[]}>(), campaigns: new Map<string, {sales: number, rev: number, leads: number}>() },
+                organic: { revenue: 0, sales: 0, leads: 0, sessions: 0, cost: 0, products: new Map<string, {qty: number, rev: number, sessions: number, cost: number, campaigns: any[]}>(), campaigns: new Map<string, {sales: number, rev: number, leads: number}>() },
                 total: { revenue: 0, sales: 0, leads: 0, sessions: 0, cost: 0 }
               };
 
-              // Process Sources
-              console.log("Raw Sources from GA4:", srcRows.map((r: any) => ({
-                source: r.dimensionValues?.[0]?.value,
-                medium: r.dimensionValues?.[1]?.value,
-                campaign: r.dimensionValues?.[2]?.value,
-                sessions: r.metricValues?.[0]?.value,
-                revenue: r.metricValues?.[3]?.value,
-                cost: r.metricValues?.[4]?.value
-              })));
-
+              // 1. Process Channel Totals & Costs
               srcRows.forEach((row: any) => {
                 const source = (row.dimensionValues?.[0]?.value || 'direct').toLowerCase();
                 const medium = (row.dimensionValues?.[1]?.value || '(none)').toLowerCase();
-                const campaign = (row.dimensionValues?.[2]?.value || '').toLowerCase();
                 
                 const sessions = parseInt(row.metricValues?.[0]?.value || '0', 10);
                 const conversions = parseInt(row.metricValues?.[1]?.value || '0', 10);
@@ -153,27 +223,11 @@ export default function App() {
                 if (leads === 0 && conversions > 0 && sales === 0) leads = conversions; 
 
                 let cat = 'organic';
-                const searchStr = `${source} ${medium} ${campaign}`;
+                const searchStr = `${source} ${medium}`;
                 
-                // Detect Google Ads
-                if (
-                    searchStr.includes('google') || 
-                    searchStr.includes('cpc') || 
-                    searchStr.includes('ads') || 
-                    searchStr.includes('gclid') ||
-                    source === 'google' && medium === 'cpc'
-                ) {
+                if (searchStr.includes('google') || searchStr.includes('cpc') || searchStr.includes('ads') || searchStr.includes('gclid') || (source === 'google' && medium === 'cpc')) {
                   cat = 'google';
-                } 
-                // Detect Meta Ads (Facebook/Instagram) - Including common referral patterns
-                else if (
-                  searchStr.includes('fb') || 
-                  searchStr.includes('meta') || 
-                  searchStr.includes('ig') || 
-                  searchStr.includes('instagram') || 
-                  searchStr.includes('facebook') || 
-                  searchStr.includes('messenger')
-                ) {
+                } else if (searchStr.includes('fb') || searchStr.includes('meta') || searchStr.includes('ig') || searchStr.includes('instagram') || searchStr.includes('facebook') || searchStr.includes('messenger')) {
                   cat = 'meta';
                 }
 
@@ -191,12 +245,64 @@ export default function App() {
                 agg.total.cost += cost;
               });
 
-              // Process Items
+              // 2. Process Campaigns
+              campRows.forEach((row: any) => {
+                const source = (row.dimensionValues?.[0]?.value || 'direct').toLowerCase();
+                const medium = (row.dimensionValues?.[1]?.value || '(none)').toLowerCase();
+                const campaign = (row.dimensionValues?.[2]?.value || '').toLowerCase();
+                const adContent = (row.dimensionValues?.[3]?.value || '').toLowerCase();
+                
+                const conversions = parseInt(row.metricValues?.[1]?.value || '0', 10);
+                const sales = parseInt(row.metricValues?.[2]?.value || '0', 10);
+                const revenue = parseFloat(row.metricValues?.[3]?.value || '0');
+                
+                let leads = Math.max(0, conversions - sales);
+                if (leads === 0 && conversions > 0 && sales === 0) leads = conversions; 
+
+                let cat = 'organic';
+                const searchStr = `${source} ${medium} ${campaign}`;
+                
+                if (searchStr.includes('google') || searchStr.includes('cpc') || searchStr.includes('ads') || searchStr.includes('gclid') || (source === 'google' && medium === 'cpc')) {
+                  cat = 'google';
+                } else if (searchStr.includes('fb') || searchStr.includes('meta') || searchStr.includes('ig') || searchStr.includes('instagram') || searchStr.includes('facebook') || searchStr.includes('messenger')) {
+                  cat = 'meta';
+                }
+
+                const target = agg[cat as keyof typeof agg] as any;
+
+                if (sales > 0 || revenue > 0 || leads > 0) {
+                  let campName = campaign;
+                  if (!campName || campName === '(not set)') campName = `${source} / ${medium}`;
+                  if (adContent && adContent !== '(not set)') campName += ` (Anúncio: ${adContent})`;
+                  
+                  const cMap = target.campaigns;
+                  if (!cMap.has(campName)) {
+                    cMap.set(campName, { sales: 0, rev: 0, leads: 0 });
+                  }
+                  const c = cMap.get(campName);
+                  c.sales += sales;
+                  c.rev += revenue;
+                  c.leads += leads;
+
+                  if (sales > 0 && revenue > 0) {
+                    winningAds.push({
+                      name: campName,
+                      sales,
+                      rev: revenue,
+                      source: cat,
+                      roas: 0 // Will assign later if we have cost rows
+                    });
+                  }
+                }
+              });
+
+              // 3. Process Items
               itmRows.forEach((row: any) => {
                 const source = (row.dimensionValues?.[0]?.value || 'direct').toLowerCase();
                 const medium = (row.dimensionValues?.[1]?.value || '(none)').toLowerCase();
-                // itemName is now at index 2
-                const itemName = row.dimensionValues?.[2]?.value || 'Unknown Product';
+                const campaign = (row.dimensionValues?.[2]?.value || '').toLowerCase();
+                const adContent = (row.dimensionValues?.[3]?.value || '').toLowerCase();
+                const itemName = row.dimensionValues?.[4]?.value || 'Unknown Product';
                 if (itemName === '(not set)') return;
 
                 const qty = parseInt(row.metricValues?.[0]?.value || '0', 10);
@@ -205,7 +311,7 @@ export default function App() {
                 if (qty === 0 && rev === 0) return;
 
                 let cat = 'organic';
-                const searchStr = `${source} ${medium}`;
+                const searchStr = `${source} ${medium} ${campaign}`;
                 
                 if (searchStr.includes('google') || searchStr.includes('cpc') || searchStr.includes('ads')) cat = 'google';
                 else if (
@@ -218,11 +324,25 @@ export default function App() {
 
                 const pMap = (agg[cat as keyof typeof agg] as any).products;
                 if (!pMap.has(itemName)) {
-                  pMap.set(itemName, { qty: 0, rev: 0 });
+                  pMap.set(itemName, { qty: 0, rev: 0, sessions: 0, cost: 0, campaigns: [] });
                 }
                 const p = pMap.get(itemName);
                 p.qty += qty;
                 p.rev += rev;
+                
+                let campName = campaign;
+                if (!campName || campName === '(not set)') campName = `${source} / ${medium}`;
+                if (adContent && adContent !== '(not set)') campName += ` (Anúncio: ${adContent})`;
+                
+                const existingCamp = p.campaigns.find((c: any) => c.name === campName);
+                if (existingCamp) {
+                    existingCamp.qty += qty;
+                    existingCamp.rev += rev;
+                } else {
+                    p.campaigns.push({ name: campName, qty, rev });
+                }
+                
+                p.campaigns.sort((a: any, b: any) => b.rev - a.rev || b.qty - a.qty);
               });
 
               // Convert product maps to sorted arrays
@@ -230,23 +350,29 @@ export default function App() {
                   .map(([name, data]) => ({ name, ...data }))
                   .sort((a, b) => b.rev - a.rev);
 
+              const formatCampaigns = (map: Map<string, any>) => Array.from(map.entries())
+                  .map(([name, data]) => ({ name, ...data }))
+                  .sort((a, b) => b.rev - a.rev || b.leads - a.leads);
+
               setChannelData({
-                meta: { ...agg.meta, products: formatProducts(agg.meta.products) },
-                google: { ...agg.google, products: formatProducts(agg.google.products) },
-                organic: { ...agg.organic, products: formatProducts(agg.organic.products) },
-                total: agg.total
+                meta: { ...agg.meta, products: formatProducts(agg.meta.products), campaigns: formatCampaigns(agg.meta.campaigns) },
+                google: { ...agg.google, products: formatProducts(agg.google.products), campaigns: formatCampaigns(agg.google.campaigns) },
+                organic: { ...agg.organic, products: formatProducts(agg.organic.products), campaigns: formatCampaigns(agg.organic.campaigns) },
+                total: agg.total,
+                winners: winningAds.sort((a, b) => b.rev - a.rev).slice(0, 10)
               });
 
-              const totalCR = agg.total.sessions > 0 ? (agg.total.sales + agg.total.leads) / agg.total.sessions * 100 : 0;
+              const totalCR = agg.total.sessions > 0 ? agg.total.sales / agg.total.sessions * 100 : 0;
               const totalROAS = agg.total.cost > 0 ? agg.total.revenue / agg.total.cost : 0;
               const totalCPL = agg.total.leads > 0 ? agg.total.cost / agg.total.leads : 0;
+              const totalCPA = agg.total.sales > 0 ? agg.total.cost / agg.total.sales : 0;
 
               setKpis([
-                { title: 'Receita Total', value: `R$ ${agg.total.revenue.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, trend: 'Exato', isUp: true, icon: DollarSign },
-                { title: 'ROAS Geral', value: `${totalROAS.toFixed(2)}x`, trend: 'Baseado no GA4', isUp: totalROAS > 2, icon: Activity },
-                { title: 'Leads Totais', value: agg.total.leads.toString(), trend: 'Todas as origens', isUp: true, icon: Users },
-                { title: 'Custo por Lead (CPL)', value: `R$ ${totalCPL.toFixed(2)}`, trend: 'Média Geral', isUp: false, icon: Focus },
-                { title: 'Taxa Conv. Geral', value: `${totalCR.toFixed(2)}%`, trend: `de ${agg.total.sessions} sessões`, isUp: true, icon: TrendingUp },
+                { title: 'Receita Total', value: `R$ ${agg.total.revenue.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, trend: 'Faturamento Blended', isUp: true, icon: DollarSign },
+                { title: 'ROAS Geral', value: `${totalROAS.toFixed(2)}x`, trend: 'Retorno sobre o Anúncio', isUp: totalROAS >= 2, icon: Activity },
+                { title: 'Custo p/ Venda (CPA)', value: `R$ ${totalCPA.toFixed(2)}`, trend: 'Custo por Aquisição', isUp: false, icon: Focus },
+                { title: 'Taxa Conv. Global', value: `${totalCR.toFixed(2)}%`, trend: `Vendas / ${agg.total.sessions} Sessões`, isUp: true, icon: TrendingUp },
+                { title: 'Vendas Totais', value: agg.total.sales.toString(), trend: 'Todas as origens', isUp: true, icon: Users },
               ]);
             }
 
@@ -466,6 +592,148 @@ export default function App() {
           ))}
         </div>
 
+        {/* Charts and Funnel Section */}
+        {dataStatus === 'success' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+             <Card className="p-5 lg:col-span-2">
+               <div className="flex items-center justify-between mb-6">
+                 <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
+                    <BarChart2 className="w-4 h-4" /> Receita vs Custo por Canal
+                 </h4>
+               </div>
+               <div className="h-64">
+                 <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={[
+                        { name: 'Meta Ads', Receita: channelData.meta.revenue, Custo: channelData.meta.cost },
+                        { name: 'Google Ads', Receita: channelData.google.revenue, Custo: channelData.google.cost },
+                        { name: 'Orgânico', Receita: channelData.organic.revenue, Custo: 0 },
+                      ]}
+                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#222225" vertical={false} />
+                      <XAxis dataKey="name" stroke="#8E9299" fontSize={12} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#8E9299" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `R$ ${val / 1000}k`} />
+                      <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: '#1A1A1D' }} />
+                      <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', color: '#8E9299', paddingTop: '20px' }} />
+                      <Bar dataKey="Receita" fill="#10b981" radius={[4, 4, 0, 0]} barSize={40} />
+                      <Bar dataKey="Custo" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={40} />
+                    </BarChart>
+                 </ResponsiveContainer>
+               </div>
+             </Card>
+
+             <Card className="p-5">
+               <h4 className="text-sm font-medium mb-6 text-[#A1A1AA] flex items-center gap-2">
+                  <Target className="w-4 h-4" /> Funil de Infoproduto
+               </h4>
+               <div className="space-y-6">
+                  {[
+                    { label: 'Sessões Totais', value: channelData.total.sessions, color: 'bg-white/10', icon: Activity },
+                    { label: 'Criação de Leads', value: channelData.total.leads, color: 'bg-blue-500/20', icon: Users, pct: channelData.total.sessions > 0 ? (channelData.total.leads / channelData.total.sessions * 100).toFixed(1) : 0 },
+                    { label: 'Vendas Realizadas', value: channelData.total.sales, color: 'bg-emerald-500/20', icon: ShoppingCart, pct: channelData.total.leads > 0 ? (channelData.total.sales / channelData.total.leads * 100).toFixed(1) : 0 },
+                  ].map((step, i, arr) => (
+                    <div key={i} className="relative">
+                      <div className={`p-4 rounded-xl border border-white/5 ${step.color} flex items-center justify-between`}>
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-black/40 rounded-lg">
+                            <step.icon className="w-4 h-4 text-white" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-[#8E9299] uppercase font-bold">{step.label}</p>
+                            <p className="text-xl font-mono">{step.value.toLocaleString('pt-BR')}</p>
+                          </div>
+                        </div>
+                        {step.pct && (
+                          <div className="text-right">
+                            <p className="text-[10px] text-[#8E9299] mb-1 font-medium">Tx. Conversão</p>
+                            <span className="text-xs font-bold bg-white/10 px-2 py-1 rounded-md">{step.pct}%</span>
+                          </div>
+                        )}
+                      </div>
+                      {i < arr.length - 1 && (
+                        <div className="flex justify-center my-1">
+                          <ChevronDown className="w-4 h-4 text-gray-700" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+               </div>
+               <div className="mt-6 pt-6 border-t border-[#222225] flex justify-between items-center">
+                 <span className="text-xs text-[#8E9299]">Tx. de Venda Global</span>
+                 <span className="text-sm font-bold text-emerald-400">
+                    {channelData.total.sessions > 0 ? (channelData.total.sales / channelData.total.sessions * 100).toFixed(2) : 0}%
+                 </span>
+               </div>
+             </Card>
+          </div>
+        )}
+
+        {/* Winning Ads and Products Matrix */}
+        {dataStatus === 'success' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+             <Card className="p-0 overflow-hidden">
+                <div className="p-5 border-b border-[#222225] flex items-center justify-between bg-gradient-to-r from-[#111113] to-transparent">
+                   <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
+                      <Award className="w-4 h-4 text-amber-400" /> Anúncios Ganhadores (Escalar)
+                   </h4>
+                   <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded border border-emerald-500/20 font-bold">Top ROI</span>
+                </div>
+                <div className="max-h-[400px] overflow-y-auto">
+                   <table className="w-full text-left">
+                      <thead className="bg-[#111113]/50 sticky top-0 z-10">
+                        <tr>
+                          <th className="p-4 text-[10px] text-[#52525B] uppercase font-bold">Campanha / Anúncio</th>
+                          <th className="p-4 text-[10px] text-[#52525B] uppercase font-bold text-right">Vendas</th>
+                          <th className="p-4 text-[10px] text-[#52525B] uppercase font-bold text-right">Receita</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#222225]/50">
+                        {channelData.winners?.map((win: any, i: number) => (
+                           <tr key={i} className="hover:bg-white/5 transition-colors">
+                              <td className="p-4 flex items-center gap-3">
+                                 <div className={`w-1.5 h-1.5 rounded-full ${win.source === 'meta' ? 'bg-blue-500' : 'bg-rose-500'}`} />
+                                 <span className="text-xs text-[#FAFAFA] truncate max-w-[240px]" title={win.name}>{win.name}</span>
+                              </td>
+                              <td className="p-4 text-xs font-mono text-center">{win.sales}</td>
+                              <td className="p-4 text-xs font-mono text-right text-emerald-400">R$ {win.rev.toLocaleString('pt-BR')}</td>
+                           </tr>
+                        ))}
+                      </tbody>
+                   </table>
+                </div>
+             </Card>
+
+             <Card className="p-0 overflow-hidden">
+                <div className="p-5 border-b border-[#222225] flex items-center justify-between bg-gradient-to-r from-[#111113] to-transparent">
+                   <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
+                      <ShoppingCart className="w-4 h-4" /> Qual curso está vendendo?
+                   </h4>
+                   <span className="text-[10px] text-[#8E9299]">Ordenado por Receita</span>
+                </div>
+                <div className="max-h-[400px] overflow-y-auto">
+                   <table className="w-full text-left border-collapse">
+                      <thead className="bg-[#111113]/50 sticky top-0 z-10">
+                        <tr>
+                          <th className="p-4 text-[10px] text-[#52525B] uppercase font-bold">Infoproduto</th>
+                          <th className="p-4 text-[10px] text-[#52525B] uppercase font-bold text-right">Vendas</th>
+                          <th className="p-4 text-[10px] text-[#52525B] uppercase font-bold text-right">ROAS</th>
+                          <th className="p-4 text-[10px] text-[#52525B] uppercase font-bold text-right">Receita</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-[#111113]/20">
+                        {[...channelData.meta.products, ...channelData.google.products, ...channelData.organic.products]
+                          .sort((a: any, b: any) => b.rev - a.rev)
+                          .map((p: any, i: number) => (
+                            <ProductRow key={i} p={p} />
+                          ))}
+                      </tbody>
+                   </table>
+                </div>
+             </Card>
+          </div>
+        )}
+
         {/* Channels Breakdown */}
         {dataStatus === 'success' && (
           <div className="space-y-6 mt-8">
@@ -481,9 +749,10 @@ export default function App() {
               const data = channelData[channel.id];
               if (!data) return null;
               
-              const cr = data.sessions > 0 ? (data.sales + data.leads) / data.sessions * 100 : 0;
+              const cr = data.sessions > 0 ? (data.sales) / data.sessions * 100 : 0;
               const roas = data.cost > 0 ? data.revenue / data.cost : 0;
-              const cpl = data.leads > 0 ? data.cost / data.leads : 0;
+              const cpa = data.sales > 0 ? data.cost / data.sales : 0;
+              const roasColor = roas > 3 ? 'text-emerald-400' : roas >= 1.5 ? 'text-amber-400' : roas > 0 ? 'text-rose-400' : 'text-gray-400';
 
               return (
                 <Card key={channel.id} className="p-0 overflow-hidden border border-[#222225]">
@@ -512,50 +781,92 @@ export default function App() {
                       <span className="text-lg font-semibold">R$ {data.revenue.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
                     </div>
                     <div className="p-4 flex flex-col justify-center">
+                      <span className="text-xs text-[#8E9299] font-medium mb-1">Custo Total</span>
+                      <span className="text-lg font-semibold text-red-400">R$ {data.cost.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                    </div>
+                    <div className="p-4 flex flex-col justify-center">
                       <span className="text-xs text-[#8E9299] font-medium mb-1">ROAS</span>
-                      <span className="text-lg font-semibold">{roas.toFixed(2)}x</span>
-                    </div>
-                    <div className="p-4 flex flex-col justify-center">
-                      <span className="text-xs text-[#8E9299] font-medium mb-1">Taxa de Conversão</span>
-                      <span className="text-lg font-semibold">{cr.toFixed(2)}%</span>
-                    </div>
-                    <div className="p-4 flex flex-col justify-center">
-                      <span className="text-xs text-[#8E9299] font-medium mb-1">Leads Gerados</span>
-                      <span className="text-lg font-semibold">{data.leads}</span>
-                    </div>
-                    <div className="p-4 flex flex-col justify-center">
-                      <span className="text-xs text-[#8E9299] font-medium mb-1">Custo por Lead (CPL)</span>
-                      <span className="text-lg font-semibold">R$ {cpl.toFixed(2)}</span>
+                      <span className={`text-lg font-semibold ${roasColor}`}>{roas.toFixed(2)}x</span>
                     </div>
                     <div className="p-4 flex flex-col justify-center">
                       <span className="text-xs text-[#8E9299] font-medium mb-1">Vendas (Qtd)</span>
                       <span className="text-lg font-semibold">{data.sales}</span>
                     </div>
+                    <div className="p-4 flex flex-col justify-center">
+                      <span className="text-xs text-[#8E9299] font-medium mb-1">Custo por Venda (CPA)</span>
+                      <span className="text-lg font-semibold">R$ {cpa.toFixed(2)}</span>
+                    </div>
+                    <div className="p-4 flex flex-col justify-center">
+                      <span className="text-xs text-[#8E9299] font-medium mb-1">Taxa de Conversão</span>
+                      <span className="text-lg font-semibold">{cr.toFixed(2)}%</span>
+                    </div>
                   </div>
 
-                  {data.products && data.products.length > 0 && (
-                    <div className="p-5 bg-[#050505] border-t border-[#222225]">
-                      <h4 className="text-sm font-medium mb-3 text-[#A1A1AA]">Produtos Vendidos</h4>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                          <thead>
-                            <tr>
-                              <th className="text-xs font-medium text-[#52525B] pb-2 uppercase tracking-wide">Produto</th>
-                              <th className="text-xs font-medium text-[#52525B] pb-2 uppercase tracking-wide text-right">Qtd</th>
-                              <th className="text-xs font-medium text-[#52525B] pb-2 uppercase tracking-wide text-right">Receita</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-[#222225]">
-                            {data.products.map((p: any, i: number) => (
-                              <tr key={i} className="hover:bg-[#111113] transition-colors">
-                                <td className="py-2 text-sm text-[#E4E3E0] max-w-[200px] truncate">{p.name}</td>
-                                <td className="py-2 text-sm text-right font-mono text-[#8E9299]">{p.qty}</td>
-                                <td className="py-2 text-sm text-right font-mono text-[#8E9299]">R$ {p.rev.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                  {(data.products?.length > 0 || data.campaigns?.length > 0) && (
+                    <div className="p-5 bg-[#050505] border-t border-[#222225] grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {data.products && data.products.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium mb-3 text-[#A1A1AA] flex items-center gap-2">
+                            <Focus className="w-4 h-4" /> Detalhamento de Cursos (Canais)
+                          </h4>
+                          <div className="overflow-x-auto rounded-lg border border-[#222225]">
+                            <table className="w-full text-left">
+                              <thead className="bg-[#111113]">
+                                <tr>
+                                  <th className="text-[10px] font-medium text-[#8E9299] p-3 uppercase tracking-wider">Produto</th>
+                                  <th className="text-[10px] font-medium text-[#8E9299] p-3 uppercase tracking-wider text-right">Qtd</th>
+                                  <th className="text-[10px] font-medium text-[#8E9299] p-3 uppercase tracking-wider text-right">Receita</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-[#222225] bg-[#0A0A0A]">
+                                {data.products.map((p: any, i: number) => (
+                                  <ProductRow key={i} p={p} />
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {data.campaigns && data.campaigns.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium mb-3 text-[#A1A1AA] flex items-center gap-2">
+                            <TrendingUp className="w-4 h-4" /> Top Campanhas / Origens
+                          </h4>
+                          <div className="overflow-x-auto rounded-lg border border-[#222225]">
+                            <table className="w-full text-left">
+                              <thead className="bg-[#111113]">
+                                <tr>
+                                  <th className="text-[10px] font-medium text-[#8E9299] p-3 uppercase tracking-wider">Campanha</th>
+                                  <th className="text-[10px] font-medium text-[#8E9299] p-3 uppercase tracking-wider text-right w-24">Vendas</th>
+                                  <th className="text-[10px] font-medium text-[#8E9299] p-3 uppercase tracking-wider text-right w-24">Taxa %</th>
+                                  <th className="text-[10px] font-medium text-[#8E9299] p-3 uppercase tracking-wider text-right w-32">Receita</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-[#222225] bg-[#0A0A0A]">
+                                {data.campaigns.map((c: any, i: number) => {
+                                  const totalCampSales = data.sales || 1;
+                                  const pct = (c.sales / totalCampSales) * 100;
+                                  return (
+                                  <tr key={i} className="hover:bg-[#111113] transition-colors">
+                                    <td className="p-3 text-xs text-[#E4E3E0] max-w-[200px] truncate" title={c.name}>{c.name}</td>
+                                    <td className="p-3 text-xs text-right font-mono text-[#8E9299]">{c.sales}</td>
+                                    <td className="p-3 text-xs text-right font-mono text-[#8E9299]">
+                                      <div className="flex items-center justify-end gap-2">
+                                        <div className="w-12 h-1.5 bg-[#222225] rounded-full overflow-hidden">
+                                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }}></div>
+                                        </div>
+                                        <span className="w-8">{pct.toFixed(0)}%</span>
+                                      </div>
+                                    </td>
+                                    <td className="p-3 text-xs text-right font-mono text-emerald-400">R$ {c.rev.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+                                  </tr>
+                                )})}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </Card>

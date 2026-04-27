@@ -148,7 +148,7 @@ async function startServer() {
       const [sourceResponse] = await analyticsDataClient.runReport({
         property: `properties/${propertyId}`,
         dateRanges: [{ startDate: startDate, endDate: endDate }],
-        dimensions: [{ name: 'sessionSource' }, { name: 'sessionMedium' }, { name: 'sessionCampaignName' }],
+        dimensions: [{ name: 'sessionSource' }, { name: 'sessionMedium' }],
         metrics: [
           { name: 'sessions' }, 
           { name: 'conversions' },
@@ -158,11 +158,24 @@ async function startServer() {
         ],
       });
 
+      console.log("Running GA4 campaigns report...");
+      const [campaignResponse] = await analyticsDataClient.runReport({
+        property: `properties/${propertyId}`,
+        dateRanges: [{ startDate: startDate, endDate: endDate }],
+        dimensions: [{ name: 'sessionSource' }, { name: 'sessionMedium' }, { name: 'sessionCampaignName' }, { name: 'sessionManualAdContent' }],
+        metrics: [
+          { name: 'sessions' }, 
+          { name: 'conversions' },
+          { name: 'ecommercePurchases' },
+          { name: 'purchaseRevenue' }
+        ],
+      });
+
       console.log("Running GA4 items report...");
       const [itemResponse] = await analyticsDataClient.runReport({
         property: `properties/${propertyId}`,
         dateRanges: [{ startDate: startDate, endDate: endDate }],
-        dimensions: [{ name: 'sessionSource' }, { name: 'sessionMedium' }, { name: 'itemName' }],
+        dimensions: [{ name: 'sessionSource' }, { name: 'sessionMedium' }, { name: 'sessionCampaignName' }, { name: 'sessionManualAdContent' }, { name: 'itemName' }],
         metrics: [
           { name: 'itemsPurchased' },
           { name: 'itemRevenue' }
@@ -170,7 +183,7 @@ async function startServer() {
       });
       
       console.log("Reponses acquired. Sending success.");
-      res.json({ status: "success", data: { sources: sourceResponse, items: itemResponse } });
+      res.json({ status: "success", data: { sources: sourceResponse, campaigns: campaignResponse, items: itemResponse } });
     } catch (error: any) {
       console.error("GA4 Proxy Final Error:", error);
       let errorMessage = error.message || "Failed to fetch from GA4";
