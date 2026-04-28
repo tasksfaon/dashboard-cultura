@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { 
   TrendingUp, Users, DollarSign, Activity, Focus,
   ArrowUpRight, ArrowDownRight, Filter, CalendarDays, Loader2, KeyRound, ChevronDown, ChevronRight, PieChart as PieChartIcon, BarChart2,
-  Zap, Target, ShoppingCart, Award, ArrowRight
+  Zap, Target, ShoppingCart, Award
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area
 } from 'recharts';
+import { supabase } from './lib/supabase';
 
 const COLORS = {
   meta: '#3b82f6', // blue-500
@@ -45,48 +45,11 @@ const mockKpis = [
 ];
 
 // --- COMPONENTS ---
-const Card = ({ children, className = "", ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <motion.div 
-    initial={{ opacity: 0, y: 15 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.4 }}
-    className={`bg-[#0F0F12]/60 backdrop-blur-xl border border-white/[0.05] rounded-3xl shadow-2xl shadow-black/50 ${className}`}
-    {...(props as any)}
-  >
+const Card = ({ children, className = '', ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div className={`bg-[#111113] border border-[#222225] rounded-2xl p-6 ${className}`} {...props}>
     {children}
-  </motion.div>
+  </div>
 );
-
-const KpiCard = ({ title, value, trend, isUp, icon: Icon, color = "blue" }: any) => {
-  const colors: Record<string, string> = {
-    blue: "text-blue-400 bg-blue-400/10 border-blue-400/20",
-    emerald: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20",
-    rose: "text-rose-400 bg-rose-400/10 border-rose-400/20",
-    amber: "text-amber-400 bg-amber-400/10 border-amber-400/20",
-  };
-  
-  return (
-    <Card className="p-7 relative overflow-hidden group">
-      {/* Decorative Glow */}
-      <div className={`absolute -top-4 -right-4 w-24 h-24 blur-3xl opacity-0 group-hover:opacity-20 transition-opacity duration-700 rounded-full ${colors[color].split(' ')[1]}`} />
-      
-      <div className="flex items-center justify-between mb-5">
-        <div className={`p-3 rounded-2xl border ${colors[color] || colors.blue}`}>
-          <Icon className="w-6 h-6" />
-        </div>
-        <div className={`flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium uppercase tracking-tight ${isUp ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
-          {isUp ? <ArrowUpRight className="w-3.5 h-3.5 mr-1" /> : <ArrowDownRight className="w-3.5 h-3.5 mr-1" />}
-          {trend}
-        </div>
-      </div>
-      
-      <div className="space-y-1">
-        <p className="text-[10px] text-[#8E9299] uppercase font-medium tracking-[0.2em]">{title}</p>
-        <h3 className="text-3xl font-medium text-white tracking-tight leading-none">{value}</h3>
-      </div>
-    </Card>
-  );
-};
 
 const ProductRow: React.FC<{ p: any }> = ({ p }) => {
   const [expanded, setExpanded] = useState(false);
@@ -105,11 +68,11 @@ const ProductRow: React.FC<{ p: any }> = ({ p }) => {
         </td>
         <td className="p-4 text-xs text-right font-mono text-[#8E9299]">{p.qty}</td>
         <td className="p-4 text-xs text-right font-mono">
-           <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${roas > 3 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-gray-500/10 text-gray-400'}`}>
+           <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${roas > 3 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-gray-500/10 text-gray-400'}`}>
              {roas > 0 ? `${roas.toFixed(1)}x` : '-'}
            </span>
         </td>
-        <td className="p-4 text-xs text-right font-mono text-emerald-400">R$ {p.rev.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+        <td className="p-4 text-xs text-right font-mono text-emerald-400 font-semibold">R$ {p.rev.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
       </tr>
       {expanded && p.campaigns && p.campaigns.length > 0 && (
         <tr className="bg-[#0f0f11]">
@@ -161,6 +124,8 @@ export default function App() {
   ];
 
   const [selectedCompanyId, setSelectedCompanyId] = useState(companies[0].id);
+  const [supabaseSchema, setSupabaseSchema] = useState<Record<string, string[]>>({});
+  const [supabaseSample, setSupabaseSample] = useState<Record<string, any[]>>({});
 
   const selectedCompany = companies.find(c => c.id === selectedCompanyId) || companies[0];
   const propertyId = selectedCompany.propertyId;
@@ -213,6 +178,59 @@ export default function App() {
 
     const fetchAnalytics = async () => {
       try {
+        let data: any;
+
+        if (selectedCompanyId === 'cultura' && supabase) {
+          console.log("🔍 Iniciando descoberta de dados no Supabase para 'Cultura'...");
+          
+          const tablesToExplore = [
+            'cadastros', 
+            'categorias', 
+            'cursos', 
+            'eventos', 
+            'eventos_cadastros', 
+            'eventos_checkins'
+          ];
+
+          // Função para explorar a estrutura das tabelas
+          const exploreData = async () => {
+            const structures: Record<string, string[]> = {};
+            const samples: Record<string, any[]> = {};
+            
+            for (const table of tablesToExplore) {
+              const { data, error } = await supabase.from(table).select('*').limit(3);
+              if (!error && data && data.length > 0) {
+                structures[table] = Object.keys(data[0]);
+                samples[table] = data;
+                console.log(`✅ Tabela '${table}' colunas:`, Object.keys(data[0]));
+              } else if (error) {
+                console.error(`❌ Erro ao explorar '${table}':`, error.message);
+              }
+            }
+            setSupabaseSchema(structures);
+            setSupabaseSample(samples);
+            return structures;
+          };
+
+          await exploreData();
+
+          // Exemplo de busca real de vendas para a Cultura
+          // Estou assumindo que 'eventos_cadastros' tem os dados de receita
+          const { data: salesData, error } = await supabase
+            .from('eventos_cadastros')
+            .select('*')
+            .limit(100);
+
+          if (error) {
+            console.error("Erro ao buscar vendas:", error);
+          } else {
+            console.log("📊 Amostra de vendas (eventos_cadastros):", salesData);
+          }
+          
+          // Por enquanto, vou deixar o fluxo seguir para o GA4 se o Supabase não retornar dados mapeados
+          // Mas já deixei a "sonda" pronta para descobrir suas colunas!
+        }
+
         let url = `/api/analytics?propertyId=${propertyId}&dateRange=${dateRange}`;
         if (dateRange === 'custom') {
           url += `&customStart=${appliedCustomDate.start}&customEnd=${appliedCustomDate.end}`;
@@ -221,7 +239,6 @@ export default function App() {
             headers: { 'Authorization': `Bearer ${JSON.stringify(tokens)}` }
         });
         
-        let data;
         const contentType = res.headers.get("content-type");
         if (contentType && contentType.indexOf("application/json") !== -1) {
           data = await res.json();
@@ -406,11 +423,11 @@ export default function App() {
               const totalCPA = agg.total.sales > 0 ? agg.total.cost / agg.total.sales : 0;
 
               setKpis([
-                { title: 'Receita Total', value: `R$ ${agg.total.revenue.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, trend: 'Blended', isUp: true, icon: DollarSign, color: "emerald" },
-                { title: 'ROAS Geral', value: `${totalROAS.toFixed(2)}x`, trend: 'GA4 Data', isUp: totalROAS >= 2, icon: Activity, color: "blue" },
-                { title: 'Custo por Venda', value: `R$ ${totalCPA.toFixed(2)}`, trend: 'CPA Médio', isUp: false, icon: Target, color: "rose" },
-                { title: 'Vendas Totais', value: agg.total.sales.toString(), trend: 'Consolidados', isUp: true, icon: ShoppingCart, color: "amber" },
-                { title: 'Taxa Conv.', value: `${totalCR.toFixed(2)}%`, trend: 'Sessões', isUp: true, icon: TrendingUp, color: "blue" },
+                { title: 'Receita Total', value: `R$ ${agg.total.revenue.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, trend: 'Faturamento Blended', isUp: true, icon: DollarSign },
+                { title: 'ROAS Geral', value: `${totalROAS.toFixed(2)}x`, trend: 'Retorno sobre o Anúncio', isUp: totalROAS >= 2, icon: Activity },
+                { title: 'Custo p/ Venda (CPA)', value: `R$ ${totalCPA.toFixed(2)}`, trend: 'Custo por Aquisição', isUp: false, icon: Focus },
+                { title: 'Taxa Conv. Global', value: `${totalCR.toFixed(2)}%`, trend: `Vendas / ${agg.total.sessions} Sessões`, isUp: true, icon: TrendingUp },
+                { title: 'Vendas Totais', value: agg.total.sales.toString(), trend: 'Todas as origens', isUp: true, icon: Users },
               ]);
             }
 
@@ -468,465 +485,488 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050507] text-[#FAFAFA] font-sans selection:bg-blue-500/30 selection:text-white pb-12 overflow-x-hidden">
-      {/* Background Atmosphere */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full opacity-60 animate-pulse" style={{ animationDuration: '8s' }} />
-        <div className="absolute top-[20%] right-[-10%] w-[35%] h-[50%] bg-emerald-500/5 blur-[120px] rounded-full opacity-40 animate-pulse" style={{ animationDuration: '12s' }} />
-        <div className="absolute bottom-[-10%] left-[20%] w-[40%] h-[40%] bg-rose-500/5 blur-[120px] rounded-full opacity-30 animate-pulse" style={{ animationDuration: '10s' }} />
-      </div>
-
+    <div className="min-h-screen bg-[#050505] text-[#FAFAFA] font-sans selection:bg-[#F43F5E] selection:text-white pb-12">
       {/* Top Navigation / Header */}
-      <header className="border-b border-white/[0.05] bg-[#050507]/60 backdrop-blur-2xl sticky top-0 z-50">
+      <header className="border-b border-[#222225] bg-[#0A0A0A]/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-8">
-            <div className="relative group">
-              <button className="flex items-center gap-4 hover:opacity-80 transition-all focus:outline-none bg-white/[0.03] px-4 py-2 rounded-2xl border border-white/5">
-                <div className="relative">
-                  <img src={selectedCompany.logo} alt="Logo" className="w-9 h-9 rounded-xl object-cover ring-2 ring-white/10" />
-                  <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-emerald-500 border-2 border-[#050507] rounded-full shadow-lg" />
-                </div>
-                <div className="flex flex-col items-start">
-                  <h1 className="text-sm font-medium uppercase tracking-tight flex items-center gap-2">
-                    {selectedCompany.name} <ChevronDown className="w-3 h-3 text-[#52525B]" />
-                  </h1>
-                  <span className="text-[10px] font-mono text-[#52525B] leading-none">Property ID: {propertyId}</span>
-                </div>
-              </button>
-              
-              <div className="absolute top-14 left-0 w-72 bg-[#0F0F12] border border-white/10 rounded-3xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 translate-y-2 group-hover:translate-y-0 overflow-hidden z-50 backdrop-blur-xl">
-                <div className="p-3 text-[10px] text-[#52525B] font-medium uppercase tracking-widest border-b border-white/5">Selecionar Unidade</div>
-                <div className="p-1">
-                  {companies.map(company => (
-                    <button
-                      key={company.id}
-                      onClick={() => setSelectedCompanyId(company.id)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.03] rounded-2xl transition-all focus:outline-none ${selectedCompanyId === company.id ? 'bg-white/[0.05]' : ''}`}
-                    >
-                      <img src={company.logo} alt={company.name} className="w-8 h-8 object-cover rounded-xl border border-white/10" />
-                      <div className="text-left">
-                        <span className="text-sm font-medium block leading-none mb-1">{company.name}</span>
-                        <span className="text-[9px] text-[#52525B] font-mono">ID: {company.propertyId}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+          <div className="relative group">
+            <button className="flex items-center gap-3 hover:opacity-80 transition-opacity focus:outline-none">
+              <img src={selectedCompany.logo} alt="Logo" className="w-10 h-10 rounded-full border border-[#222225] object-cover" />
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-semibold tracking-tight">{selectedCompany.name}</h1>
+                <ChevronDown className="w-4 h-4 text-[#8E9299]" />
               </div>
+            </button>
+            <div className="absolute top-12 left-0 w-64 bg-[#111113] border border-[#222225] rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 overflow-hidden z-50">
+              {companies.map(company => (
+                 <button
+                   key={company.id}
+                   onClick={() => setSelectedCompanyId(company.id)}
+                   className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-[#222225] transition-colors focus:outline-none ${selectedCompanyId === company.id ? 'bg-[#1A1A1D]' : ''}`}
+                 >
+                   <img src={company.logo} alt={company.name} className="w-8 h-8 object-cover rounded-full border border-[#222225]" />
+                   <span className="text-sm font-medium">{company.name}</span>
+                 </button>
+              ))}
+              {tokens && (
+                <div className="p-2 border-t border-[#222225]">
+                  <button 
+                    onClick={handleDisconnect}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors"
+                  >
+                    <KeyRound className="w-3 h-3" />
+                    Desconectar Google
+                  </button>
+                </div>
+              )}
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
             <div className="relative">
               <button 
                   onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
-                  className="flex items-center gap-3 px-5 py-2.5 rounded-2xl border border-white/5 bg-white/[0.03] hover:bg-white/[0.08] transition-all text-xs font-medium uppercase tracking-widest focus:outline-none shadow-lg shadow-black/20"
+                  className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#222225] bg-[#111113] hover:bg-[#1A1A1D] transition-colors text-sm font-medium focus:outline-none"
               >
-                <CalendarDays className="w-4 h-4 text-blue-400" />
+                <CalendarDays className="w-4 h-4 text-[#8E9299]" />
                 <span>{dateRangeLabels[dateRange]}</span>
-                <ChevronDown className={`w-3 h-3 transition-transform ${isDateDropdownOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className="w-4 h-4 text-[#8E9299]" />
               </button>
               
-              <AnimatePresence>
-                {isDateDropdownOpen && (
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                    className="absolute top-14 right-0 w-64 bg-[#0F0F12] border border-white/10 rounded-3xl shadow-2xl z-50 p-2 text-sm backdrop-blur-xl"
-                  >
-                     <div className="grid grid-cols-1 gap-1">
-                       {Object.entries(dateRangeLabels).map(([key, label]) => (
-                         <button
-                            key={key}
-                            onClick={() => { 
-                              setDateRange(key); 
-                              if(key !== 'custom') setIsDateDropdownOpen(false); 
-                            }}
-                            className={`w-full text-left px-4 py-2.5 rounded-2xl hover:bg-white/[0.03] transition-all focus:outline-none flex items-center justify-between ${dateRange === key ? 'bg-blue-500/10 text-blue-400' : 'text-[#8E9299]'}`}
-                         >
-                           <span className="font-medium">{label}</span>
-                           {dateRange === key && <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.5)]" />}
-                         </button>
-                       ))}
-                     </div>
+              {isDateDropdownOpen && (
+                <div className="absolute top-12 right-0 w-64 bg-[#111113] border border-[#222225] rounded-xl shadow-xl z-50 p-2 text-sm">
+                   {Object.entries(dateRangeLabels).map(([key, label]) => (
+                     <button
+                        key={key}
+                        onClick={() => { 
+                          setDateRange(key); 
+                          if(key !== 'custom') setIsDateDropdownOpen(false); 
+                        }}
+                        className={`w-full text-left px-4 py-2.5 rounded-lg hover:bg-[#222225] transition-colors focus:outline-none ${dateRange === key ? 'bg-[#1A1A1D] font-medium text-white' : 'text-[#8E9299]'}`}
+                     >
+                       {label}
+                     </button>
+                   ))}
 
-                     {dateRange === 'custom' && (
-                       <div className="mt-2 pt-4 border-t border-white/5 flex flex-col gap-4 px-3 pb-2">
-                         <div className="flex flex-col gap-2">
-                           <label className="text-[10px] text-[#52525B] font-medium uppercase tracking-widest">Início</label>
-                           <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="bg-black/40 border border-white/5 text-white px-4 py-3 rounded-xl text-xs focus:outline-none focus:border-blue-500/50" />
-                         </div>
-                         <div className="flex flex-col gap-2">
-                           <label className="text-[10px] text-[#52525B] font-medium uppercase tracking-widest">Fim</label>
-                           <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="bg-black/40 border border-white/5 text-white px-4 py-3 rounded-xl text-xs focus:outline-none focus:border-blue-500/50" />
-                         </div>
-                         <button 
-                           onClick={() => {
-                             setAppliedCustomDate({ start: customStart, end: customEnd });
-                             setIsDateDropdownOpen(false);
-                           }}
-                           className="bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl text-xs font-medium uppercase tracking-widest transition-all shadow-lg shadow-blue-500/20"
-                         >
-                           Aplicar Filtro
-                         </button>
+                   {dateRange === 'custom' && (
+                     <div className="mt-2 pt-3 border-t border-[#222225] flex flex-col gap-3 px-2 pb-1">
+                       <div className="flex flex-col gap-1">
+                         <label className="text-xs text-[#8E9299]">Data de Início</label>
+                         <input 
+                           type="date" 
+                           value={customStart} 
+                           onChange={e => setCustomStart(e.target.value)} 
+                           className="bg-[#050505] border border-[#222225] text-white px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-[#8E9299]" 
+                         />
                        </div>
-                     )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                       <div className="flex flex-col gap-1">
+                         <label className="text-xs text-[#8E9299]">Data de Fim</label>
+                         <input 
+                           type="date" 
+                           value={customEnd} 
+                           onChange={e => setCustomEnd(e.target.value)} 
+                           className="bg-[#050505] border border-[#222225] text-white px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-[#8E9299]" 
+                         />
+                       </div>
+                       <button 
+                         onClick={() => {
+                           setAppliedCustomDate({ start: customStart, end: customEnd });
+                           setIsDateDropdownOpen(false);
+                         }}
+                         className="mt-1 bg-white text-black py-2 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors"
+                       >
+                         Aplicar Filtro
+                       </button>
+                     </div>
+                   )}
+                </div>
+              )}
             </div>
             
-            {tokens && (
-              <button 
-                onClick={handleDisconnect}
-                className="p-3 rounded-2xl border border-white/5 bg-white/[0.03] hover:bg-rose-500/10 hover:text-rose-400 transition-all"
-                title="Desconectar Google"
-              >
-                <KeyRound className="w-4 h-4" />
-              </button>
-            )}
+            <button className="flex items-center gap-2 px-4 py-2 ml-2 rounded-full border border-[#222225] bg-[#111113] hover:bg-[#1A1A1D] transition-colors text-sm font-medium">
+              <Filter className="w-4 h-4 text-[#8E9299]" />
+              <span>Filtros</span>
+            </button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 mt-12 space-y-12 relative z-10">
+      <main className="max-w-7xl mx-auto px-6 mt-8 space-y-6">
         
         {/* SETUP BANNER */}
         {dataStatus === 'logged_out' && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <Card className="p-10 text-center max-w-3xl mx-auto border-dashed border-blue-500/30 bg-blue-500/[0.02]">
-              <div className="w-20 h-20 bg-blue-500/10 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner">
-                <KeyRound className="w-10 h-10 text-blue-500" />
-              </div>
-              <h2 className="text-3xl font-medium mb-4 text-white tracking-tight uppercase">Conectar Google Analytics</h2>
-              <p className="text-sm text-[#8E9299] max-w-2xl mx-auto mb-10 leading-relaxed font-medium">
-                Sincronize sua conta Google para transformar os dados brutos da unidade <span className="text-white">{selectedCompany.name}</span> em inteligência competitiva e ROAS real.
+          <div className="bg-[#111113] border border-[#222225] text-white rounded-2xl p-8 flex flex-col md:flex-row gap-6 items-center justify-between">
+            <div className="flex-1">
+              <h3 className="text-xl font-medium mb-2">Conectar Google Analytics</h3>
+              <p className="text-sm text-[#8E9299] max-w-2xl mb-4">
+                Para visualizar seus dados reais da propriedade {selectedCompany.name} ({propertyId}), conecte sua conta Google. Esta autorização é segura e usada apenas para leitura de dados de relatórios. Ela será salva no seu navegador para que você não precise aprovar toda vez.
               </p>
-              <button 
-                  onClick={handleConnect}
-                  className="inline-flex items-center gap-3 px-10 py-5 rounded-3xl bg-blue-600 hover:bg-blue-500 text-white font-medium uppercase tracking-[0.2em] text-xs transition-all shadow-2xl shadow-blue-500/30 hover:scale-[1.02] active:scale-95"
-              >
-                Conectar Conta GA4 <ChevronRight className="w-4 h-4" />
-              </button>
-            </Card>
-          </motion.div>
+            </div>
+            <button 
+                onClick={handleConnect}
+                className="flex items-center gap-2 px-6 py-3 rounded-full bg-white text-black hover:bg-gray-200 transition-colors font-medium whitespace-nowrap"
+            >
+              Conectar Conta Google
+            </button>
+          </div>
         )}
         
         {dataStatus === 'error' && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <div className="bg-rose-500/5 border border-rose-500/20 text-rose-400 rounded-3xl p-8 flex items-center gap-6">
-              <div className="p-4 bg-rose-500/10 rounded-2xl">
-                 <Zap className="w-8 h-8" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xl font-medium uppercase mb-1 tracking-tight">Falha Crítica no Sistema</p>
-                <p className="text-sm text-amber-400 font-medium">{errorMessage}</p>
-              </div>
-              <button onClick={() => window.location.reload()} className="px-6 py-3 bg-white/5 hover:bg-white/10 rounded-2xl text-sm font-medium transition-all">Recarregar</button>
-            </div>
-          </motion.div>
+          <div className="bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-2xl p-6">
+            <h3 className="text-lg font-medium mb-2 text-rose-400">Erro na Consulta da API</h3>
+            <p className="text-sm">{errorMessage}</p>
+          </div>
         )}
 
-        {propertyId && dataStatus === 'success' && (
-          <div className="space-y-12">
-            <div>
-              <div className="flex items-end justify-between mb-8">
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                    <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-[#52525B]">Live Performance Insight</span>
-                  </div>
-                  <h2 className="text-4xl font-medium tracking-tight text-white uppercase">
-                    Visão Geral do Resultado
-                  </h2>
-                </div>
-                {dataStatus === 'loading' && (
-                  <div className="flex items-center gap-2 text-[#8E9299]">
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span className="text-xs font-medium uppercase tracking-widest">Sincronizando...</span>
-                  </div>
-                )}
-              </div>
+        <div className="mb-8">
+          <h2 className="text-3xl font-light tracking-tight mb-2">
+            Performance Overview 
+            {dataStatus === 'loading' && <Loader2 className="inline-block ml-4 w-5 h-5 animate-spin text-[#8E9299]" />}
+          </h2>
+          <p className="text-[#8E9299]">Blended data across all channels.</p>
+        </div>
 
-              {/* KPIs Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-                {kpis.map((kpi: any, idx) => (
-                  <KpiCard key={idx} {...kpi} />
-                ))}
-              </div>
+        {/* SUPABASE EXPLORER - Somente para Cultura */}
+        {selectedCompanyId === 'cultura' && Object.keys(supabaseSchema).length > 0 && (
+          <Card className="border-emerald-500/30 bg-emerald-500/5 mb-8">
+            <h3 className="text-lg font-medium mb-4 flex items-center gap-2 text-emerald-400">
+              <Activity className="w-5 h-5" /> Supabase Data Explorer (Conectado!)
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Object.entries(supabaseSchema).map(([tableName, columns]) => (
+                <div key={tableName} className="bg-black/40 p-4 rounded-xl border border-white/5">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-bold text-white uppercase tracking-wider">{tableName}</span>
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded">{columns.length} colunas</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {columns.map(col => (
+                      <span key={col} className="text-[10px] bg-white/5 text-gray-400 px-2 py-0.5 rounded border border-white/5">
+                        {col}
+                      </span>
+                    ))}
+                  </div>
+                  {supabaseSample[tableName] && (
+                    <div className="mt-3 pt-3 border-t border-white/5">
+                      <p className="text-[9px] text-gray-500 uppercase mb-1">Amostra de dados:</p>
+                      <pre className="text-[9px] text-emerald-500/70 overflow-x-auto whitespace-pre">
+                        {JSON.stringify(supabaseSample[tableName][0], null, 2).substring(0, 150)}...
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
+            <p className="text-xs text-emerald-500/60 mt-4 italic">
+              * Eu já consegui puxar esses dados! Agora só preciso que você me confirme quais colunas representam o valor da venda, data e status para eu montar os gráficos reais.
+            </p>
+          </Card>
+        )}
 
-            {/* Charts and Funnel Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <Card className="p-8 lg:col-span-2 relative">
-                <div className="flex items-center justify-between mb-10">
-                  <h4 className="text-xs font-medium text-[#8E9299] uppercase tracking-[0.2em] flex items-center gap-3">
-                    <BarChart2 className="w-5 h-5 text-blue-500" /> Comparativo de Atribuição (Vendas x Custo)
-                  </h4>
-                  <div className="flex gap-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]" />
-                      <span className="text-[10px] text-[#52525B] font-medium uppercase">Receita</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.3)]" />
-                      <span className="text-[10px] text-[#52525B] font-medium uppercase">Custo</span>
-                    </div>
-                  </div>
+        {/* KPIs Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          {kpis.map((kpi, idx) => (
+            <Card key={idx} className="relative overflow-hidden group hover:border-[#333338] transition-colors p-5">
+              <div className="flex justify-between items-start mb-3">
+                <div className="p-2 bg-[#1A1A1D] rounded-lg group-hover:bg-[#222225] transition-colors">
+                  <kpi.icon className="w-5 h-5 text-[#8E9299]" />
                 </div>
-                <div className="h-[320px] w-full">
-                  <ResponsiveContainer width="100%" height="100%">
+              </div>
+              <div>
+                <p className="text-xs text-[#8E9299] mb-1 font-medium">{kpi.title}</p>
+                <h3 className="text-2xl font-semibold tracking-tight">{kpi.value}</h3>
+                <p className="text-xs text-[#52525B] mt-1">{kpi.trend}</p>
+              </div>
+              <div className="absolute -right-6 -bottom-6 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
+                <kpi.icon className="w-24 h-24" />
+              </div>
+            </Card>
+          ))}
+        </div>
+
+        {/* Charts and Funnel Section */}
+        {dataStatus === 'success' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+             <Card className="p-5 lg:col-span-2">
+               <div className="flex items-center justify-between mb-6">
+                 <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
+                    <BarChart2 className="w-4 h-4" /> Receita vs Custo por Canal
+                 </h4>
+               </div>
+               <div className="h-64">
+                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={[
-                        { name: 'META ADS', Receita: channelData.meta.revenue, Custo: channelData.meta.cost },
-                        { name: 'GOOGLE ADS', Receita: channelData.google.revenue, Custo: channelData.google.cost },
-                        { name: 'ORGÂNICO', Receita: channelData.organic.revenue, Custo: 0 },
+                        { name: 'Meta Ads', Receita: channelData.meta.revenue, Custo: channelData.meta.cost },
+                        { name: 'Google Ads', Receita: channelData.google.revenue, Custo: channelData.google.cost },
+                        { name: 'Orgânico', Receita: channelData.organic.revenue, Custo: 0 },
                       ]}
-                      margin={{ top: 0, right: 0, left: -20, bottom: 0 }}
+                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
                     >
-                      <CartesianGrid strokeDasharray="4 4" stroke="rgba(255,255,255,0.03)" vertical={false} />
-                      <XAxis dataKey="name" stroke="#52525B" fontSize={11} fontWeight={900} tickLine={false} axisLine={false} dy={15} />
-                      <YAxis stroke="#52525B" fontSize={10} fontWeight={900} tickLine={false} axisLine={false} tickFormatter={(val) => `R$ ${val / 1000}k`} />
-                      <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
-                      <Bar dataKey="Receita" fill="#10b981" radius={[8, 8, 0, 0]} barSize={32} />
-                      <Bar dataKey="Custo" fill="#f43f5e" radius={[8, 8, 0, 0]} barSize={32} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#222225" vertical={false} />
+                      <XAxis dataKey="name" stroke="#8E9299" fontSize={12} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#8E9299" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `R$ ${val / 1000}k`} />
+                      <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: '#1A1A1D' }} />
+                      <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', color: '#8E9299', paddingTop: '20px' }} />
+                      <Bar dataKey="Receita" fill="#10b981" radius={[4, 4, 0, 0]} barSize={40} />
+                      <Bar dataKey="Custo" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={40} />
                     </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </Card>
+                 </ResponsiveContainer>
+               </div>
+             </Card>
 
-              <Card className="p-8 border-white/5 bg-gradient-to-br from-white/[0.02] to-transparent">
-                <h4 className="text-xs font-medium text-[#8E9299] uppercase tracking-[0.2em] mb-10 flex items-center gap-3">
-                  <Target className="w-5 h-5 text-blue-500" /> Funil de Infoproduto
-                </h4>
-                <div className="space-y-8 relative">
-                  <div className="absolute left-1/2 top-4 bottom-4 w-[1px] bg-white/[0.05] -translate-x-1/2" />
+             <Card className="p-5">
+               <h4 className="text-sm font-medium mb-6 text-[#A1A1AA] flex items-center gap-2">
+                  <Target className="w-4 h-4" /> Funil de Infoproduto
+               </h4>
+               <div className="space-y-6">
                   {[
-                    { label: 'Visitas no Site', value: channelData.total.sessions, color: 'text-white', icon: Activity, bg: 'bg-white/5' },
-                    { label: 'Checkouts/Leads', value: channelData.total.leads, color: 'text-blue-400', icon: Users, bg: 'bg-blue-500/10', pct: channelData.total.sessions > 0 ? (channelData.total.leads / channelData.total.sessions * 100).toFixed(1) : 0 },
-                    { label: 'Vendas Pagas', value: channelData.total.sales, color: 'text-emerald-400', icon: ShoppingCart, bg: 'bg-emerald-500/10', pct: channelData.total.leads > 0 ? (channelData.total.sales / channelData.total.leads * 100).toFixed(1) : 0 },
-                  ].map((step, i) => (
-                    <div key={i} className="relative z-10 flex flex-col items-center">
-                      <div className={`p-4 rounded-2xl ${step.bg} border border-white/5 backdrop-blur-md w-full group hover:border-white/10 transition-all`}>
-                        <div className="flex items-center justify-between">
-                           <div className="flex items-center gap-3">
-                              <div className="p-2 bg-black/40 rounded-xl group-hover:scale-110 transition-transform">
-                                <step.icon className={`w-4 h-4 ${step.color}`} />
-                              </div>
-                              <div>
-                                <p className="text-[10px] text-[#52525B] font-medium uppercase tracking-widest">{step.label}</p>
-                                <p className="text-xl font-medium tracking-tight">{step.value.toLocaleString('pt-BR')}</p>
-                              </div>
-                           </div>
-                           {step.pct && (
-                             <div className="text-right">
-                               <p className="text-[9px] text-[#52525B] font-medium uppercase mb-1">Conversão</p>
-                               <span className={`text-xs font-medium px-2 py-1 rounded-lg bg-black/40 border border-white/5 ${step.color}`}>{step.pct}%</span>
-                             </div>
-                           )}
+                    { label: 'Sessões Totais', value: channelData.total.sessions, color: 'bg-white/10', icon: Activity },
+                    { label: 'Criação de Leads', value: channelData.total.leads, color: 'bg-blue-500/20', icon: Users, pct: channelData.total.sessions > 0 ? (channelData.total.leads / channelData.total.sessions * 100).toFixed(1) : 0 },
+                    { label: 'Vendas Realizadas', value: channelData.total.sales, color: 'bg-emerald-500/20', icon: ShoppingCart, pct: channelData.total.leads > 0 ? (channelData.total.sales / channelData.total.leads * 100).toFixed(1) : 0 },
+                  ].map((step, i, arr) => (
+                    <div key={i} className="relative">
+                      <div className={`p-4 rounded-xl border border-white/5 ${step.color} flex items-center justify-between`}>
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-black/40 rounded-lg">
+                            <step.icon className="w-4 h-4 text-white" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-[#8E9299] uppercase font-bold">{step.label}</p>
+                            <p className="text-xl font-mono">{step.value.toLocaleString('pt-BR')}</p>
+                          </div>
                         </div>
+                        {step.pct && (
+                          <div className="text-right">
+                            <p className="text-[10px] text-[#8E9299] mb-1 font-medium">Tx. Conversão</p>
+                            <span className="text-xs font-bold bg-white/10 px-2 py-1 rounded-md">{step.pct}%</span>
+                          </div>
+                        )}
                       </div>
+                      {i < arr.length - 1 && (
+                        <div className="flex justify-center my-1">
+                          <ChevronDown className="w-4 h-4 text-gray-700" />
+                        </div>
+                      )}
                     </div>
                   ))}
-                </div>
-                <div className="mt-8 pt-8 border-t border-white/5 flex flex-col gap-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] text-[#52525B] font-medium uppercase tracking-widest">Taxa de Venda (Global)</span>
-                    <span className="text-lg font-medium text-emerald-400 tracking-tight">
-                       {channelData.total.sessions > 0 ? (channelData.total.sales / channelData.total.sessions * 100).toFixed(2) : 0}%
-                    </span>
-                  </div>
-                </div>
-              </Card>
-            </div>
+               </div>
+               <div className="mt-6 pt-6 border-t border-[#222225] flex justify-between items-center">
+                 <span className="text-xs text-[#8E9299]">Tx. de Venda Global</span>
+                 <span className="text-sm font-bold text-emerald-400">
+                    {channelData.total.sessions > 0 ? (channelData.total.sales / channelData.total.sessions * 100).toFixed(2) : 0}%
+                 </span>
+               </div>
+             </Card>
+          </div>
+        )}
 
-            {/* Winning Ads and Products Matrix */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <Card className="p-0 overflow-hidden border-white/5">
-                <div className="p-8 border-b border-white/5 bg-gradient-to-r from-white/[0.03] to-transparent flex items-center justify-between">
-                   <div className="flex items-center gap-4">
-                     <div className="w-10 h-10 bg-amber-500/10 rounded-2xl flex items-center justify-center border border-amber-500/20 shadow-lg shadow-amber-500/5">
-                        <Award className="w-5 h-5 text-amber-500" />
-                     </div>
-                     <div>
-                       <h4 className="text-xs font-medium text-white uppercase tracking-[0.2em]">Top Anúncios (Escalar)</h4>
-                       <p className="text-[10px] text-[#52525B] font-medium">Campanhas com custo/benefício superior</p>
-                     </div>
-                   </div>
+        {/* Winning Ads and Products Matrix */}
+        {dataStatus === 'success' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+             <Card className="p-0 overflow-hidden">
+                <div className="p-5 border-b border-[#222225] flex items-center justify-between bg-gradient-to-r from-[#111113] to-transparent">
+                   <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
+                      <Award className="w-4 h-4 text-amber-400" /> Anúncios Ganhadores (Escalar)
+                   </h4>
+                   <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded border border-emerald-500/20 font-bold">Top ROI</span>
                 </div>
-                <div className="max-h-[440px] overflow-y-auto custom-scrollbar">
+                <div className="max-h-[400px] overflow-y-auto">
                    <table className="w-full text-left">
-                      <thead className="bg-[#0A0A0C] sticky top-0 z-20">
+                      <thead className="bg-[#111113]/50 sticky top-0 z-10">
                         <tr>
-                          <th className="p-5 text-[10px] text-[#52525B] uppercase font-medium tracking-widest">Ativo / Campanha</th>
-                          <th className="p-5 text-[10px] text-[#52525B] uppercase font-medium tracking-widest text-right">Vendas</th>
-                          <th className="p-5 text-[10px] text-[#52525B] uppercase font-medium tracking-widest text-right">Faturamento</th>
+                          <th className="p-4 text-[10px] text-[#52525B] uppercase font-bold">Campanha / Anúncio</th>
+                          <th className="p-4 text-[10px] text-[#52525B] uppercase font-bold text-right">Vendas</th>
+                          <th className="p-4 text-[10px] text-[#52525B] uppercase font-bold text-right">Receita</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-white/5">
+                      <tbody className="divide-y divide-[#222225]/50">
                         {channelData.winners?.map((win: any, i: number) => (
-                           <tr key={i} className="hover:bg-white/[0.02] transition-colors group">
-                              <td className="p-5 flex items-center gap-4">
-                                 <div className={`w-2 h-2 rounded-full ${win.source === 'meta' ? 'bg-blue-500' : 'bg-rose-500'} shadow-[0_0_8px_rgba(0,0,0,0)] group-hover:shadow-current transition-all`} />
-                                 <span className="text-xs text-[#FAFAFA] font-medium truncate max-w-[280px]" title={win.name}>{win.name}</span>
+                           <tr key={i} className="hover:bg-white/5 transition-colors">
+                              <td className="p-4 flex items-center gap-3">
+                                 <div className={`w-1.5 h-1.5 rounded-full ${win.source === 'meta' ? 'bg-blue-500' : 'bg-rose-500'}`} />
+                                 <span className="text-xs text-[#FAFAFA] truncate max-w-[240px]" title={win.name}>{win.name}</span>
                               </td>
-                              <td className="p-5 text-xs font-mono text-center font-medium text-[#8E9299]">{win.sales}</td>
-                              <td className="p-5 text-sm font-medium text-right text-emerald-400 tracking-tight px-6">R$ {win.rev.toLocaleString('pt-BR')}</td>
+                              <td className="p-4 text-xs font-mono text-center">{win.sales}</td>
+                              <td className="p-4 text-xs font-mono text-right text-emerald-400">R$ {win.rev.toLocaleString('pt-BR')}</td>
                            </tr>
                         ))}
                       </tbody>
                    </table>
                 </div>
-              </Card>
+             </Card>
 
-              <Card className="p-0 overflow-hidden border-white/5">
-                 <div className="p-8 border-b border-white/5 bg-gradient-to-r from-white/[0.03] to-transparent flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-blue-500/10 rounded-2xl flex items-center justify-center border border-blue-500/20 shadow-lg shadow-blue-500/5">
-                         <ShoppingCart className="w-5 h-5 text-blue-500" />
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-medium text-white uppercase tracking-[0.2em]">Cursos & Infoprodutos</h4>
-                        <p className="text-[10px] text-[#52525B] font-medium">Rankings de faturamento por item</p>
-                      </div>
-                    </div>
-                 </div>
-                 <div className="max-h-[440px] overflow-y-auto custom-scrollbar">
-                    <table className="w-full text-left border-collapse">
-                       <thead className="bg-[#0A0A0C] sticky top-0 z-20">
-                         <tr>
-                           <th className="p-5 text-[10px] text-[#52525B] uppercase font-medium tracking-widest">Produto</th>
-                           <th className="p-5 text-[10px] text-[#52525B] uppercase font-medium tracking-widest text-right">Qtd</th>
-                           <th className="p-5 text-[10px] text-[#52525B] uppercase font-medium tracking-widest text-right">ROI</th>
-                           <th className="p-5 text-[10px] text-[#52525B] uppercase font-medium tracking-widest text-right">Faturamento</th>
-                         </tr>
-                       </thead>
-                       <tbody className="bg-[#111113]/20">
-                         {[...channelData.meta.products, ...channelData.google.products, ...channelData.organic.products]
-                           .sort((a: any, b: any) => b.rev - a.rev)
-                           .map((p: any, i: number) => (
-                             <ProductRow key={i} p={p} />
-                           ))}
-                       </tbody>
-                    </table>
-                 </div>
-              </Card>
-            </div>
+             <Card className="p-0 overflow-hidden">
+                <div className="p-5 border-b border-[#222225] flex items-center justify-between bg-gradient-to-r from-[#111113] to-transparent">
+                   <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
+                      <ShoppingCart className="w-4 h-4" /> Qual curso está vendendo?
+                   </h4>
+                   <span className="text-[10px] text-[#8E9299]">Ordenado por Receita</span>
+                </div>
+                <div className="max-h-[400px] overflow-y-auto">
+                   <table className="w-full text-left border-collapse">
+                      <thead className="bg-[#111113]/50 sticky top-0 z-10">
+                        <tr>
+                          <th className="p-4 text-[10px] text-[#52525B] uppercase font-bold">Infoproduto</th>
+                          <th className="p-4 text-[10px] text-[#52525B] uppercase font-bold text-right">Vendas</th>
+                          <th className="p-4 text-[10px] text-[#52525B] uppercase font-bold text-right">ROAS</th>
+                          <th className="p-4 text-[10px] text-[#52525B] uppercase font-bold text-right">Receita</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-[#111113]/20">
+                        {[...channelData.meta.products, ...channelData.google.products, ...channelData.organic.products]
+                          .sort((a: any, b: any) => b.rev - a.rev)
+                          .map((p: any, i: number) => (
+                            <ProductRow key={i} p={p} />
+                          ))}
+                      </tbody>
+                   </table>
+                </div>
+             </Card>
+          </div>
+        )}
 
-            {/* Channels Breakdown */}
-            <div className="space-y-8">
-              {[
-                { id: 'meta', name: 'Meta Ads', icon: Activity, color: 'text-blue-400' },
-                { id: 'google', name: 'Google Ads', icon: Zap, color: 'text-rose-400' },
-                { id: 'organic', name: 'Orgânico', icon: TrendingUp, color: 'text-emerald-400' }
-              ].map(channel => {
-                const data = channelData[channel.id];
-                if (!data) return null;
-                
-                const cr = data.sessions > 0 ? (data.sales) / data.sessions * 100 : 0;
-                const roas = data.cost > 0 ? data.revenue / data.cost : 0;
-                const cpa = data.sales > 0 ? data.cost / data.sales : 0;
-                const roasColor = roas > 3 ? 'text-emerald-400' : roas >= 1.5 ? 'text-amber-400' : roas > 0 ? 'text-rose-400' : 'text-gray-400';
+        {/* Channels Breakdown */}
+        {dataStatus === 'success' && (
+          <div className="space-y-6 mt-8">
+            <h2 className="text-2xl font-light tracking-tight mb-4 border-b border-[#222225] pb-2">
+              Detalhamento de Canais
+            </h2>
+            
+            {[
+              { id: 'meta', name: 'Meta Ads', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
+              { id: 'google', name: 'Google Ads', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20' },
+              { id: 'organic', name: 'Tráfego Orgânico / Direto', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' }
+            ].map(channel => {
+              const data = channelData[channel.id];
+              if (!data) return null;
+              
+              const cr = data.sessions > 0 ? (data.sales) / data.sessions * 100 : 0;
+              const roas = data.cost > 0 ? data.revenue / data.cost : 0;
+              const cpa = data.sales > 0 ? data.cost / data.sales : 0;
+              const roasColor = roas > 3 ? 'text-emerald-400' : roas >= 1.5 ? 'text-amber-400' : roas > 0 ? 'text-rose-400' : 'text-gray-400';
 
-                return (
-                  <Card key={channel.id} className="p-0 overflow-hidden border-white/5">
-                    <div className="p-8 bg-gradient-to-r from-white/[0.03] to-transparent border-b border-white/5 flex flex-col md:flex-row justify-between items-center gap-6">
-                      <div className="flex items-center gap-4">
-                        <div className={`p-4 rounded-2xl bg-black/40 border border-white/5 ${channel.color}`}>
-                          <channel.icon className="w-8 h-8" />
-                        </div>
-                        <div>
-                          <h3 className="text-2xl font-medium uppercase tracking-tight text-white">{channel.name}</h3>
-                          <p className="text-[10px] text-[#52525B] font-medium uppercase tracking-[0.2em]">{data.sessions.toLocaleString()} Sessões Identificadas</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex flex-wrap items-center gap-8 bg-black/40 p-6 rounded-3xl border border-white/5">
-                        <div className="flex flex-col">
-                          <span className="text-[9px] text-[#52525B] font-medium uppercase tracking-widest mb-1">Receita</span>
-                          <span className="text-xl font-medium text-white tracking-tight">R$ {data.revenue.toLocaleString('pt-BR')}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-[9px] text-[#52525B] font-medium uppercase tracking-widest mb-1">Custo</span>
-                          <span className="text-xl font-medium text-rose-500 tracking-tight">R$ {data.cost.toLocaleString('pt-BR')}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-[9px] text-[#52525B] font-medium uppercase tracking-widest mb-1">ROAS</span>
-                          <span className={`text-xl font-medium tracking-tight ${roasColor}`}>{roas.toFixed(2)}x</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-[9px] text-[#52525B] font-medium uppercase tracking-widest mb-1">Vendas</span>
-                          <span className="text-xl font-medium text-white tracking-tight">{data.sales}</span>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-[9px] text-[#52525B] font-medium uppercase tracking-widest mb-1">CPA</span>
-                          <span className="text-xl font-medium text-white tracking-tight">R$ {cpa.toFixed(0)}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {(data.products?.length > 0 || data.campaigns?.length > 0) && (
-                      <div className="p-8 bg-black/20 space-y-10">
-                        {data.campaigns && data.campaigns.length > 0 && (
-                          <div>
-                            <h4 className="text-[10px] font-medium uppercase tracking-[0.3em] text-[#52525B] mb-5 flex items-center gap-3">
-                              <Target className="w-4 h-4 text-blue-500" /> Detalhamento de Ativos & Campanhas
-                            </h4>
-                            <div className="overflow-hidden rounded-3xl border border-white/5 bg-[#050507]">
-                              <table className="w-full text-left">
-                                <thead className="bg-[#111113]">
-                                  <tr>
-                                    <th className="text-[10px] font-medium text-[#52525B] p-5 uppercase tracking-widest">Campanha / Criativo</th>
-                                    <th className="text-[10px] font-medium text-[#52525B] p-5 uppercase tracking-widest text-right w-24">Vendas</th>
-                                    <th className="text-[10px] font-medium text-[#52525B] p-5 uppercase tracking-widest text-right w-32">Participação</th>
-                                    <th className="text-[10px] font-medium text-[#52525B] p-5 uppercase tracking-widest text-right w-32">Receita</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-white/5">
-                                  {data.campaigns.map((c: any, i: number) => {
-                                    const totalCampSales = data.sales || 1;
-                                    const pct = (c.sales / totalCampSales) * 100;
-                                    return (
-                                    <tr key={i} className="hover:bg-white/[0.02] transition-all group">
-                                      <td className="p-5 text-xs text-[#E4E3E0] max-w-[280px] truncate font-medium group-hover:text-white" title={c.name}>{c.name}</td>
-                                      <td className="p-5 text-xs text-right font-mono text-[#8E9299] font-medium">{c.sales}</td>
-                                      <td className="p-5 text-xs text-right font-mono text-[#8E9299]">
-                                        <div className="flex items-center justify-end gap-3">
-                                          <div className="w-20 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                            <div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{ width: `${pct}%` }}></div>
-                                          </div>
-                                          <span className="w-10 text-[10px] font-medium">{pct.toFixed(0)}%</span>
-                                        </div>
-                                      </td>
-                                      <td className="p-5 text-sm text-right font-medium text-emerald-400 tracking-tight">R$ {c.rev.toLocaleString('pt-BR')}</td>
-                                    </tr>
-                                  )})}
-                                </tbody>
-                              </table>
-                            </div>
+              return (
+                <Card key={channel.id} className="p-0 overflow-hidden border border-[#222225]">
+                  <div className="p-5 border-b border-[#222225] flex justify-between items-center bg-[#0A0A0A]">
+                    <div className="flex items-center gap-3">
+                      <span className={`px-3 py-1 text-xs font-medium rounded-full border ${channel.color}`}>
+                        {channel.name}
+                      </span>
+                      {data.cost === 0 && channel.id !== 'organic' && (
+                        <div className="group relative flex items-center">
+                          <span className="text-[10px] text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 cursor-help">
+                            ⚠️ Sem dados de custo no GA4
+                          </span>
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-64 p-3 bg-gray-900 border border-gray-700 rounded-lg shadow-xl text-xs text-gray-300 z-50">
+                            <p className="font-semibold text-white mb-1">Como enviar o custo da Meta para o GA4?</p>
+                            <p className="mb-2">O GA4 só importa custos automaticamente do Google Ads. Para Facebook/Meta Ads, o GTM não lê essas informações.</p>
+                            <p>Você precisa usar o <b>Data Import do GA4</b> (Admin &gt; Data Import &gt; Cost Data) enviando um CSV (manualmente ou via ferramentas como API, Zapier, Supermetrics, etc).</p>
                           </div>
-                        )}
-                      </div>
-                    )}
-                  </Card>
-                );
-              })}
-            </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-6 divide-x divide-y md:divide-y-0 divide-[#222225] bg-[#111113]">
+                    <div className="p-4 flex flex-col justify-center">
+                      <span className="text-xs text-[#8E9299] font-medium mb-1">Receita Gerada</span>
+                      <span className="text-lg font-semibold">R$ {data.revenue.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                    </div>
+                    <div className="p-4 flex flex-col justify-center">
+                      <span className="text-xs text-[#8E9299] font-medium mb-1">Custo Total</span>
+                      <span className="text-lg font-semibold text-red-400">R$ {data.cost.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                    </div>
+                    <div className="p-4 flex flex-col justify-center">
+                      <span className="text-xs text-[#8E9299] font-medium mb-1">ROAS</span>
+                      <span className={`text-lg font-semibold ${roasColor}`}>{roas.toFixed(2)}x</span>
+                    </div>
+                    <div className="p-4 flex flex-col justify-center">
+                      <span className="text-xs text-[#8E9299] font-medium mb-1">Vendas (Qtd)</span>
+                      <span className="text-lg font-semibold">{data.sales}</span>
+                    </div>
+                    <div className="p-4 flex flex-col justify-center">
+                      <span className="text-xs text-[#8E9299] font-medium mb-1">Custo por Venda (CPA)</span>
+                      <span className="text-lg font-semibold">R$ {cpa.toFixed(2)}</span>
+                    </div>
+                    <div className="p-4 flex flex-col justify-center">
+                      <span className="text-xs text-[#8E9299] font-medium mb-1">Taxa de Conversão</span>
+                      <span className="text-lg font-semibold">{cr.toFixed(2)}%</span>
+                    </div>
+                  </div>
+
+                  {(data.products?.length > 0 || data.campaigns?.length > 0) && (
+                    <div className="p-5 bg-[#050505] border-t border-[#222225] grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {data.products && data.products.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium mb-3 text-[#A1A1AA] flex items-center gap-2">
+                            <Focus className="w-4 h-4" /> Detalhamento de Cursos (Canais)
+                          </h4>
+                          <div className="overflow-x-auto rounded-lg border border-[#222225]">
+                            <table className="w-full text-left">
+                              <thead className="bg-[#111113]">
+                                <tr>
+                                  <th className="text-[10px] font-medium text-[#8E9299] p-3 uppercase tracking-wider">Produto</th>
+                                  <th className="text-[10px] font-medium text-[#8E9299] p-3 uppercase tracking-wider text-right">Qtd</th>
+                                  <th className="text-[10px] font-medium text-[#8E9299] p-3 uppercase tracking-wider text-right">Receita</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-[#222225] bg-[#0A0A0A]">
+                                {data.products.map((p: any, i: number) => (
+                                  <ProductRow key={i} p={p} />
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {data.campaigns && data.campaigns.length > 0 && (
+                        <div>
+                          <h4 className="text-sm font-medium mb-3 text-[#A1A1AA] flex items-center gap-2">
+                            <TrendingUp className="w-4 h-4" /> Top Campanhas / Origens
+                          </h4>
+                          <div className="overflow-x-auto rounded-lg border border-[#222225]">
+                            <table className="w-full text-left">
+                              <thead className="bg-[#111113]">
+                                <tr>
+                                  <th className="text-[10px] font-medium text-[#8E9299] p-3 uppercase tracking-wider">Campanha</th>
+                                  <th className="text-[10px] font-medium text-[#8E9299] p-3 uppercase tracking-wider text-right w-24">Vendas</th>
+                                  <th className="text-[10px] font-medium text-[#8E9299] p-3 uppercase tracking-wider text-right w-24">Taxa %</th>
+                                  <th className="text-[10px] font-medium text-[#8E9299] p-3 uppercase tracking-wider text-right w-32">Receita</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-[#222225] bg-[#0A0A0A]">
+                                {data.campaigns.map((c: any, i: number) => {
+                                  const totalCampSales = data.sales || 1;
+                                  const pct = (c.sales / totalCampSales) * 100;
+                                  return (
+                                  <tr key={i} className="hover:bg-[#111113] transition-colors">
+                                    <td className="p-3 text-xs text-[#E4E3E0] max-w-[200px] truncate" title={c.name}>{c.name}</td>
+                                    <td className="p-3 text-xs text-right font-mono text-[#8E9299]">{c.sales}</td>
+                                    <td className="p-3 text-xs text-right font-mono text-[#8E9299]">
+                                      <div className="flex items-center justify-end gap-2">
+                                        <div className="w-12 h-1.5 bg-[#222225] rounded-full overflow-hidden">
+                                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }}></div>
+                                        </div>
+                                        <span className="w-8">{pct.toFixed(0)}%</span>
+                                      </div>
+                                    </td>
+                                    <td className="p-3 text-xs text-right font-mono text-emerald-400">R$ {c.rev.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+                                  </tr>
+                                )})}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
           </div>
         )}
       </main>
-
-      <footer className="max-w-7xl mx-auto px-6 mt-12 py-12 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-6 text-[10px] font-medium uppercase tracking-[0.3em] text-[#52525B] relative z-10">
-        <div>© 2026 Traffic Performance Engine</div>
-        <div className="flex items-center gap-8">
-          <span className="hover:text-white transition-colors cursor-pointer">Security Portal</span>
-          <span className="hover:text-white transition-colors cursor-pointer">GA4 Cloud Sync</span>
-          <span className="hover:text-white transition-colors cursor-pointer">Export Ledger</span>
-        </div>
-      </footer>
     </div>
   );
 }
