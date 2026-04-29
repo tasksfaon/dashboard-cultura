@@ -962,7 +962,7 @@ export default function App() {
               </div>
               <div>
                 <p className="text-[0.75rem] font-medium text-text-label uppercase tracking-[0.05em] mb-1">{kpi.title}</p>
-                <h3 className="text-[2.25rem] font-bold tabular-nums tracking-tight tracking-tight">{kpi.value}</h3>
+                <h3 className="text-[1.5rem] font-bold tabular-nums tracking-tight whitespace-nowrap">{kpi.value}</h3>
                 <p className="text-xs text-text-muted mt-1">{kpi.trend}</p>
               </div>
               <div className="absolute -right-6 -bottom-6 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity text-primary">
