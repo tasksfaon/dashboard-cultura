@@ -1122,25 +1122,88 @@ export default function App() {
           </div>
         )}
 
-        {/* Top 5 Clientes */}
-        {dataStatus === 'success' && channelData.topCustomers && channelData.topCustomers.length > 0 && (
-          <div className="lg:col-span-1 mt-8">
-            <Card>
-              <h3 className="text-sm font-medium text-[#A1A1AA] mb-4 flex items-center gap-2">
-                  <Award className="w-4 h-4 text-primary" /> Top 5 Clientes (LTV)
-              </h3>
-              <div className="space-y-3">
-                {channelData.topCustomers.map((c: any, i: number) => (
-                    <div key={i} onClick={() => setSelectedCustomerDetail(c)} className="flex items-center justify-between p-3 rounded-[4px] bg-black/40 hover:bg-[#1E1E1E] cursor-pointer transition-colors border border-border">
-                        <div className="max-w-[70%]">
-                          <p className="text-xs text-text-primary truncate font-medium">{c.name}</p>
-                          <p className="text-[10px] text-text-secondary">{c.sales} vendas</p>
-                        </div>
-                        <p className="text-xs text-primary font-mono font-bold">R$ {c.rev.toLocaleString('pt-BR')}</p>
+        {/* Combined Section for Top Clientes and Payment Methods */}
+        {dataStatus === 'success' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+            {/* Top 5 Clientes */}
+            {channelData.topCustomers && channelData.topCustomers.length > 0 && (
+              <Card className="h-full">
+                <h3 className="text-sm font-medium text-[#A1A1AA] mb-4 flex items-center gap-2">
+                    <Award className="w-4 h-4 text-primary" /> Top 5 Clientes (LTV)
+                </h3>
+                <div className="space-y-3">
+                  {channelData.topCustomers.map((c: any, i: number) => (
+                      <div key={i} onClick={() => setSelectedCustomerDetail(c)} className="flex items-center justify-between p-3 rounded-[4px] bg-black/40 hover:bg-[#1E1E1E] cursor-pointer transition-colors border border-border">
+                          <div className="max-w-[70%]">
+                            <p className="text-xs text-text-primary truncate font-medium">{c.name}</p>
+                            <p className="text-[10px] text-text-secondary">{c.sales} vendas</p>
+                          </div>
+                          <p className="text-xs text-primary font-mono font-bold">R$ {c.rev.toLocaleString('pt-BR')}</p>
+                      </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {/* PAYMENT METHODS CHART */}
+            {selectedCompanyId === 'cultura' && channelData.paymentMethods && (
+              <Card className="p-6 h-full">
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h4 className="text-sm font-medium text-text-primary flex items-center gap-2">
+                          <CreditCard className="w-4 h-4 text-primary" /> Métodos de Pagamento
+                      </h4>
+                      <p className="text-[11px] text-text-secondary mt-1">Distribuição de Volume</p>
                     </div>
-                ))}
-              </div>
-            </Card>
+                </div>
+                <div className="flex flex-col gap-6">
+                    <div className="h-[180px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={channelData.paymentMethods}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={55}
+                            outerRadius={80}
+                            paddingAngle={8}
+                            dataKey="value"
+                          >
+                            {channelData.paymentMethods.map((_: any, index: number) => (
+                              <Cell key={`cell-${index}`} fill={[
+                                '#DCA61F', '#6366f1', '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6'
+                              ][index % 6]} stroke="none" />
+                            ))}
+                          </Pie>
+                          <RechartsTooltip 
+                              contentStyle={{ backgroundColor: '#111113', border: '1px solid #222225', borderRadius: '8px' }}
+                              formatter={(val: number) => [`R$ ${val.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, 'Volume']}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="space-y-3">
+                      {channelData.paymentMethods.map((pm: any, i: number) => {
+                        const colors = ['bg-[#DCA61F]', 'bg-[#6366f1]', 'bg-[#737373]', 'bg-[#525252]', 'bg-[#404040]', 'bg-[#E5E5E5]'];
+                        const totalRev = channelData.total.revenue;
+                        const pct = ((pm.value / totalRev) * 100).toFixed(1);
+                        return (
+                          <div key={i} className="flex items-center justify-between group">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-2.5 h-2.5 rounded-full ${colors[i % 6]}`} />
+                              <span className="text-[11px] text-text-secondary group-hover:text-text-primary transition-colors">{pm.name}</span>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-[11px] font-mono font-bold text-text-primary">R$ {pm.value.toLocaleString('pt-BR')}</p>
+                                <p className="text-[10px] text-text-secondary">{pct}%</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                </div>
+              </Card>
+            )}
           </div>
         )}
 
@@ -1241,67 +1304,6 @@ export default function App() {
           </div>
         )}
 
-        {/* PAYMENT METHODS CHART */}
-        {selectedCompanyId === 'cultura' && dataStatus === 'success' && channelData.paymentMethods && (
-          <div className="mt-8">
-            <Card className="p-6">
-               <div className="flex items-center justify-between mb-8">
-                  <div>
-                    <h4 className="text-sm font-medium text-text-primary flex items-center gap-2">
-                       <CreditCard className="w-4 h-4 text-primary" /> Métodos de Pagamento
-                    </h4>
-                    <p className="text-[11px] text-text-secondary mt-1">Volume financeiro por tipo de transação</p>
-                  </div>
-               </div>
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-                  <div className="h-[280px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={channelData.paymentMethods}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={70}
-                          outerRadius={100}
-                          paddingAngle={8}
-                          dataKey="value"
-                        >
-                          {channelData.paymentMethods.map((_: any, index: number) => (
-                            <Cell key={`cell-${index}`} fill={[
-                              '#DCA61F', '#6366f1', '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6'
-                            ][index % 6]} stroke="none" />
-                          ))}
-                        </Pie>
-                        <RechartsTooltip 
-                           contentStyle={{ backgroundColor: '#111113', border: '1px solid #222225', borderRadius: '8px' }}
-                           formatter={(val: number) => [`R$ ${val.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, 'Volume']}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="space-y-5">
-                    {channelData.paymentMethods.map((pm: any, i: number) => {
-                      const colors = ['bg-[#DCA61F]', 'bg-[#A3A3A3]', 'bg-[#737373]', 'bg-[#525252]', 'bg-[#404040]', 'bg-[#E5E5E5]'];
-                      const totalRev = channelData.total.revenue;
-                      const pct = ((pm.value / totalRev) * 100).toFixed(1);
-                      return (
-                        <div key={i} className="flex items-center justify-between group">
-                          <div className="flex items-center gap-4">
-                            <div className={`w-3 h-3 rounded-full ${colors[i % 6]}`} />
-                            <span className="text-sm text-text-secondary group-hover:text-text-primary transition-colors">{pm.name}</span>
-                          </div>
-                          <div className="text-right">
-                             <p className="text-sm font-mono font-bold text-text-primary">R$ {pm.value.toLocaleString('pt-BR')}</p>
-                             <p className="text-[11px] text-text-secondary">{pct}% do total</p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-               </div>
-            </Card>
-          </div>
-        )}
 
         {/* Winning Ads and Products Matrix */}
         {dataStatus === 'success' && (
