@@ -323,17 +323,26 @@ export default function App() {
             let startDate = new Date();
             let endDate = new Date();
             
-            if (dateRange === '7days') startDate.setDate(now.getDate() - 7);
-            else if (dateRange === '14days') startDate.setDate(now.getDate() - 14);
-            else if (dateRange === '30days') startDate.setDate(now.getDate() - 30);
+            if (dateRange === '7days') { 
+              startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); 
+              startDate.setHours(0,0,0,0); 
+            }
+            else if (dateRange === '14days') { 
+              startDate = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000); 
+              startDate.setHours(0,0,0,0); 
+            }
+            else if (dateRange === '30days') { 
+              startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); 
+              startDate.setHours(0,0,0,0); 
+            }
             else if (dateRange === 'thisMonth') {
               startDate = new Date(now.getFullYear(), now.getMonth(), 1);
               startDate.setHours(0,0,0,0);
             }
             else if (dateRange === 'yesterday') {
-              startDate.setDate(now.getDate() - 1);
+              startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
               startDate.setHours(0,0,0,0);
-              endDate.setDate(now.getDate() - 1);
+              endDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
               endDate.setHours(23,59,59,999);
             }
             else if (dateRange === 'today') {
@@ -341,46 +350,43 @@ export default function App() {
               endDate.setHours(23,59,59,999);
             }
             else if (dateRange === 'custom' && appliedCustomDate.start) {
-              startDate = new Date(appliedCustomDate.start);
+              // Ensure we apply local timezone correctly to custom dates
+              const [sy, sm, sd] = appliedCustomDate.start.split('-').map(Number);
+              startDate = new Date(sy, sm - 1, sd, 0, 0, 0, 0);
               if (appliedCustomDate.end) {
-                endDate = new Date(appliedCustomDate.end);
-                endDate.setHours(23, 59, 59, 999);
+                const [ey, em, ed] = appliedCustomDate.end.split('-').map(Number);
+                endDate = new Date(ey, em - 1, ed, 23, 59, 59, 999);
               }
             }
-            else startDate.setDate(now.getDate() - 365); // Default 1 ano
+            else { 
+              startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000); 
+              startDate.setHours(0,0,0,0); 
+            } // Default 1 ano
 
             const filteredData = (checkouts || []).filter(c => {
               const dateVal = c.timestamp || c.created_at;
               if (!dateVal) return false;
               
-              // Normalize to UTC Date for consistent comparison
+              // Normalize to valid ISO by adding 'Z' if there is an offset or nothing. 
+              // The database has '+00' which is already valid, but replacing ' ' with 'T' handles PostgreSQL string format
               const itemDate = new Date(dateVal.replace(' ', 'T'));
               
-              // Adjust startDate and endDate to UTC to match
-              const startUtc = new Date(Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0, 0, 0, 0));
-              const endUtc = new Date(Date.UTC(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59, 999));
-              
-              const inRange = itemDate >= startUtc && itemDate <= endUtc;
-              return inRange;
+              return itemDate >= startDate && itemDate <= endDate;
             });
             setFilteredCheckouts(filteredData);
+            
             const filteredCadastros = cadastros.filter(c => {
               const dateVal = c.data_cadastro;
               if (!dateVal) return false;
-              // Handle PostgreSQL timestamp format "YYYY-MM-DD HH:MM:SS"
+              
               const itemDate = new Date(dateVal.replace(' ', 'T'));
-              
-              // Adjust startDate and endDate to UTC to match
-              const startUtc = new Date(Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0, 0, 0, 0));
-              const endUtc = new Date(Date.UTC(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59, 999));
-              
-              return itemDate >= startUtc && itemDate <= endUtc;
+              return itemDate >= startDate && itemDate <= endDate;
             });
 
             // --- PROCESSAMENTO DE DADOS SUPABASE PARA O DASHBOARD ---
             const leadsCount = filteredCadastros.length;
-            const totalRevenue = filteredCheckouts.reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
-            const salesCount = filteredCheckouts.length;
+            const totalRevenue = filteredData.reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
+            const salesCount = filteredData.length;
             
             const paymentMap = new Map<string, number>();
             let fallbackCount = 0;
@@ -423,7 +429,7 @@ export default function App() {
               return 'organic';
             };
 
-            filteredCheckouts.forEach(checkout => {
+            filteredData.forEach(checkout => {
               let source = checkout.utm_source || '';
               let medium = checkout.utm_medium || '';
               let campaign = checkout.utm_campaign || '';
@@ -488,7 +494,7 @@ export default function App() {
             const trendMap = new Map<string, { value: number, salesCount: number, leads: number, products: Map<string, number> }>();
             
             // Inicializar com checkouts (vendas)
-            filteredCheckouts.forEach(c => {
+            filteredData.forEach(c => {
               const dateStr = new Date(c.timestamp || c.created_at).toLocaleDateString('pt-BR');
               if (!trendMap.has(dateStr)) {
                 trendMap.set(dateStr, { value: 0, salesCount: 0, leads: 0, products: new Map() });
@@ -527,7 +533,7 @@ export default function App() {
 
             // Atribuição de "Campanhas" (Winning Ads)
             const campaignMap = new Map();
-            filteredCheckouts.forEach(c => {
+            filteredData.forEach(c => {
                const camp = c.utm_campaign || c.utm_source || 'Desconhecido';
                if (!campaignMap.has(camp)) campaignMap.set(camp, { name: camp, sales: 0, rev: 0, source: '' });
                const stats = campaignMap.get(camp);
@@ -543,7 +549,7 @@ export default function App() {
 
             // --- TOP 5 CLIENTES ---
             const customerMap = new Map();
-            filteredCheckouts.forEach(c => {
+            filteredData.forEach(c => {
                 const uid = c.id_usuario;
                 if (!customerMap.has(uid)) customerMap.set(uid, { id: uid, rev: 0, sales: 0, purchases: [] });
                 const stats = customerMap.get(uid);
@@ -684,6 +690,51 @@ export default function App() {
     { name: 'Cancelado', value: filteredCheckouts.filter(c => (c.status || '').toLowerCase().trim() === 'cancelado').length, color: '#f43f5e' }
   ].filter(d => d.value > 0);
 
+  const getTodayStats = () => {
+    const today = new Date();
+    
+    // Checkouts Today
+    const checkoutsToday = supabaseCheckouts.filter(c => {
+      const dateVal = c.timestamp || c.created_at;
+      if (!dateVal) return false;
+      const d = new Date(dateVal.replace(' ', 'T'));
+      return d.getFullYear() === today.getFullYear() && 
+             d.getMonth() === today.getMonth() && 
+             d.getDate() === today.getDate();
+    });
+
+    const productsCount = new Map<string, number>();
+    checkoutsToday.forEach(c => {
+      const curso = supabaseCursos.find(cur => cur.id_curso === c.id_curso);
+      const name = curso ? curso.nome : 'Produto #' + c.id_curso;
+      productsCount.set(name, (productsCount.get(name) || 0) + 1);
+    });
+
+    const productSummary = Array.from(productsCount.entries())
+      .map(([name, qty]) => `${qty} ${name}`)
+      .join(', ');
+
+    const vendasHojeStr = checkoutsToday.length > 0 
+      ? `Vendas hoje: ${productSummary}`
+      : `Vendas hoje: 0`;
+
+    // Cadastros Today
+    const cadastrosToday = supabaseCadastros.filter(c => {
+      const dateVal = c.data_cadastro;
+      if (!dateVal) return false;
+      const d = new Date(dateVal.replace(' ', 'T'));
+      return d.getFullYear() === today.getFullYear() && 
+             d.getMonth() === today.getMonth() && 
+             d.getDate() === today.getDate();
+    });
+
+    const cadastrosHojeStr = `Cadastros hoje: ${cadastrosToday.length}`;
+
+    return { vendasHojeStr, cadastrosHojeStr };
+  };
+
+  const { vendasHojeStr, cadastrosHojeStr } = getTodayStats();
+
   return (
     <div className="min-h-screen bg-bg-app text-text-main font-sans selection:bg-primary selection:text-white pb-12">
       {/* Top Navigation / Header */}
@@ -771,6 +822,8 @@ export default function App() {
             </div>
           </Card>
         )}
+        
+
         
         {/* SETUP BANNER - Totalmente removido para Cultura */}
         {dataStatus === 'logged_out' && selectedCompanyId !== 'cultura' && (
@@ -1335,10 +1388,11 @@ export default function App() {
         {selectedCompanyId === 'cultura' && dataStatus === 'success' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
              <Card className="p-0 overflow-hidden border-indigo-500/20">
-                <div className="p-5 border-b border-[#222225] flex items-center justify-between bg-indigo-500/5">
-                   <h4 className="text-sm font-medium text-indigo-400 flex items-center gap-2">
+                <div className="p-5 border-b border-[#222225] flex flex-col sm:flex-row sm:items-center justify-between bg-indigo-500/5 gap-2">
+                   <h4 className="text-sm font-medium text-indigo-400 flex items-center gap-2 shrink-0">
                       <CreditCard className="w-4 h-4" /> Vendas Recentes (Checkouts)
                    </h4>
+                   <span className="text-[11px] text-indigo-300/70 font-medium sm:text-right">{vendasHojeStr}</span>
                 </div>
                  <div className="max-h-[500px] overflow-y-auto">
                    <div className="divide-y divide-white/5">
@@ -1475,10 +1529,11 @@ export default function App() {
              </Card>
 
              <Card className="p-0 overflow-hidden border-emerald-500/20">
-                <div className="p-5 border-b border-[#222225] flex items-center justify-between bg-emerald-500/5">
-                   <h4 className="text-sm font-medium text-emerald-400 flex items-center gap-2">
+                <div className="p-5 border-b border-[#222225] flex flex-col sm:flex-row sm:items-center justify-between bg-emerald-500/5 gap-2">
+                   <h4 className="text-sm font-medium text-emerald-400 flex items-center gap-2 shrink-0">
                       <Users className="w-4 h-4" /> Novos Leads (Cadastros)
                    </h4>
+                   <span className="text-[11px] text-emerald-300/70 font-medium sm:text-right">{cadastrosHojeStr}</span>
                 </div>
                 <div className="max-h-[400px] overflow-y-auto">
                   <div className="divide-y divide-white/5">
