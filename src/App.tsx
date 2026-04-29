@@ -11,14 +11,12 @@ import {
 import { supabase } from './lib/supabase';
 
 const COLORS = {
-  meta: '#3b82f6', // blue-500
-  google: '#f43f5e', // rose-500
-  organic: '#10b981', // emerald-500
+  meta: '#DCA61F', // blue-500
+  google: '#DCA61F', // rose-500
+  organic: '#DCA61F', // emerald-500
 };
 
-const CHART_COLORS = [
-  '#6366f1', '#10b981', '#f43f5e', '#f59e0b', '#8b5cf6', '#3b82f6', '#ec4899', '#06b6d4', '#14b8a6', '#f97316'
-];
+const CHART_COLORS = ['#DCA61F', '#A3A3A3', '#737373', '#525252', '#404040', '#E5E5E5', '#FFFFFF', '#D4D4D4', '#262626', '#171717'];
 
 const PieChartLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, value, index, name, percent }: any) => {
   const RADIAN = Math.PI / 180;
@@ -75,7 +73,7 @@ const mockKpis = [
 
 // --- COMPONENTS ---
 const Card = ({ children, className = '', ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={`bg-bg-card border border-border rounded-2xl p-6 shadow-sm ${className}`} {...props}>
+  <div className={`bg-bg-card border border-border rounded-sm p-6 shadow-sm ${className}`} {...props}>
     {children}
   </div>
 );
@@ -88,7 +86,7 @@ const ProductRow: React.FC<{ p: any, isSupabase?: boolean }> = ({ p, isSupabase 
       <tr onClick={() => setExpanded(!expanded)} className="hover:bg-[#111113] transition-colors cursor-pointer group border-b border-[#222225]/50">
         <td className="p-4 text-xs text-[#E4E3E0] max-w-[200px] truncate" title={p.name}>
           <div className="flex items-center gap-2">
-            <ChevronRight className={`w-3 h-3 shrink-0 text-gray-500 transition-transform ${expanded ? 'rotate-90' : ''}`} />
+            <ChevronRight className={`w-3 h-3 shrink-0 text-text-secondary transition-transform ${expanded ? 'rotate-90' : ''}`} />
             <div className="flex flex-col">
               <span className="truncate font-medium">{p.name}</span>
               {!isSupabase && <span className="text-[10px] text-[#52525B]">Sessões: {p.sessions || 0}</span>}
@@ -98,27 +96,27 @@ const ProductRow: React.FC<{ p: any, isSupabase?: boolean }> = ({ p, isSupabase 
         <td className="p-4 text-xs text-right font-mono text-[#8E9299]">{p.qty}</td>
         <td className="p-4 text-xs text-right font-mono">
            {isSupabase ? (
-             <span className="text-[10px] text-gray-500 uppercase">Supabase</span>
+             <span className="text-[10px] text-text-secondary uppercase">Supabase</span>
            ) : (
-             <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${roas > 3 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-gray-500/10 text-gray-400'}`}>
+             <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${roas > 3 ? 'bg-primary/10 text-primary' : 'bg-gray-500/10 text-text-secondary'}`}>
                {roas > 0 ? `${roas.toFixed(1)}x` : '-'}
              </span>
            )}
         </td>
-        <td className="p-4 text-xs text-right font-mono text-emerald-400 font-semibold">R$ {p.rev.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+        <td className="p-4 text-xs text-right font-mono text-primary font-semibold">R$ {p.rev.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
       </tr>
       {expanded && p.campaigns && p.campaigns.length > 0 && (
         <tr className="bg-[#0f0f11]">
           <td colSpan={4} className="p-0">
             <div className="px-4 py-3 border-l-2 border-[#333] ml-4 bg-[#0a0a0a]">
-              <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-2 font-medium">Vendas por Campanha/Origem</div>
+              <div className="text-[10px] text-text-secondary uppercase tracking-widest mb-2 font-medium">Vendas por Campanha/Origem</div>
               <div className="space-y-2">
                 {p.campaigns.map((c: any, idx: number) => (
                   <div key={idx} className="flex justify-between items-center text-xs">
-                    <span className="text-gray-400 truncate pr-2 max-w-[180px]" title={c.name}>{c.name}</span>
+                    <span className="text-text-secondary truncate pr-2 max-w-[180px]" title={c.name}>{c.name}</span>
                     <div className="flex space-x-4 shrink-0 text-right">
-                      <span className="font-mono text-gray-500 w-8">{c.qty} un</span>
-                      <span className="font-mono text-emerald-500/80 w-20">R$ {c.rev.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                      <span className="font-mono text-text-secondary w-8">{c.qty} un</span>
+                      <span className="font-mono text-primary w-20">R$ {c.rev.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
                     </div>
                   </div>
                 ))}
@@ -393,14 +391,14 @@ export default function App() {
             
             // Atribuição por Canal (UTM Source)
             const channelDefinitions: Record<string, { name: string, color: string }> = {
-              meta: { name: 'Meta Ads', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
-              google: { name: 'Search Ads', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20' },
-              comercial: { name: 'Comercial', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
-              rdstation: { name: 'RD Station', color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' },
-              bio: { name: 'Bio do Instagram', color: 'bg-pink-500/10 text-pink-400 border-pink-500/20' },
-              manychat: { name: 'Manychat', color: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' },
-              email: { name: 'E-Mail', color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' },
-              organic: { name: 'Busca Orgânica / Sem Rastreio', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' }
+              meta: { name: 'Meta Ads', color: 'bg-primary/10 text-primary border-primary/20' },
+              google: { name: 'Search Ads', color: 'bg-primary/10 text-primary border-primary/20' },
+              comercial: { name: 'Comercial', color: 'bg-primary/10 text-primary border-primary/20' },
+              rdstation: { name: 'RD Station', color: 'bg-primary/10 text-primary border-primary/20' },
+              bio: { name: 'Bio do Instagram', color: 'bg-primary/10 text-primary border-primary/20' },
+              manychat: { name: 'Manychat', color: 'bg-primary/10 text-primary border-primary/20' },
+              email: { name: 'E-Mail', color: 'bg-primary/10 text-primary border-primary/20' },
+              organic: { name: 'Busca Orgânica / Sem Rastreio', color: 'bg-primary/10 text-primary border-primary/20' }
             };
 
             const channelMap: any = {};
@@ -685,9 +683,9 @@ export default function App() {
   };
 
   const statusPieData = [
-    { name: 'Pago', value: filteredCheckouts.filter(c => (c.status || '').toLowerCase().trim() === 'pago').length, color: '#10b981' },
+    { name: 'Pago', value: filteredCheckouts.filter(c => (c.status || '').toLowerCase().trim() === 'pago').length, color: '#DCA61F' },
     { name: 'Aguardando', value: filteredCheckouts.filter(c => (c.status || '').toLowerCase().trim() === 'aguardando').length, color: '#f59e0b' },
-    { name: 'Cancelado', value: filteredCheckouts.filter(c => (c.status || '').toLowerCase().trim() === 'cancelado').length, color: '#f43f5e' }
+    { name: 'Cancelado', value: filteredCheckouts.filter(c => (c.status || '').toLowerCase().trim() === 'cancelado').length, color: '#DCA61F' }
   ].filter(d => d.value > 0);
 
   const getTodayStats = () => {
@@ -710,13 +708,9 @@ export default function App() {
       productsCount.set(name, (productsCount.get(name) || 0) + 1);
     });
 
-    const productSummary = Array.from(productsCount.entries())
-      .map(([name, qty]) => `${qty} ${name}`)
-      .join(', ');
-
-    const vendasHojeStr = checkoutsToday.length > 0 
-      ? `Vendas hoje: ${productSummary}`
-      : `Vendas hoje: 0`;
+    const todayPieData = Array.from(productsCount.entries())
+      .map(([name, qty]) => ({ name, value: qty }))
+      .sort((a, b) => b.value - a.value);
 
     // Cadastros Today
     const cadastrosToday = supabaseCadastros.filter(c => {
@@ -728,12 +722,14 @@ export default function App() {
              d.getDate() === today.getDate();
     });
 
-    const cadastrosHojeStr = `Cadastros hoje: ${cadastrosToday.length}`;
-
-    return { vendasHojeStr, cadastrosHojeStr };
+    return { 
+      todayPieData,
+      vendasHojeTotal: checkoutsToday.length,
+      cadastrosHojeTotal: cadastrosToday.length
+    };
   };
 
-  const { vendasHojeStr, cadastrosHojeStr } = getTodayStats();
+  const { todayPieData, vendasHojeTotal, cadastrosHojeTotal } = getTodayStats();
 
   return (
     <div className="min-h-screen bg-bg-app text-text-main font-sans selection:bg-primary selection:text-white pb-12">
@@ -750,11 +746,11 @@ export default function App() {
             <div className="relative">
               <button 
                   onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#222225] bg-[#111113] hover:bg-[#1A1A1D] transition-colors text-sm font-medium focus:outline-none"
+                  className="flex items-center gap-2 px-4 py-2 rounded-sm border border-border bg-bg-card hover:brightness-110 transition-colors text-sm font-medium focus:outline-none"
               >
-                <CalendarDays className="w-4 h-4 text-[#8E9299]" />
+                <CalendarDays className="w-4 h-4 text-text-secondary" />
                 <span>{dateRangeLabels[dateRange]}</span>
-                <ChevronDown className="w-4 h-4 text-[#8E9299]" />
+                <ChevronDown className="w-4 h-4 text-text-secondary" />
               </button>
               
               {isDateDropdownOpen && (
@@ -836,7 +832,7 @@ export default function App() {
             </div>
             <button 
                 onClick={handleConnect}
-                className="flex items-center gap-2 px-6 py-3 rounded-full bg-white text-black hover:bg-gray-200 transition-colors font-medium whitespace-nowrap"
+                className="flex items-center gap-2 px-6 py-3 rounded-sm bg-primary text-white hover:brightness-110 transition-colors font-medium whitespace-nowrap"
             >
               Conectar Conta Google
             </button>
@@ -844,8 +840,8 @@ export default function App() {
         )}
         
         {dataStatus === 'error' && (
-          <div className="bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-2xl p-6">
-            <h3 className="text-lg font-medium mb-2 text-rose-400">Erro na Consulta da API</h3>
+          <div className="bg-primary/10 border border-primary/20 text-primary rounded-2xl p-6">
+            <h3 className="text-lg font-medium mb-2 text-primary">Erro na Consulta da API</h3>
             <p className="text-sm">{errorMessage}</p>
           </div>
         )}
@@ -869,7 +865,7 @@ export default function App() {
               <div className="flex gap-4 text-right">
                 <div>
                    <p className="text-[10px] text-[#52525B] uppercase font-bold">Máximo Diário</p>
-                   <p className="text-lg font-mono text-emerald-400">R$ {Math.max(...channelData.trendData.map((d: any) => d.value)).toLocaleString('pt-BR')}</p>
+                   <p className="text-lg font-mono text-primary">R$ {Math.max(...channelData.trendData.map((d: any) => d.value)).toLocaleString('pt-BR')}</p>
                 </div>
               </div>
             </div>
@@ -878,8 +874,8 @@ export default function App() {
                 <AreaChart data={channelData.trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="#DCA61F" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#DCA61F" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#222225" vertical={false} />
@@ -901,7 +897,7 @@ export default function App() {
                   <Area
                     type="monotone"
                     dataKey="leads"
-                    stroke="#3b82f6"
+                    stroke="#DCA61F"
                     strokeWidth={2}
                     fill="transparent"
                     name="Leads"
@@ -916,15 +912,15 @@ export default function App() {
                             <div className="space-y-2 mb-3">
                               <div className="flex justify-between items-center">
                                 <span className="text-[#8E9299]">Faturamento:</span>
-                                <span className="text-emerald-400 font-bold ml-4">R$ {Number(data.value || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                <span className="text-primary font-bold ml-4">R$ {Number(data.value || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                               </div>
                               <div className="flex justify-between items-center">
                                 <span className="text-[#8E9299]">Vendas:</span>
-                                <span className="text-emerald-400 font-bold ml-4">{data.salesCount}</span>
+                                <span className="text-primary font-bold ml-4">{data.salesCount}</span>
                               </div>
                               <div className="flex justify-between items-center">
                                 <span className="text-[#8E9299]">Novos Leads:</span>
-                                <span className="text-blue-400 font-bold ml-4">{data.leads}</span>
+                                <span className="text-primary font-bold ml-4">{data.leads}</span>
                               </div>
                             </div>
                             
@@ -933,7 +929,7 @@ export default function App() {
                                 <p className="text-[#52525B] uppercase text-[9px] font-bold tracking-widest mb-1">Vendas por Produto:</p>
                                 {data.products.map((p: any, idx: number) => (
                                   <div key={idx} className="flex justify-between gap-4 items-center">
-                                    <span className="text-gray-400 truncate max-w-[140px] italic">{p.name}</span>
+                                    <span className="text-text-secondary truncate max-w-[140px] italic">{p.name}</span>
                                     <span className="text-white font-mono bg-white/5 px-1.5 rounded text-[10px]">{p.qty}x</span>
                                   </div>
                                 ))}
@@ -948,7 +944,7 @@ export default function App() {
                   <Area 
                     type="monotone" 
                     dataKey="salesCount" 
-                    stroke="#10b981" 
+                    stroke="#DCA61F" 
                     strokeWidth={2}
                     fillOpacity={1} 
                     fill="url(#colorRev)" 
@@ -964,18 +960,18 @@ export default function App() {
         {/* KPIs Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           {kpis.map((kpi, idx) => (
-            <Card key={idx} className="relative overflow-hidden group hover:border-[#333338] transition-colors p-5">
+            <Card key={idx} className="relative overflow-hidden group hover:border-primary/50 transition-colors p-5">
               <div className="flex justify-between items-start mb-3">
-                <div className="p-2 bg-[#1A1A1D] rounded-lg group-hover:bg-[#222225] transition-colors">
-                  <kpi.icon className="w-5 h-5 text-[#8E9299]" />
+                <div className="p-2 bg-primary/10 rounded-sm transition-colors text-primary">
+                  <kpi.icon className="w-5 h-5" />
                 </div>
               </div>
               <div>
-                <p className="text-xs text-[#8E9299] mb-1 font-medium">{kpi.title}</p>
+                <p className="text-xs text-text-secondary mb-1 font-medium">{kpi.title}</p>
                 <h3 className="text-2xl font-semibold tracking-tight">{kpi.value}</h3>
                 <p className="text-xs text-[#52525B] mt-1">{kpi.trend}</p>
               </div>
-              <div className="absolute -right-6 -bottom-6 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
+              <div className="absolute -right-6 -bottom-6 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity text-primary">
                 <kpi.icon className="w-24 h-24" />
               </div>
             </Card>
@@ -1099,31 +1095,31 @@ export default function App() {
         {selectedCustomerDetail && (
           <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setSelectedCustomerDetail(null)}>
             <Card className="max-w-lg w-full p-8 relative animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-                <button onClick={() => setSelectedCustomerDetail(null)} className="absolute top-4 right-4 text-gray-500 hover:text-white">✕</button>
-                <h3 className="text-sm font-medium text-emerald-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                <button onClick={() => setSelectedCustomerDetail(null)} className="absolute top-4 right-4 text-text-secondary hover:text-white">✕</button>
+                <h3 className="text-sm font-medium text-primary uppercase tracking-widest mb-2 flex items-center gap-2">
                      <Award className="w-4 h-4" /> Perfil Financeiro
                 </h3>
                 <p className="text-3xl font-bold mb-1">{selectedCustomerDetail.name}</p>
-                <p className="text-gray-500 text-sm mb-6">ID: {selectedCustomerDetail.id}</p>
+                <p className="text-text-secondary text-sm mb-6">ID: {selectedCustomerDetail.id}</p>
                 
                 <div className="grid grid-cols-2 gap-4">
                     <div className="bg-white/5 p-4 rounded-lg">
-                        <p className="text-[10px] text-gray-500 uppercase">Receita Total</p>
-                        <p className="text-lg font-mono text-emerald-400">R$ {selectedCustomerDetail.rev.toLocaleString('pt-BR')}</p>
+                        <p className="text-[10px] text-text-secondary uppercase">Receita Total</p>
+                        <p className="text-lg font-mono text-primary">R$ {selectedCustomerDetail.rev.toLocaleString('pt-BR')}</p>
                     </div>
                     <div className="bg-white/5 p-4 rounded-lg">
-                        <p className="text-[10px] text-gray-500 uppercase">Vendas</p>
+                        <p className="text-[10px] text-text-secondary uppercase">Vendas</p>
                         <p className="text-lg font-mono text-white">{selectedCustomerDetail.sales}x</p>
                     </div>
                 </div>
                 
                 <div className="mt-6">
-                    <p className="text-[10px] text-gray-500 uppercase mb-2">Histórico de Compras</p>
+                    <p className="text-[10px] text-text-secondary uppercase mb-2">Histórico de Compras</p>
                     <div className="space-y-2">
                         {selectedCustomerDetail.purchases.map((p: any, idx: number) => (
                             <div key={idx} className="flex justify-between p-2 rounded bg-white/5 text-xs">
                                 <span className="text-white truncate max-w-[200px]">{p.cursoName}</span>
-                                <span className="font-mono text-emerald-400">R$ {Number(p.valor).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                <span className="font-mono text-primary">R$ {Number(p.valor).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                             </div>
                         ))}
                     </div>
@@ -1137,16 +1133,16 @@ export default function App() {
           <div className="lg:col-span-1 mt-8">
             <Card>
               <h3 className="text-sm font-medium text-[#A1A1AA] mb-4 flex items-center gap-2">
-                  <Award className="w-4 h-4 text-emerald-400" /> Top 5 Clientes (LTV)
+                  <Award className="w-4 h-4 text-primary" /> Top 5 Clientes (LTV)
               </h3>
               <div className="space-y-3">
                 {channelData.topCustomers.map((c: any, i: number) => (
                     <div key={i} onClick={() => setSelectedCustomerDetail(c)} className="flex items-center justify-between p-3 rounded-lg bg-black/40 hover:bg-[#1A1A1D] cursor-pointer transition-colors border border-[#222225]">
                         <div className="max-w-[70%]">
                           <p className="text-xs text-white truncate font-medium">{c.name}</p>
-                          <p className="text-[10px] text-gray-500">{c.sales} vendas</p>
+                          <p className="text-[10px] text-text-secondary">{c.sales} vendas</p>
                         </div>
-                        <p className="text-xs text-emerald-400 font-mono font-bold">R$ {c.rev.toLocaleString('pt-BR')}</p>
+                        <p className="text-xs text-primary font-mono font-bold">R$ {c.rev.toLocaleString('pt-BR')}</p>
                     </div>
                 ))}
               </div>
@@ -1164,12 +1160,12 @@ export default function App() {
                   </h4>
                   {channelData.hasFallback && (
                     <div className="group relative flex items-center cursor-help">
-                      <span className="text-[10px] bg-amber-500/10 text-amber-500 px-2 py-1 rounded-full border border-amber-500/20 flex items-center gap-1">
+                      <span className="text-[10px] bg-primary/10 text-primary px-2 py-1 rounded-full border border-primary/20 flex items-center gap-1">
                         <Activity className="w-3 h-3" /> Origem Provável (Primeiro Contato)
                       </span>
                       <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-[#111113] border border-[#222225] rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 text-[11px] leading-relaxed">
                         <p className="text-white font-bold mb-1">Como funciona?</p>
-                        <p className="text-gray-400">Quando uma venda não possui rastreio UTM direto no checkout, buscamos a origem original do usuário no cadastro (First Click). Isso recupera faturamento que antes ficaria "Sem Rastreio".</p>
+                        <p className="text-text-secondary">Quando uma venda não possui rastreio UTM direto no checkout, buscamos a origem original do usuário no cadastro (First Click). Isso recupera faturamento que antes ficaria "Sem Rastreio".</p>
                       </div>
                     </div>
                   )}
@@ -1194,8 +1190,8 @@ export default function App() {
                        <YAxis stroke="#8E9299" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `R$ ${val >= 1000 ? (val/1000).toFixed(1)+'k' : val}`} />
                        <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: '#1A1A1D' }} />
                        <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', color: '#8E9299', paddingTop: '20px' }} />
-                       <Bar dataKey="Receita" fill="#10b981" radius={[4, 4, 0, 0]} barSize={40} />
-                       {selectedCompanyId !== 'cultura' && <Bar dataKey="Custo" fill="#f43f5e" radius={[4, 4, 0, 0]} barSize={40} />}
+                       <Bar dataKey="Receita" fill="#DCA61F" radius={[4, 4, 0, 0]} barSize={40} />
+                       {selectedCompanyId !== 'cultura' && <Bar dataKey="Custo" fill="#DCA61F" radius={[4, 4, 0, 0]} barSize={40} />}
                      </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -1208,8 +1204,8 @@ export default function App() {
                <div className="space-y-6">
                   {[
                     selectedCompanyId !== 'cultura' && { label: 'Sessões Totais', value: channelData.total.sessions, color: 'bg-white/10', icon: Activity },
-                    { label: 'Criação de Leads', value: channelData.total.leads, color: 'bg-blue-500/20', icon: Users, pct: (selectedCompanyId !== 'cultura' && channelData.total.sessions > 0) ? (channelData.total.leads / channelData.total.sessions * 100).toFixed(1) : undefined },
-                    { label: 'Vendas Realizadas', value: channelData.total.sales, color: 'bg-emerald-500/20', icon: ShoppingCart, pct: channelData.total.leads > 0 ? (channelData.total.sales / channelData.total.leads * 100).toFixed(1) : 0 },
+                    { label: 'Criação de Leads', value: channelData.total.leads, color: 'bg-primary/20', icon: Users, pct: (selectedCompanyId !== 'cultura' && channelData.total.sessions > 0) ? (channelData.total.leads / channelData.total.sessions * 100).toFixed(1) : undefined },
+                    { label: 'Vendas Realizadas', value: channelData.total.sales, color: 'bg-primary/20', icon: ShoppingCart, pct: channelData.total.leads > 0 ? (channelData.total.sales / channelData.total.leads * 100).toFixed(1) : 0 },
                   ].filter(Boolean).map((step: any, i, arr) => (
                     <div key={i} className="relative">
                       <div className={`p-4 rounded-xl border border-white/5 ${step.color} flex items-center justify-between`}>
@@ -1242,7 +1238,7 @@ export default function App() {
                {selectedCompanyId !== 'cultura' && (
                  <div className="mt-6 pt-6 border-t border-[#222225] flex justify-between items-center">
                    <span className="text-xs text-[#8E9299]">Tx. de Venda Global</span>
-                   <span className="text-sm font-bold text-emerald-400">
+                   <span className="text-sm font-bold text-primary">
                       {channelData.total.sessions > 0 ? (channelData.total.sales / channelData.total.sessions * 100).toFixed(2) : 0}%
                    </span>
                  </div>
@@ -1258,9 +1254,9 @@ export default function App() {
                <div className="flex items-center justify-between mb-8">
                   <div>
                     <h4 className="text-sm font-medium text-white flex items-center gap-2">
-                       <CreditCard className="w-4 h-4 text-indigo-400" /> Métodos de Pagamento
+                       <CreditCard className="w-4 h-4 text-primary" /> Métodos de Pagamento
                     </h4>
-                    <p className="text-[11px] text-gray-500 mt-1">Volume financeiro por tipo de transação</p>
+                    <p className="text-[11px] text-text-secondary mt-1">Volume financeiro por tipo de transação</p>
                   </div>
                </div>
                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
@@ -1278,7 +1274,7 @@ export default function App() {
                         >
                           {channelData.paymentMethods.map((_: any, index: number) => (
                             <Cell key={`cell-${index}`} fill={[
-                              '#10b981', '#6366f1', '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6'
+                              '#DCA61F', '#6366f1', '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6'
                             ][index % 6]} stroke="none" />
                           ))}
                         </Pie>
@@ -1291,18 +1287,18 @@ export default function App() {
                   </div>
                   <div className="space-y-5">
                     {channelData.paymentMethods.map((pm: any, i: number) => {
-                      const colors = ['bg-emerald-500', 'bg-indigo-500', 'bg-amber-500', 'bg-pink-500', 'bg-cyan-500', 'bg-violet-500'];
+                      const colors = ['bg-[#DCA61F]', 'bg-[#A3A3A3]', 'bg-[#737373]', 'bg-[#525252]', 'bg-[#404040]', 'bg-[#E5E5E5]'];
                       const totalRev = channelData.total.revenue;
                       const pct = ((pm.value / totalRev) * 100).toFixed(1);
                       return (
                         <div key={i} className="flex items-center justify-between group">
                           <div className="flex items-center gap-4">
                             <div className={`w-3 h-3 rounded-full ${colors[i % 6]}`} />
-                            <span className="text-sm text-gray-300 group-hover:text-white transition-colors">{pm.name}</span>
+                            <span className="text-sm text-text-secondary group-hover:text-white transition-colors">{pm.name}</span>
                           </div>
                           <div className="text-right">
                              <p className="text-sm font-mono font-bold text-white">R$ {pm.value.toLocaleString('pt-BR')}</p>
-                             <p className="text-[11px] text-gray-500">{pct}% do total</p>
+                             <p className="text-[11px] text-text-secondary">{pct}% do total</p>
                           </div>
                         </div>
                       );
@@ -1320,9 +1316,9 @@ export default function App() {
              <Card className="p-0 overflow-hidden">
                 <div className="p-5 border-b border-[#222225] flex items-center justify-between bg-gradient-to-r from-[#111113] to-transparent">
                    <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
-                      <Award className="w-4 h-4 text-amber-400" /> Anúncios Ganhadores (Escalar)
+                      <Award className="w-4 h-4 text-primary" /> Anúncios Ganhadores (Escalar)
                    </h4>
-                   <span className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded border border-emerald-500/20 font-bold">Top ROI</span>
+                   <span className="text-[10px] bg-primary/10 text-primary px-2 py-1 rounded border border-primary/20 font-bold">Top ROI</span>
                 </div>
                 <div className="max-h-[400px] overflow-y-auto">
                    <table className="w-full text-left">
@@ -1337,15 +1333,15 @@ export default function App() {
                         {channelData.winners?.length > 0 ? channelData.winners.map((win: any, i: number) => (
                            <tr key={i} className="hover:bg-white/5 transition-colors">
                               <td className="p-4 flex items-center gap-3">
-                                 <div className={`w-1.5 h-1.5 rounded-full ${win.source === 'meta' ? 'bg-blue-500' : 'bg-rose-500'}`} />
+                                 <div className={`w-1.5 h-1.5 rounded-full ${win.source === 'meta' ? 'bg-primary' : 'bg-primary'}`} />
                                  <span className="text-xs text-[#FAFAFA] truncate max-w-[240px]" title={win.name}>{win.name}</span>
                               </td>
                               <td className="p-4 text-xs font-mono text-center">{win.sales}</td>
-                              <td className="p-4 text-xs font-mono text-right text-emerald-400">R$ {win.rev.toLocaleString('pt-BR')}</td>
+                              <td className="p-4 text-xs font-mono text-right text-primary">R$ {win.rev.toLocaleString('pt-BR')}</td>
                            </tr>
                         )) : (
                           <tr>
-                            <td colSpan={3} className="p-8 text-center text-gray-600 italic text-xs">
+                            <td colSpan={3} className="p-8 text-center text-[#525252] italic text-xs">
                               {selectedCompanyId === 'cultura' ? 'Dados insuficientes de UTMs para classificar anúncios.' : 'Nenhum dado de campanha encontrado.'}
                             </td>
                           </tr>
@@ -1384,15 +1380,67 @@ export default function App() {
           </div>
         )}
 
+        {/* RESUMO HOJE - PERFORMANCE EM TEMPO REAL */}
+        {selectedCompanyId === 'cultura' && dataStatus === 'success' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-8">
+                <h4 className="text-sm font-medium text-text-secondary flex items-center gap-2">
+                  <Activity className="w-4 h-4" /> Vendas de Hoje ({vendasHojeTotal})
+                </h4>
+              </div>
+              <div className="h-[250px] w-full">
+                {todayPieData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={todayPieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                        labelLine={false}
+                        label={PieChartLabel}
+                      >
+                        {todayPieData.map((entry: any, index: number) => (
+                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} stroke="none" />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip content={<CustomTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-sm text-text-secondary italic">
+                    Nenhuma venda registrada ainda hoje.
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            <Card className="p-6 flex flex-col items-center justify-center">
+              <div className="text-center">
+                <h4 className="text-sm font-medium text-text-secondary mb-4 flex items-center gap-2 justify-center">
+                  <Users className="w-4 h-4" /> Cadastros de Hoje
+                </h4>
+                <div className="text-6xl font-light tracking-tighter text-primary">
+                  {cadastrosHojeTotal}
+                </div>
+                <p className="text-xs text-text-secondary mt-2 uppercase tracking-wide">Novos Leads Captados</p>
+              </div>
+            </Card>
+          </div>
+        )}
+
         {/* LIVE ACTIVITY FEED - Somente para Cultura */}
         {selectedCompanyId === 'cultura' && dataStatus === 'success' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-             <Card className="p-0 overflow-hidden border-indigo-500/20">
-                <div className="p-5 border-b border-[#222225] flex flex-col sm:flex-row sm:items-center justify-between bg-indigo-500/5 gap-2">
-                   <h4 className="text-sm font-medium text-indigo-400 flex items-center gap-2 shrink-0">
+             <Card className="p-0 overflow-hidden border-primary/20">
+                <div className="p-5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between bg-white/5 gap-2">
+                   <h4 className="text-sm font-medium text-primary flex items-center gap-2 shrink-0">
                       <CreditCard className="w-4 h-4" /> Vendas Recentes (Checkouts)
                    </h4>
-                   <span className="text-[11px] text-indigo-300/70 font-medium sm:text-right">{vendasHojeStr}</span>
                 </div>
                  <div className="max-h-[500px] overflow-y-auto">
                    <div className="divide-y divide-white/5">
@@ -1416,43 +1464,43 @@ export default function App() {
                               className={`p-4 flex items-center justify-between hover:bg-white/[0.04] cursor-pointer transition-colors ${isExpanded ? 'bg-white/[0.03]' : ''}`}
                             >
                               <div className="flex items-center gap-3">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isExpanded ? 'bg-emerald-500 text-black' : 'bg-emerald-500/10 text-emerald-500'}`}>
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isExpanded ? 'bg-primary text-black' : 'bg-primary/10 text-primary'}`}>
                                     <DollarSign className="w-4 h-4" />
                                 </div>
                                 <div className="max-w-[150px] sm:max-w-none">
                                     <p className="text-xs font-medium text-white truncate">{lead?.nome || 'Usuário #' + checkout.id_usuario}</p>
-                                    <p className="text-[10px] text-gray-500 truncate">{curso?.nome || 'Curso #' + checkout.id_curso}</p>
+                                    <p className="text-[10px] text-text-secondary truncate">{curso?.nome || 'Curso #' + checkout.id_curso}</p>
                                 </div>
                               </div>
                               <div className="flex items-center gap-4">
                                 <div className="text-right hidden sm:block">
-                                   <p className="text-[10px] text-gray-400">{purchaseDate.toLocaleDateString('pt-BR')}</p>
-                                   <p className="text-[9px] text-gray-600 uppercase font-bold">{paymentMethod} / {checkout.status}</p>
+                                   <p className="text-[10px] text-text-secondary">{purchaseDate.toLocaleDateString('pt-BR')}</p>
+                                   <p className="text-[9px] text-[#525252] uppercase font-bold">{paymentMethod} / {checkout.status}</p>
                                 </div>
                                 <div className="text-right">
-                                   <p className="text-sm font-bold text-emerald-400">R$ {Number(checkout.valor).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
-                                   <ChevronDown className={`w-3 h-3 text-gray-600 ml-auto transition-transform ${isExpanded ? 'rotate-180 text-emerald-500' : ''}`} />
+                                   <p className="text-sm font-bold text-primary">R$ {Number(checkout.valor).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                                   <ChevronDown className={`w-3 h-3 text-[#525252] ml-auto transition-transform ${isExpanded ? 'rotate-180 text-primary' : ''}`} />
                                 </div>
                               </div>
                             </div>
 
                             {isExpanded && (
-                              <div className="px-6 pb-10 pt-6 bg-white/[0.03] border-b border-indigo-500/20 animate-in fade-in slide-in-from-top-4 duration-300">
+                              <div className="px-6 pb-10 pt-6 bg-white/[0.03] border-b border-primary/20 animate-in fade-in slide-in-from-top-4 duration-300">
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-12 gap-x-16">
                                   
                                   {/* Seção: Identidade & Contato */}
                                   <div className="space-y-6">
                                     <div className="flex items-center gap-2 mb-4">
-                                      <div className="w-1 h-3 bg-indigo-500 rounded-full" />
-                                      <p className="text-[10px] text-gray-400 uppercase font-bold tracking-[0.2em]">Identidade e Contato</p>
+                                      <div className="w-1 h-3 bg-primary rounded-full" />
+                                      <p className="text-[10px] text-text-secondary uppercase font-bold tracking-[0.2em]">Identidade e Contato</p>
                                     </div>
                                     <div className="space-y-4 pl-3">
                                       <div className="flex flex-col gap-1">
-                                        <span className="text-[9px] text-gray-500 uppercase font-medium">E-mail de Cadastro</span>
+                                        <span className="text-[9px] text-text-secondary uppercase font-medium">E-mail de Cadastro</span>
                                         <span className="text-sm text-white font-medium select-all break-all">{lead?.email || 'Não informado'}</span>
                                       </div>
                                       <div className="flex flex-col gap-1">
-                                        <span className="text-[9px] text-gray-500 uppercase font-medium">WhatsApp / Telefone</span>
+                                        <span className="text-[9px] text-text-secondary uppercase font-medium">WhatsApp / Telefone</span>
                                         <span className="text-sm text-white font-mono">{lead?.telefone || 'Não informado'}</span>
                                       </div>
                                     </div>
@@ -1461,17 +1509,17 @@ export default function App() {
                                   {/* Seção: Ciclo de Venda */}
                                   <div className="space-y-6">
                                     <div className="flex items-center gap-2 mb-4">
-                                      <div className="w-1 h-3 bg-emerald-500 rounded-full" />
-                                      <p className="text-[10px] text-gray-400 uppercase font-bold tracking-[0.2em]">Ciclo de Venda</p>
+                                      <div className="w-1 h-3 bg-primary rounded-full" />
+                                      <p className="text-[10px] text-text-secondary uppercase font-bold tracking-[0.2em]">Ciclo de Venda</p>
                                     </div>
                                     <div className="space-y-4 pl-3">
                                       <div className="flex flex-col gap-1">
-                                        <span className="text-[9px] text-gray-500 uppercase font-medium text-indigo-400/80">Data de Primeiro Contato</span>
+                                        <span className="text-[9px] text-text-secondary uppercase font-medium text-primary">Data de Primeiro Contato</span>
                                         <span className="text-sm text-white">{regDate ? regDate.toLocaleString('pt-BR') : '---'}</span>
                                       </div>
                                       <div className="flex flex-col gap-1">
-                                        <span className="text-[9px] text-gray-500 uppercase font-medium text-emerald-400/80">Janela de Decisão</span>
-                                        <span className={`text-sm font-bold ${timeToConversion === 'Instantâneo' ? 'text-blue-400' : 'text-emerald-400'}`}>
+                                        <span className="text-[9px] text-text-secondary uppercase font-medium text-primary">Janela de Decisão</span>
+                                        <span className={`text-sm font-bold ${timeToConversion === 'Instantâneo' ? 'text-primary' : 'text-primary'}`}>
                                           {timeToConversion === 'Instantâneo' ? 'Compra Imediata' : `${timeToConversion} pós-cadastro`}
                                         </span>
                                       </div>
@@ -1481,14 +1529,14 @@ export default function App() {
                                   {/* Seção: Atribuição Detalhada */}
                                   <div className="space-y-6 lg:col-span-1 md:col-span-2">
                                     <div className="flex items-center gap-2 mb-4">
-                                      <div className="w-1 h-3 bg-amber-500 rounded-full" />
-                                      <p className="text-[10px] text-gray-400 uppercase font-bold tracking-[0.2em]">Atribuição do Negócio</p>
+                                      <div className="w-1 h-3 bg-primary rounded-full" />
+                                      <p className="text-[10px] text-text-secondary uppercase font-bold tracking-[0.2em]">Atribuição do Negócio</p>
                                     </div>
                                     <div className="space-y-5 pl-3">
                                       <div>
-                                        <span className="text-[9px] text-gray-500 uppercase font-medium block mb-2">Canal de Origem</span>
-                                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
-                                          <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                                        <span className="text-[9px] text-text-secondary uppercase font-medium block mb-2">Canal de Origem</span>
+                                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20">
+                                          <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                                           <span className="text-xs text-indigo-300 font-bold">
                                             {getFriendlyChannel(checkout.utm_source || lead?.utm_source_cadastro, checkout.utm_medium || lead?.utm_medium_cadastro, checkout.utm_campaign || lead?.utm_campaign_cadastro, checkout.utm_content || lead?.utm_content_cadastro)}
                                           </span>
@@ -1497,21 +1545,21 @@ export default function App() {
 
                                       <div className="pt-2 border-t border-white/5 space-y-2">
                                         <div className="flex items-center justify-between text-[10px]">
-                                          <span className="text-gray-500">UTM Source:</span>
-                                          <span className="text-gray-300 font-mono">{checkout.utm_source || lead?.utm_source_cadastro || '(vazio)'}</span>
+                                          <span className="text-text-secondary">UTM Source:</span>
+                                          <span className="text-text-secondary font-mono">{checkout.utm_source || lead?.utm_source_cadastro || '(vazio)'}</span>
                                         </div>
                                         <div className="flex items-center justify-between text-[10px]">
-                                          <span className="text-gray-500">UTM Campaign:</span>
-                                          <span className="text-gray-300 font-mono truncate max-w-[150px]" title={checkout.utm_campaign || lead?.utm_campaign_cadastro}>
+                                          <span className="text-text-secondary">UTM Campaign:</span>
+                                          <span className="text-text-secondary font-mono truncate max-w-[150px]" title={checkout.utm_campaign || lead?.utm_campaign_cadastro}>
                                             {checkout.utm_campaign || lead?.utm_campaign_cadastro || '(vazio)'}
                                           </span>
                                         </div>
                                       </div>
 
                                       {!checkout.utm_source && lead?.utm_source_cadastro && (
-                                        <div className="mt-4 p-3 rounded-xl bg-amber-500/5 border border-amber-500/20 flex items-start gap-3">
-                                          <Activity className="w-4 h-4 text-amber-500 shrink-0" />
-                                          <p className="text-[10px] text-amber-500/90 leading-relaxed font-medium">
+                                        <div className="mt-4 p-3 rounded-xl bg-white/5 border border-primary/20 flex items-start gap-3">
+                                          <Activity className="w-4 h-4 text-primary shrink-0" />
+                                          <p className="text-[10px] text-primary leading-relaxed font-medium">
                                             Venda sem rastreio direto. Atribuição recuperada através do <span className="underline decoration-amber-500/50">Primeiro Contato</span> do lead na base.
                                           </p>
                                         </div>
@@ -1528,12 +1576,11 @@ export default function App() {
                 </div>
              </Card>
 
-             <Card className="p-0 overflow-hidden border-emerald-500/20">
-                <div className="p-5 border-b border-[#222225] flex flex-col sm:flex-row sm:items-center justify-between bg-emerald-500/5 gap-2">
-                   <h4 className="text-sm font-medium text-emerald-400 flex items-center gap-2 shrink-0">
+             <Card className="p-0 overflow-hidden border-primary/20">
+                <div className="p-5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between bg-white/5 gap-2">
+                   <h4 className="text-sm font-medium text-primary flex items-center gap-2 shrink-0">
                       <Users className="w-4 h-4" /> Novos Leads (Cadastros)
                    </h4>
-                   <span className="text-[11px] text-emerald-300/70 font-medium sm:text-right">{cadastrosHojeStr}</span>
                 </div>
                 <div className="max-h-[400px] overflow-y-auto">
                   <div className="divide-y divide-white/5">
@@ -1557,27 +1604,27 @@ export default function App() {
                             className={`p-4 flex items-center justify-between hover:bg-white/[0.04] cursor-pointer transition-colors ${isExpanded ? 'bg-white/[0.03]' : ''}`}
                           >
                             <div className="flex items-center gap-3">
-                               <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isExpanded ? 'bg-indigo-500 text-white' : hasPurchased ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/10 text-blue-500'}`}>
+                               <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isExpanded ? 'bg-primary text-white' : hasPurchased ? 'bg-primary/20 text-primary' : 'bg-primary/10 text-primary'}`}>
                                   <Users className="w-4 h-4" />
                                </div>
                                <div>
                                   <div className="flex items-center gap-2">
                                     <p className="text-xs font-medium text-white">{lead.nome || lead.email || 'Lead #' + lead.id_usuario}</p>
                                     {hasPurchased && (
-                                      <span className="text-[8px] bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 px-1.5 py-0.5 rounded-full font-black tracking-widest">
+                                      <span className="text-[8px] bg-primary/10 text-primary border border-primary/30 px-1.5 py-0.5 rounded-full font-black tracking-widest">
                                         CLIENTE
                                       </span>
                                     )}
                                   </div>
-                                  <p className="text-[10px] text-gray-500">{origin}</p>
+                                  <p className="text-[10px] text-text-secondary">{origin}</p>
                                </div>
                             </div>
                             <div className="flex items-center gap-4">
                                <div className="text-right">
-                                  <p className="text-[10px] text-gray-400">{new Date(lead.data_cadastro).toLocaleDateString('pt-BR')}</p>
-                                  <p className="text-[9px] text-gray-600 uppercase tracking-tighter">{lead.cidade || 'S/ Cidade'}</p>
+                                  <p className="text-[10px] text-text-secondary">{new Date(lead.data_cadastro).toLocaleDateString('pt-BR')}</p>
+                                  <p className="text-[9px] text-[#525252] uppercase tracking-tighter">{lead.cidade || 'S/ Cidade'}</p>
                                </div>
-                               <ChevronDown className={`w-3 h-3 text-gray-600 transition-transform ${isExpanded ? 'rotate-180 text-indigo-400' : ''}`} />
+                               <ChevronDown className={`w-3 h-3 text-[#525252] transition-transform ${isExpanded ? 'rotate-180 text-primary' : ''}`} />
                             </div>
                           </div>
 
@@ -1586,17 +1633,17 @@ export default function App() {
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                 <div className="space-y-4">
                                   <div>
-                                    <p className="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-2">Informações de Contato</p>
+                                    <p className="text-[9px] text-text-secondary uppercase font-bold tracking-widest mb-2">Informações de Contato</p>
                                     <div className="space-y-1.5">
-                                      <p className="text-[11px] text-white flex justify-between"><span className="text-gray-600">E-mail:</span> <span className="font-medium select-all">{lead.email || 'N/A'}</span></p>
-                                      <p className="text-[11px] text-white flex justify-between"><span className="text-gray-600">Tel/Cel:</span> <span className="font-mono">{lead.telefone || 'N/A'}</span></p>
-                                      <p className="text-[11px] text-white flex justify-between"><span className="text-gray-600">Local:</span> <span>{lead.cidade ? `${lead.cidade} - ${lead.estado || ''}` : 'Não identificado'}</span></p>
+                                      <p className="text-[11px] text-white flex justify-between"><span className="text-[#525252]">E-mail:</span> <span className="font-medium select-all">{lead.email || 'N/A'}</span></p>
+                                      <p className="text-[11px] text-white flex justify-between"><span className="text-[#525252]">Tel/Cel:</span> <span className="font-mono">{lead.telefone || 'N/A'}</span></p>
+                                      <p className="text-[11px] text-white flex justify-between"><span className="text-[#525252]">Local:</span> <span>{lead.cidade ? `${lead.cidade} - ${lead.estado || ''}` : 'Não identificado'}</span></p>
                                     </div>
                                   </div>
 
                                   {hasPurchased && purchase && (
-                                    <div className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
-                                      <p className="text-[9px] text-emerald-500 uppercase font-bold tracking-widest mb-2">Conversão Realizada</p>
+                                    <div className="p-3 rounded-lg bg-white/5 border border-primary/20">
+                                      <p className="text-[9px] text-primary uppercase font-bold tracking-widest mb-2">Conversão Realizada</p>
                                       <p className="text-[10px] text-emerald-200/80 leading-relaxed">
                                         Comprou <span className="text-white font-bold italic">"{supabaseCursos.find(c => c.id_curso === purchase.id_curso)?.nome || 'Produto'}"</span> em {new Date(purchase.timestamp || purchase.created_at).toLocaleDateString('pt-BR')}.
                                       </p>
@@ -1606,24 +1653,24 @@ export default function App() {
 
                                 <div className="space-y-4">
                                   <div>
-                                    <p className="text-[9px] text-gray-500 uppercase font-bold tracking-widest mb-2">Rastreamento (UTMs)</p>
+                                    <p className="text-[9px] text-text-secondary uppercase font-bold tracking-widest mb-2">Rastreamento (UTMs)</p>
                                     <div className="space-y-2">
                                       <div className="p-2 rounded bg-black/20 border border-white/5 space-y-1">
                                         <div className="flex justify-between text-[10px]">
-                                          <span className="text-gray-600">Source:</span>
-                                          <span className="text-gray-300 font-mono truncate max-w-[120px]">{lead.utm_source_cadastro || '(vazio)'}</span>
+                                          <span className="text-[#525252]">Source:</span>
+                                          <span className="text-text-secondary font-mono truncate max-w-[120px]">{lead.utm_source_cadastro || '(vazio)'}</span>
                                         </div>
                                         <div className="flex justify-between text-[10px]">
-                                          <span className="text-gray-600">Medium:</span>
-                                          <span className="text-gray-300 font-mono truncate max-w-[120px]">{lead.utm_medium_cadastro || '(vazio)'}</span>
+                                          <span className="text-[#525252]">Medium:</span>
+                                          <span className="text-text-secondary font-mono truncate max-w-[120px]">{lead.utm_medium_cadastro || '(vazio)'}</span>
                                         </div>
                                         <div className="flex justify-between text-[10px]">
-                                          <span className="text-gray-600">Campaign:</span>
-                                          <span className="text-gray-300 font-mono truncate max-w-[120px]">{lead.utm_campaign_cadastro || '(vazio)'}</span>
+                                          <span className="text-[#525252]">Campaign:</span>
+                                          <span className="text-text-secondary font-mono truncate max-w-[120px]">{lead.utm_campaign_cadastro || '(vazio)'}</span>
                                         </div>
                                       </div>
                                       <div className="flex items-center gap-2 mt-4">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                                        <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                                         <span className="text-[10px] text-indigo-300 font-bold uppercase tracking-tight">Canal: {origin}</span>
                                       </div>
                                     </div>
@@ -1649,18 +1696,18 @@ export default function App() {
             </h2>
             
             {(selectedCompanyId === 'cultura' ? [
-              { id: 'meta', name: 'Meta Ads', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
-              { id: 'google', name: 'Search Ads', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20' },
-              { id: 'comercial', name: 'Comercial', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' },
-              { id: 'rdstation', name: 'RD Station', color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20' },
-              { id: 'bio', name: 'Bio do Instagram', color: 'bg-pink-500/10 text-pink-400 border-pink-500/20' },
-              { id: 'manychat', name: 'Manychat', color: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' },
-              { id: 'email', name: 'E-Mail', color: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' },
-              { id: 'organic', name: 'Busca Orgânica / Sem Rastreio', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' }
+              { id: 'meta', name: 'Meta Ads', color: 'bg-primary/10 text-primary border-primary/20' },
+              { id: 'google', name: 'Search Ads', color: 'bg-primary/10 text-primary border-primary/20' },
+              { id: 'comercial', name: 'Comercial', color: 'bg-primary/10 text-primary border-primary/20' },
+              { id: 'rdstation', name: 'RD Station', color: 'bg-primary/10 text-primary border-primary/20' },
+              { id: 'bio', name: 'Bio do Instagram', color: 'bg-primary/10 text-primary border-primary/20' },
+              { id: 'manychat', name: 'Manychat', color: 'bg-primary/10 text-primary border-primary/20' },
+              { id: 'email', name: 'E-Mail', color: 'bg-primary/10 text-primary border-primary/20' },
+              { id: 'organic', name: 'Busca Orgânica / Sem Rastreio', color: 'bg-primary/10 text-primary border-primary/20' }
             ] : [
-              { id: 'meta', name: 'Meta Ads', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
-              { id: 'google', name: 'Google Ads', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20' },
-              { id: 'organic', name: 'Tráfego Orgânico / Direto', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' }
+              { id: 'meta', name: 'Meta Ads', color: 'bg-primary/10 text-primary border-primary/20' },
+              { id: 'google', name: 'Google Ads', color: 'bg-primary/10 text-primary border-primary/20' },
+              { id: 'organic', name: 'Tráfego Orgânico / Direto', color: 'bg-primary/10 text-primary border-primary/20' }
             ]).map(channel => {
               const data = channelData[channel.id];
               if (!data || (selectedCompanyId === 'cultura' && data.revenue === 0 && data.leads === 0)) return null;
@@ -1669,7 +1716,7 @@ export default function App() {
               const roas = data.cost > 0 ? data.revenue / data.cost : 0;
               const cpa = data.sales > 0 ? data.cost / data.sales : 0;
               const avgTicket = data.sales > 0 ? data.revenue / data.sales : 0;
-              const roasColor = roas > 3 ? 'text-emerald-400' : roas >= 1.5 ? 'text-amber-400' : roas > 0 ? 'text-rose-400' : 'text-gray-400';
+              const roasColor = roas > 3 ? 'text-primary' : roas >= 1.5 ? 'text-primary' : roas > 0 ? 'text-primary' : 'text-text-secondary';
 
               return (
                 <Card key={channel.id} className="p-0 overflow-hidden border border-[#222225]">
@@ -1688,7 +1735,7 @@ export default function App() {
                     {selectedCompanyId === 'cultura' ? (
                       <div className="p-4 flex flex-col justify-center">
                         <span className="text-xs text-[#8E9299] font-medium mb-1">Total Leads</span>
-                        <span className="text-lg font-semibold text-blue-400">{data.leads}</span>
+                        <span className="text-lg font-semibold text-primary">{data.leads}</span>
                       </div>
                     ) : (
                       <div className="p-4 flex flex-col justify-center">
@@ -1699,7 +1746,7 @@ export default function App() {
                     {selectedCompanyId === 'cultura' ? (
                        <div className="p-4 flex flex-col justify-center">
                         <span className="text-xs text-[#8E9299] font-medium mb-1">Ticket Médio</span>
-                        <span className="text-lg font-semibold text-emerald-400">R$ {avgTicket.toFixed(2)}</span>
+                        <span className="text-lg font-semibold text-primary">R$ {avgTicket.toFixed(2)}</span>
                       </div>
                     ) : (
                       <div className="p-4 flex flex-col justify-center">
@@ -1714,7 +1761,7 @@ export default function App() {
                     {selectedCompanyId === 'cultura' ? (
                        <div className="p-4 flex flex-col justify-center">
                         <span className="text-xs text-[#8E9299] font-medium mb-1">Conversão Lead/Venda</span>
-                        <span className="text-lg font-semibold text-indigo-400">{data.leads > 0 ? ((data.sales / data.leads) * 100).toFixed(1) : 0}%</span>
+                        <span className="text-lg font-semibold text-primary">{data.leads > 0 ? ((data.sales / data.leads) * 100).toFixed(1) : 0}%</span>
                       </div>
                     ) : (
                       <div className="p-4 flex flex-col justify-center">
@@ -1776,12 +1823,12 @@ export default function App() {
                                     <td className="p-3 text-xs text-right font-mono text-[#8E9299]">
                                       <div className="flex items-center justify-end gap-2">
                                         <div className="w-12 h-1.5 bg-[#222225] rounded-full overflow-hidden">
-                                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }}></div>
+                                          <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }}></div>
                                         </div>
                                         <span className="w-8">{pct.toFixed(0)}%</span>
                                       </div>
                                     </td>
-                                    <td className="p-3 text-xs text-right font-mono text-emerald-400">R$ {c.rev.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+                                    <td className="p-3 text-xs text-right font-mono text-primary">R$ {c.rev.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
                                   </tr>
                                 )})}
                               </tbody>
