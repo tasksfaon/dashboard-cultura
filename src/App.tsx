@@ -839,21 +839,19 @@ export default function App() {
           </div>
         )}
 
-        <div className="mb-8">
-          <h2 className="text-3xl font-light tracking-tight mb-2">
-            Performance Overview 
-            {dataStatus === 'loading' && <Loader2 className="inline-block ml-4 w-5 h-5 animate-spin text-text-label" />}
-          </h2>
-          <p className="text-text-label">Blended data across all channels.</p>
-        </div>
+        {dataStatus === 'loading' && (
+          <div className="flex items-center gap-2 mb-8">
+            <Loader2 className="w-5 h-5 animate-spin text-text-label" />
+            <span className="text-sm text-text-label">Carregando dados...</span>
+          </div>
+        )}
 
         {/* GRÁFICO DE RECEITA TEMPORAL - Principal */}
         {dataStatus === 'success' && channelData.trendData && channelData.trendData.length > 0 && (
           <Card className="mb-8 p-6 bg-gradient-to-br from-[#111113] to-[#0A0A0A]">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-sm font-medium text-text-label uppercase tracking-wider mb-1">Performance Histórica</h3>
-                <p className="text-[2.25rem] font-bold tabular-nums tracking-tight">Receita Diária (Faturamento Real)</p>
+                <h3 className="text-[1.5rem] font-serif font-normal text-text-primary">Performance diária</h3>
               </div>
               <div className="flex gap-4 text-right">
                 <div>
