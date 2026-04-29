@@ -159,6 +159,7 @@ export default function App() {
   const [supabaseCategorias, setSupabaseCategorias] = useState<any[]>([]);
   const [supabaseCursos, setSupabaseCursos] = useState<any[]>([]);
   const [supabaseCheckouts, setSupabaseCheckouts] = useState<any[]>([]);
+  const [filteredCheckouts, setFilteredCheckouts] = useState<any[]>([]);
   const [sheetData, setSheetData] = useState<any[]>([]);
 
   useEffect(() => {
@@ -320,6 +321,7 @@ export default function App() {
             // --- FILTRAGEM POR DATA (JS) ---
             const now = new Date();
             let startDate = new Date();
+            let endDate = new Date();
             
             if (dateRange === '7days') startDate.setDate(now.getDate() - 7);
             else if (dateRange === '14days') startDate.setDate(now.getDate() - 14);
@@ -328,13 +330,52 @@ export default function App() {
               startDate = new Date(now.getFullYear(), now.getMonth(), 1);
               startDate.setHours(0,0,0,0);
             }
-            else if (dateRange === 'yesterday') startDate.setDate(now.getDate() - 1);
-            else if (dateRange === 'today') startDate.setHours(0,0,0,0);
-            else if (dateRange === 'custom' && appliedCustomDate.start) startDate = new Date(appliedCustomDate.start);
+            else if (dateRange === 'yesterday') {
+              startDate.setDate(now.getDate() - 1);
+              startDate.setHours(0,0,0,0);
+              endDate.setDate(now.getDate() - 1);
+              endDate.setHours(23,59,59,999);
+            }
+            else if (dateRange === 'today') {
+              startDate.setHours(0,0,0,0);
+              endDate.setHours(23,59,59,999);
+            }
+            else if (dateRange === 'custom' && appliedCustomDate.start) {
+              startDate = new Date(appliedCustomDate.start);
+              if (appliedCustomDate.end) {
+                endDate = new Date(appliedCustomDate.end);
+                endDate.setHours(23, 59, 59, 999);
+              }
+            }
             else startDate.setDate(now.getDate() - 365); // Default 1 ano
 
-            const filteredCheckouts = checkouts.filter(c => new Date(c.timestamp || c.created_at) >= startDate);
-            const filteredCadastros = cadastros.filter(c => new Date(c.data_cadastro) >= startDate);
+            const filteredData = (checkouts || []).filter(c => {
+              const dateVal = c.timestamp || c.created_at;
+              if (!dateVal) return false;
+              
+              // Normalize to UTC Date for consistent comparison
+              const itemDate = new Date(dateVal.replace(' ', 'T'));
+              
+              // Adjust startDate and endDate to UTC to match
+              const startUtc = new Date(Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0, 0, 0, 0));
+              const endUtc = new Date(Date.UTC(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59, 999));
+              
+              const inRange = itemDate >= startUtc && itemDate <= endUtc;
+              return inRange;
+            });
+            setFilteredCheckouts(filteredData);
+            const filteredCadastros = cadastros.filter(c => {
+              const dateVal = c.data_cadastro;
+              if (!dateVal) return false;
+              // Handle PostgreSQL timestamp format "YYYY-MM-DD HH:MM:SS"
+              const itemDate = new Date(dateVal.replace(' ', 'T'));
+              
+              // Adjust startDate and endDate to UTC to match
+              const startUtc = new Date(Date.UTC(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0, 0, 0, 0));
+              const endUtc = new Date(Date.UTC(endDate.getFullYear(), endDate.getMonth(), endDate.getDate(), 23, 59, 59, 999));
+              
+              return itemDate >= startUtc && itemDate <= endUtc;
+            });
 
             // --- PROCESSAMENTO DE DADOS SUPABASE PARA O DASHBOARD ---
             const leadsCount = filteredCadastros.length;
@@ -637,35 +678,24 @@ export default function App() {
     setDataStatus('logged_out');
   };
 
+  const statusPieData = [
+    { name: 'Pago', value: filteredCheckouts.filter(c => (c.status || '').toLowerCase().trim() === 'pago').length, color: '#10b981' },
+    { name: 'Aguardando', value: filteredCheckouts.filter(c => (c.status || '').toLowerCase().trim() === 'aguardando').length, color: '#f59e0b' },
+    { name: 'Cancelado', value: filteredCheckouts.filter(c => (c.status || '').toLowerCase().trim() === 'cancelado').length, color: '#f43f5e' }
+  ].filter(d => d.value > 0);
+
   return (
     <div className="min-h-screen bg-bg-app text-text-main font-sans selection:bg-primary selection:text-white pb-12">
       {/* Top Navigation / Header */}
-      <header className="border-b border-border bg-bg-app/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="relative group">
-              <button className="flex items-center gap-3 hover:opacity-80 transition-opacity focus:outline-none">
-                <img src={selectedCompany.logo} alt="Logo" className="w-10 h-10 rounded-full border border-[#222225] object-cover" />
-                <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-semibold tracking-tight">{selectedCompany.name}</h1>
-                </div>
-              </button>
-              <div className="absolute top-12 left-0 w-64 bg-[#111113] border border-[#222225] rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 overflow-hidden z-50">
-                {companies.map(company => (
-                   <button
-                     key={company.id}
-                     onClick={() => setSelectedCompanyId(company.id)}
-                     className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-[#222225] transition-colors focus:outline-none ${selectedCompanyId === company.id ? 'bg-[#1A1A1D]' : ''}`}
-                   >
-                     <img src={company.logo} alt={company.name} className="w-8 h-8 object-cover rounded-full border border-[#222225]" />
-                     <span className="text-sm font-medium">{company.name}</span>
-                   </button>
-                ))}
-              </div>
-            </div>
+      <header className="border-b border-border bg-bg-app/80 backdrop-blur-md z-50">
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center relative">
+          
+          <div className="absolute left-1/2 -translate-x-1/2 z-0 flex flex-col items-center top-2">
+             <img src="https://jndvesrtqewjqvarfaox.supabase.co/storage/v1/object/public/Logos/625949743_18077241884595017_7660496256666720708_n.jpg" alt="Logo Central" className="w-20 h-20 rounded-full border border-[#222225] object-cover" />
+             <span className="text-xs font-semibold text-white mt-1">Dashboard Cultura</span>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 ml-auto z-10">
             <div className="relative">
               <button 
                   onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
@@ -726,16 +756,13 @@ export default function App() {
               )}
             </div>
             
-            <button className="flex items-center gap-2 px-4 py-2 ml-2 rounded-full border border-[#222225] bg-[#111113] hover:bg-[#1A1A1D] transition-colors text-sm font-medium">
-              <Filter className="w-4 h-4 text-[#8E9299]" />
-              <span>Filtros</span>
-            </button>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-6 mt-8 space-y-6">
         
+
         {sheetData.length > 0 && (
           <Card className="mb-8">
             <h3 className="text-sm font-medium text-[#8E9299] uppercase tracking-wider mb-4">Ad Names (Planilha)</h3>
@@ -817,17 +844,8 @@ export default function App() {
                     tickLine={false} 
                     axisLine={false} 
                   />
-                  <YAxis 
-                    yAxisId="right"
-                    orientation="right"
-                    stroke="#3b82f6" 
-                    fontSize={10} 
-                    tickLine={false} 
-                    axisLine={false} 
-                    tickFormatter={(val) => `${val}`}
-                  />
+                  
                   <Area
-                    yAxisId="right"
                     type="monotone"
                     dataKey="leads"
                     stroke="#3b82f6"
@@ -913,7 +931,55 @@ export default function App() {
 
         {/* Insights de Distribuição */}
         {dataStatus === 'success' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-8">
+                <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
+                  <Activity className="w-4 h-4" /> Proporção Status Checkout
+                </h4>
+              </div>
+              <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={statusPieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={5}
+                      dataKey="value"
+                      labelLine={false}
+                      label={PieChartLabel}
+                    >
+                      {statusPieData.map((entry: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip 
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-[#111113] border border-[#222225] p-3 rounded-lg shadow-xl outline-none">
+                              <div className="flex items-center justify-between gap-4 text-sm">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: data.color }} />
+                                  <span className="text-[#8E9299]">Status: {data.name}</span>
+                                </div>
+                                <span className="font-mono text-white text-lg font-bold">{data.value}</span>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+
             <Card className="p-6">
               <div className="flex items-center justify-between mb-8">
                 <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
@@ -1307,7 +1373,7 @@ export default function App() {
                               <div className="flex items-center gap-4">
                                 <div className="text-right hidden sm:block">
                                    <p className="text-[10px] text-gray-400">{purchaseDate.toLocaleDateString('pt-BR')}</p>
-                                   <p className="text-[9px] text-gray-600 uppercase font-bold">{paymentMethod}</p>
+                                   <p className="text-[9px] text-gray-600 uppercase font-bold">{paymentMethod} / {checkout.status}</p>
                                 </div>
                                 <div className="text-right">
                                    <p className="text-sm font-bold text-emerald-400">R$ {Number(checkout.valor).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
