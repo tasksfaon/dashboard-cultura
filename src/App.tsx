@@ -46,7 +46,7 @@ const PieChartLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, value, inde
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-bg-card border border-border p-3 rounded-[14px] shadow-xl outline-none">
+      <div className="bg-bg-card border border-border p-3 rounded-[4px] shadow-xl outline-none">
         <p className="text-text-primary font-medium mb-2">{label}</p>
         {payload.map((entry: any, index: number) => (
            <div key={index} className="flex items-center justify-between gap-4 text-sm mb-1">
@@ -733,20 +733,22 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-bg-page text-text-main font-sans selection:bg-primary selection:text-text-primary pb-12">
+      {/* Decorative Top Bar */}
+      <div className="h-1 w-full bg-gradient-to-r from-transparent via-primary to-transparent opacity-50" />
       {/* Top Navigation / Header */}
-      <header className="border-b border-border bg-bg-page/80 backdrop-blur-md z-50">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center relative">
+      <header className="border-b border-border bg-bg-page/80 backdrop-blur-md z-[60] pt-10 pb-6 relative">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col items-center relative">
           
-          <div className="absolute left-1/2 -translate-x-1/2 z-0 flex flex-col items-center top-2">
-             <img src="https://jndvesrtqewjqvarfaox.supabase.co/storage/v1/object/public/Logos/625949743_18077241884595017_7660496256666720708_n.jpg" alt="Logo Central" className="w-20 h-20 rounded-full border border-border object-cover" />
-             <span className="text-xs font-semibold text-text-primary mt-1">Dashboard Cultura</span>
+          <div className="z-0 flex flex-col items-center mb-4">
+             <img src="https://jndvesrtqewjqvarfaox.supabase.co/storage/v1/object/public/Logos/625949743_18077241884595017_7660496256666720708_n.jpg" alt="Logo Central" className="w-28 h-28 rounded-full border border-border object-cover mb-4 shadow-2xl" />
+             <span className="text-3xl font-serif font-normal italic text-text-primary tracking-[0.08em]">Dashboard Cultura Jurídica</span>
           </div>
           
-          <div className="flex items-center gap-2 ml-auto z-10">
+          <div className="flex items-center gap-2 ml-auto z-50 w-full justify-end mt-4 md:mt-0 md:absolute md:top-1/2 md:-translate-y-1/2 md:right-6">
             <div className="relative">
               <button 
                   onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-[8px] border border-border bg-bg-card hover:brightness-110 transition-colors text-sm font-medium focus:outline-none"
+                  className="flex items-center gap-2 px-4 py-2 rounded-[4px] border border-border bg-bg-card hover:brightness-110 transition-colors text-sm font-medium focus:outline-none"
               >
                 <CalendarDays className="w-4 h-4 text-text-secondary" />
                 <span>{dateRangeLabels[dateRange]}</span>
@@ -754,7 +756,7 @@ export default function App() {
               </button>
               
               {isDateDropdownOpen && (
-                <div className="absolute top-12 right-0 w-64 bg-bg-card border border-border rounded-[14px] shadow-xl z-50 p-2 text-sm">
+                <div className="absolute top-12 right-0 w-64 bg-bg-card border border-border rounded-[4px] shadow-2xl z-[100] p-2 text-sm">
                    {Object.entries(dateRangeLabels).map(([key, label]) => (
                      <button
                         key={key}
@@ -762,7 +764,7 @@ export default function App() {
                           setDateRange(key); 
                           if(key !== 'custom') setIsDateDropdownOpen(false); 
                         }}
-                        className={`w-full text-left px-4 py-2.5 rounded-[14px] hover:bg-bg-sidebar transition-colors focus:outline-none ${dateRange === key ? 'bg-[#1E1E1E] font-medium text-text-primary' : 'text-text-label'}`}
+                        className={`w-full text-left px-4 py-2.5 rounded-[4px] hover:bg-bg-sidebar transition-colors focus:outline-none ${dateRange === key ? 'bg-[#1E1E1E] font-medium text-text-primary' : 'text-text-label'}`}
                      >
                        {label}
                      </button>
@@ -776,7 +778,7 @@ export default function App() {
                            type="date" 
                            value={customStart} 
                            onChange={e => setCustomStart(e.target.value)} 
-                           className="bg-bg-input border border-border text-text-primary px-3 py-2 rounded-[14px] text-xs focus:outline-none focus:border-primary" 
+                           className="bg-bg-input border border-border text-text-primary px-3 py-2 rounded-[4px] text-xs focus:outline-none focus:border-primary" 
                          />
                        </div>
                        <div className="flex flex-col gap-1">
@@ -785,7 +787,7 @@ export default function App() {
                            type="date" 
                            value={customEnd} 
                            onChange={e => setCustomEnd(e.target.value)} 
-                           className="bg-bg-input border border-border text-text-primary px-3 py-2 rounded-[14px] text-xs focus:outline-none focus:border-primary" 
+                           className="bg-bg-input border border-border text-text-primary px-3 py-2 rounded-[4px] text-xs focus:outline-none focus:border-primary" 
                          />
                        </div>
                        <button 
@@ -793,7 +795,7 @@ export default function App() {
                            setAppliedCustomDate({ start: customStart, end: customEnd });
                            setIsDateDropdownOpen(false);
                          }}
-                         className="mt-1 bg-primary text-bg-page py-2 rounded-[8px] text-[0.8125rem] font-semibold hover:bg-primary-dark transition-colors"
+                         className="mt-1 bg-primary text-bg-page py-2 rounded-[4px] text-[0.8125rem] font-semibold hover:bg-primary-dark transition-colors"
                        >
                          Aplicar Filtro
                        </button>
@@ -816,7 +818,7 @@ export default function App() {
         
         {/* SETUP BANNER - Totalmente removido para Cultura */}
         {dataStatus === 'logged_out' && selectedCompanyId !== 'cultura' && (
-          <div className="bg-bg-card border border-border text-text-primary rounded-[14px] p-8 flex flex-col md:flex-row gap-6 items-center justify-between">
+          <div className="bg-bg-card border border-border text-text-primary rounded-[4px] p-8 flex flex-col md:flex-row gap-6 items-center justify-between">
             <div className="flex-1">
               <h3 className="text-xl font-medium mb-2">Conectar Google Analytics</h3>
               <p className="text-sm text-text-label max-w-2xl mb-4">
@@ -825,7 +827,7 @@ export default function App() {
             </div>
             <button 
                 onClick={handleConnect}
-                className="flex items-center gap-2 px-6 py-3 rounded-[8px] bg-primary text-[#0D0D0D] font-semibold tracking-[0.02em] hover:bg-[#E6BE5A] transition-colors font-medium whitespace-nowrap"
+                className="flex items-center gap-2 px-6 py-3 rounded-[4px] bg-primary text-[#0D0D0D] font-semibold tracking-[0.02em] hover:bg-[#E6BE5A] transition-colors font-medium whitespace-nowrap"
             >
               Conectar Conta Google
             </button>
@@ -833,8 +835,8 @@ export default function App() {
         )}
         
         {dataStatus === 'error' && (
-          <div className="bg-primary/10 border border-primary/20 text-primary rounded-[14px] p-6">
-            <h3 className="text-[1.5rem] font-bold text-text-primary mb-2 text-primary">Erro na Consulta da API</h3>
+          <div className="bg-primary/10 border border-primary/20 text-primary rounded-[4px] p-6">
+            <h3 className="text-[1.5rem] font-serif font-normal text-text-primary mb-2 text-primary">Erro na Consulta da API</h3>
             <p className="text-sm">{errorMessage}</p>
           </div>
         )}
@@ -851,7 +853,7 @@ export default function App() {
           <Card className="mb-8 p-6 bg-gradient-to-br from-[#111113] to-[#0A0A0A]">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-[1.5rem] font-bold text-text-primary">Performance diária</h3>
+                <h3 className="text-[1.5rem] font-serif font-normal text-text-primary italic">Performance diária</h3>
               </div>
               <div className="flex gap-4 text-right">
                 <div>
@@ -898,7 +900,7 @@ export default function App() {
                       if (active && payload && payload.length) {
                         const data = payload[0].payload;
                         return (
-                          <div className="bg-bg-card border border-border p-4 rounded-[14px] shadow-2xl text-[11px] min-w-[180px] backdrop-blur-sm bg-black/80">
+                          <div className="bg-bg-card border border-border p-4 rounded-[4px] shadow-2xl text-[11px] min-w-[180px] backdrop-blur-sm bg-black/80">
                             <p className="text-text-label mb-3 font-medium border-b border-white/5 pb-2">{label}</p>
                             <div className="space-y-2 mb-3">
                               <div className="flex justify-between items-center">
@@ -953,7 +955,7 @@ export default function App() {
           {kpis.map((kpi, idx) => (
             <Card key={idx} className="relative overflow-hidden group hover:border-primary/50 transition-colors p-5">
               <div className="flex justify-between items-start mb-3">
-                <div className="p-2 bg-primary/10 rounded-[8px] transition-colors text-primary">
+                <div className="p-2 bg-primary/10 rounded-[4px] transition-colors text-primary">
                   <kpi.icon className="w-5 h-5" />
                 </div>
               </div>
@@ -1001,7 +1003,7 @@ export default function App() {
                         if (active && payload && payload.length) {
                           const data = payload[0].payload;
                           return (
-                            <div className="bg-bg-card border border-border p-3 rounded-[14px] shadow-xl outline-none">
+                            <div className="bg-bg-card border border-border p-3 rounded-[4px] shadow-xl outline-none">
                               <div className="flex items-center justify-between gap-4 text-sm">
                                 <div className="flex items-center gap-2">
                                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: data.color }} />
@@ -1087,18 +1089,18 @@ export default function App() {
           <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setSelectedCustomerDetail(null)}>
             <Card className="max-w-lg w-full p-8 relative animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
                 <button onClick={() => setSelectedCustomerDetail(null)} className="absolute top-4 right-4 text-text-secondary hover:text-text-primary">✕</button>
-                <h3 className="text-[0.8125rem] font-semibold text-text-secondary uppercase tracking-[0.06em] text-primary uppercase tracking-widest mb-2 flex items-center gap-2">
+                <h3 className="text-[0.8125rem] font-semibold text-primary uppercase tracking-[0.15em] mb-2 flex items-center gap-2 border-b border-border/30 pb-2">
                      <Award className="w-4 h-4" /> Perfil Financeiro
                 </h3>
                 <p className="text-[2.25rem] font-bold tabular-nums tracking-tight mb-1">{selectedCustomerDetail.name}</p>
                 <p className="text-text-secondary text-sm mb-6">ID: {selectedCustomerDetail.id}</p>
                 
                 <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-white/5 p-4 rounded-[14px]">
+                    <div className="bg-white/5 p-4 rounded-[4px]">
                         <p className="text-[10px] text-text-secondary uppercase">Receita Total</p>
                         <p className="text-lg font-mono text-primary">R$ {selectedCustomerDetail.rev.toLocaleString('pt-BR')}</p>
                     </div>
-                    <div className="bg-white/5 p-4 rounded-[14px]">
+                    <div className="bg-white/5 p-4 rounded-[4px]">
                         <p className="text-[10px] text-text-secondary uppercase">Vendas</p>
                         <p className="text-lg font-mono text-text-primary">{selectedCustomerDetail.sales}x</p>
                     </div>
@@ -1128,7 +1130,7 @@ export default function App() {
               </h3>
               <div className="space-y-3">
                 {channelData.topCustomers.map((c: any, i: number) => (
-                    <div key={i} onClick={() => setSelectedCustomerDetail(c)} className="flex items-center justify-between p-3 rounded-[14px] bg-black/40 hover:bg-[#1E1E1E] cursor-pointer transition-colors border border-border">
+                    <div key={i} onClick={() => setSelectedCustomerDetail(c)} className="flex items-center justify-between p-3 rounded-[4px] bg-black/40 hover:bg-[#1E1E1E] cursor-pointer transition-colors border border-border">
                         <div className="max-w-[70%]">
                           <p className="text-xs text-text-primary truncate font-medium">{c.name}</p>
                           <p className="text-[10px] text-text-secondary">{c.sales} vendas</p>
@@ -1154,7 +1156,7 @@ export default function App() {
                       <span className="text-[10px] bg-primary/10 text-primary px-2 py-1 rounded-full border border-primary/20 flex items-center gap-1">
                         <Activity className="w-3 h-3" /> Origem Provável (Primeiro Contato)
                       </span>
-                      <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-bg-card border border-border rounded-[14px] shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 text-[11px] leading-relaxed">
+                      <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-bg-card border border-border rounded-[4px] shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 text-[11px] leading-relaxed">
                         <p className="text-text-primary font-bold mb-1">Como funciona?</p>
                         <p className="text-text-secondary">Quando uma venda não possui rastreio UTM direto no checkout, buscamos a origem original do usuário no cadastro (First Click). Isso recupera faturamento que antes ficaria "Sem Rastreio".</p>
                       </div>
@@ -1199,7 +1201,7 @@ export default function App() {
                     { label: 'Vendas Realizadas', value: channelData.total.sales, color: 'bg-primary/20', icon: ShoppingCart, pct: channelData.total.leads > 0 ? (channelData.total.sales / channelData.total.leads * 100).toFixed(1) : 0 },
                   ].filter(Boolean).map((step: any, i, arr) => (
                     <div key={i} className="relative">
-                      <div className={`p-4 rounded-[14px] border border-white/5 ${step.color} flex items-center justify-between`}>
+                      <div className={`p-4 rounded-[4px] border border-white/5 ${step.color} flex items-center justify-between`}>
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-black/20 flex items-center justify-center text-text-primary">
                             <step.icon className="w-5 h-5" />
@@ -1429,7 +1431,7 @@ export default function App() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
              <Card className="p-0 overflow-hidden border-primary/20">
                 <div className="p-5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between bg-white/5 gap-2">
-                   <h4 className="text-[0.8125rem] font-semibold text-text-secondary uppercase tracking-[0.06em] text-primary flex items-center gap-2 shrink-0">
+                <h4 className="text-[0.75rem] font-serif font-normal text-primary/80 uppercase tracking-[0.25em] flex items-center gap-2 shrink-0">
                       <CreditCard className="w-4 h-4" /> Vendas Recentes (Checkouts)
                    </h4>
                 </div>
@@ -1526,7 +1528,7 @@ export default function App() {
                                     <div className="space-y-5 pl-3">
                                       <div>
                                         <span className="text-[9px] text-text-secondary uppercase font-medium block mb-2">Canal de Origem</span>
-                                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-[14px] bg-primary/10 border border-primary/20">
+                                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-[4px] bg-primary/10 border border-primary/20">
                                           <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                                           <span className="text-xs text-primary font-bold">
                                             {getFriendlyChannel(checkout.utm_source || lead?.utm_source_cadastro, checkout.utm_medium || lead?.utm_medium_cadastro, checkout.utm_campaign || lead?.utm_campaign_cadastro, checkout.utm_content || lead?.utm_content_cadastro)}
@@ -1548,7 +1550,7 @@ export default function App() {
                                       </div>
 
                                       {!checkout.utm_source && lead?.utm_source_cadastro && (
-                                        <div className="mt-4 p-3 rounded-[14px] bg-white/5 border border-primary/20 flex items-start gap-3">
+                                        <div className="mt-4 p-3 rounded-[4px] bg-white/5 border border-primary/20 flex items-start gap-3">
                                           <Activity className="w-4 h-4 text-primary shrink-0" />
                                           <p className="text-[10px] text-primary leading-relaxed font-medium">
                                             Venda sem rastreio direto. Atribuição recuperada através do <span className="underline decoration-primary/50">Primeiro Contato</span> do lead na base.
@@ -1569,10 +1571,10 @@ export default function App() {
 
              <Card className="p-0 overflow-hidden border-primary/20">
                 <div className="p-5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between bg-white/5 gap-2">
-                   <h4 className="text-[0.8125rem] font-semibold text-text-secondary uppercase tracking-[0.06em] text-primary flex items-center gap-2 shrink-0">
-                      <Users className="w-4 h-4" /> Novos Leads (Cadastros)
-                   </h4>
-                </div>
+                <h4 className="text-[0.75rem] font-serif font-normal text-primary/80 uppercase tracking-[0.25em] flex items-center gap-2 shrink-0">
+                       <Users className="w-4 h-4" /> Novos Leads (Cadastros)
+                    </h4>
+                 </div>
                 <div className="max-h-[400px] overflow-y-auto">
                   <div className="divide-y divide-white/5">
                     {supabaseCadastros.slice(0, 30).map((lead, i) => {
@@ -1633,7 +1635,7 @@ export default function App() {
                                   </div>
 
                                   {hasPurchased && purchase && (
-                                    <div className="p-3 rounded-[14px] bg-white/5 border border-primary/20">
+                                    <div className="p-3 rounded-[4px] bg-white/5 border border-primary/20">
                                       <p className="text-[9px] text-primary uppercase font-bold tracking-widest mb-2">Conversão Realizada</p>
                                       <p className="text-[10px] text-text-secondary leading-relaxed">
                                         Comprou <span className="text-text-primary font-bold italic">"{supabaseCursos.find(c => c.id_curso === purchase.id_curso)?.nome || 'Produto'}"</span> em {new Date(purchase.timestamp || purchase.created_at).toLocaleDateString('pt-BR')}.
@@ -1769,7 +1771,7 @@ export default function App() {
                           <h4 className="text-sm font-medium mb-3 text-[#A1A1AA] flex items-center gap-2">
                             <Focus className="w-4 h-4" /> Detalhamento de Cursos (Canais)
                           </h4>
-                          <div className="overflow-x-auto rounded-[14px] border border-border">
+                          <div className="overflow-x-auto rounded-[4px] border border-border">
                             <table className="w-full text-left">
                               <thead className="bg-bg-card">
                                 <tr>
@@ -1793,7 +1795,7 @@ export default function App() {
                           <h4 className="text-sm font-medium mb-3 text-[#A1A1AA] flex items-center gap-2">
                             <TrendingUp className="w-4 h-4" /> Top Campanhas / Origens
                           </h4>
-                          <div className="overflow-x-auto rounded-[14px] border border-border">
+                          <div className="overflow-x-auto rounded-[4px] border border-border">
                             <table className="w-full text-left">
                               <thead className="bg-bg-card">
                                 <tr>
