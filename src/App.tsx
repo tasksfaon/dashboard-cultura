@@ -834,7 +834,7 @@ export default function App() {
         
         {dataStatus === 'error' && (
           <div className="bg-primary/10 border border-primary/20 text-primary rounded-[14px] p-6">
-            <h3 className="text-[1.5rem] font-serif font-normal text-text-primary mb-2 text-primary">Erro na Consulta da API</h3>
+            <h3 className="text-[1.5rem] font-bold text-text-primary mb-2 text-primary">Erro na Consulta da API</h3>
             <p className="text-sm">{errorMessage}</p>
           </div>
         )}
@@ -851,7 +851,7 @@ export default function App() {
           <Card className="mb-8 p-6 bg-gradient-to-br from-[#111113] to-[#0A0A0A]">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-[1.5rem] font-serif font-normal text-text-primary">Performance diária</h3>
+                <h3 className="text-[1.5rem] font-bold text-text-primary">Performance diária</h3>
               </div>
               <div className="flex gap-4 text-right">
                 <div>
@@ -1007,7 +1007,7 @@ export default function App() {
                                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: data.color }} />
                                   <span className="text-text-label">Status: {data.name}</span>
                                 </div>
-                                <span className="font-mono text-text-primary text-[24px] font-serif font-normal tracking-[-0.01em]">{data.value}</span>
+                                <span className="font-mono text-text-primary text-[24px] font-bold">{data.value}</span>
                               </div>
                             </div>
                           );
@@ -1721,43 +1721,43 @@ export default function App() {
                   <div className={`grid grid-cols-2 md:grid-cols-5 divide-x divide-y md:divide-y-0 divide-[#222225] bg-bg-card`}>
                     <div className="p-4 flex flex-col justify-center">
                       <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Receita Gerada</span>
-                      <span className="text-[24px] font-serif font-normal tracking-[-0.01em]">R$ {data.revenue.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                      <span className="text-[24px] font-bold">R$ {data.revenue.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
                     </div>
                     {selectedCompanyId === 'cultura' ? (
                       <div className="p-4 flex flex-col justify-center">
                         <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Total Leads</span>
-                        <span className="text-[24px] font-serif font-normal tracking-[-0.01em] text-primary">{data.leads}</span>
+                        <span className="text-[24px] font-bold text-primary">{data.leads}</span>
                       </div>
                     ) : (
                       <div className="p-4 flex flex-col justify-center">
                         <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Custo Total</span>
-                        <span className="text-[24px] font-serif font-normal tracking-[-0.01em] text-red-400">R$ {data.cost.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                        <span className="text-[24px] font-bold text-red-400">R$ {data.cost.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
                       </div>
                     )}
                     {selectedCompanyId === 'cultura' ? (
                        <div className="p-4 flex flex-col justify-center">
                         <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Ticket Médio</span>
-                        <span className="text-[24px] font-serif font-normal tracking-[-0.01em] text-primary">R$ {avgTicket.toFixed(2)}</span>
+                        <span className="text-[24px] font-bold text-primary">R$ {avgTicket.toFixed(2)}</span>
                       </div>
                     ) : (
                       <div className="p-4 flex flex-col justify-center">
                         <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">ROAS</span>
-                        <span className={`text-[24px] font-serif font-normal tracking-[-0.01em] ${roasColor}`}>{roas.toFixed(2)}x</span>
+                        <span className={`text-[24px] font-bold ${roasColor}`}>{roas.toFixed(2)}x</span>
                       </div>
                     )}
                     <div className="p-4 flex flex-col justify-center">
                       <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Vendas (Qtd)</span>
-                      <span className="text-[24px] font-serif font-normal tracking-[-0.01em]">{data.sales}</span>
+                      <span className="text-[24px] font-bold">{data.sales}</span>
                     </div>
                     {selectedCompanyId === 'cultura' ? (
                        <div className="p-4 flex flex-col justify-center">
                         <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Conversão Lead/Venda</span>
-                        <span className="text-[24px] font-serif font-normal tracking-[-0.01em] text-primary">{data.leads > 0 ? ((data.sales / data.leads) * 100).toFixed(1) : 0}%</span>
+                        <span className="text-[24px] font-bold text-primary">{data.leads > 0 ? ((data.sales / data.leads) * 100).toFixed(1) : 0}%</span>
                       </div>
                     ) : (
                       <div className="p-4 flex flex-col justify-center">
                         <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Taxa de Conversão</span>
-                        <span className="text-[24px] font-serif font-normal tracking-[-0.01em]">{cr.toFixed(2)}%</span>
+                        <span className="text-[24px] font-bold">{cr.toFixed(2)}%</span>
                       </div>
                     )}
                   </div>

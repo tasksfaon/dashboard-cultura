@@ -50,7 +50,7 @@
 
 @theme {
   --font-sans: var(--font-ui);
-  --font-serif: var(--font-display);
+  --font-serif: var(--font-ui);
   --color-primary: var(--accent);
   --color-primary-dark: var(--accent-hover);
   --color-bg-app: var(--bg-page);
