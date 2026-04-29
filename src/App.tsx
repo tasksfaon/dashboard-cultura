@@ -159,6 +159,32 @@ export default function App() {
   const [supabaseCategorias, setSupabaseCategorias] = useState<any[]>([]);
   const [supabaseCursos, setSupabaseCursos] = useState<any[]>([]);
   const [supabaseCheckouts, setSupabaseCheckouts] = useState<any[]>([]);
+  const [sheetData, setSheetData] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchSheetData = async () => {
+      const url = 'https://docs.google.com/spreadsheets/d/13Jwi6tpiUR7opXYhYnkZd4ympKIrWVmfhcNOchans5I/gviz/tq?tqx=out:csv';
+      try {
+        const response = await fetch(url);
+        const csvText = await response.text();
+        const rows = csvText.split('\n');
+        // Assume first row is header
+        const headers = rows[0].split(',').map(h => h.replace(/"/g, ''));
+        const adNameIndex = headers.indexOf('Ad Name');
+        
+        const parsedData = rows.slice(1).map(row => {
+            const values = row.split(',').map(v => v.replace(/"/g, ''));
+            return adNameIndex !== -1 ? values[adNameIndex] : null;
+        }).filter(v => v !== null && v !== "");
+        
+        setSheetData(parsedData);
+        console.log('Ad Names extracted:', parsedData);
+      } catch (error) {
+        console.error('Error fetching sheet:', error);
+      }
+    };
+    fetchSheetData();
+  }, []);
 
   const selectedCompany = companies.find(c => c.id === selectedCompanyId) || companies[0];
   const propertyId = selectedCompany.propertyId;
@@ -709,6 +735,15 @@ export default function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 mt-8 space-y-6">
+        
+        {sheetData.length > 0 && (
+          <Card className="mb-8">
+            <h3 className="text-sm font-medium text-[#8E9299] uppercase tracking-wider mb-4">Ad Names (Planilha)</h3>
+            <div className="h-40 overflow-y-auto space-y-2">
+                {sheetData.map((name, i) => <div key={i} className="text-white text-sm">{name}</div>)}
+            </div>
+          </Card>
+        )}
         
         {/* SETUP BANNER - Totalmente removido para Cultura */}
         {dataStatus === 'logged_out' && selectedCompanyId !== 'cultura' && (
