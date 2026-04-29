@@ -810,14 +810,7 @@ export default function App() {
       <main className="max-w-7xl mx-auto px-6 mt-8 space-y-6">
         
 
-        {sheetData.length > 0 && (
-          <Card className="mb-8">
-            <h3 className="text-sm font-medium text-text-label uppercase tracking-wider mb-4">Ad Names (Planilha)</h3>
-            <div className="h-40 overflow-y-auto space-y-2">
-                {sheetData.map((name, i) => <div key={i} className="text-text-primary text-sm">{name}</div>)}
-            </div>
-          </Card>
-        )}
+
         
 
         
