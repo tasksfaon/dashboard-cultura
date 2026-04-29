@@ -46,15 +46,15 @@ const PieChartLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, value, inde
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-[#111113] border border-[#222225] p-3 rounded-lg shadow-xl outline-none">
-        <p className="text-[#FAFAFA] font-medium mb-2">{label}</p>
+      <div className="bg-bg-card border border-border p-3 rounded-[14px] shadow-xl outline-none">
+        <p className="text-text-primary font-medium mb-2">{label}</p>
         {payload.map((entry: any, index: number) => (
            <div key={index} className="flex items-center justify-between gap-4 text-sm mb-1">
              <div className="flex items-center gap-2">
                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
-               <span className="text-[#8E9299]">{entry.name}</span>
+               <span className="text-text-label">{entry.name}</span>
              </div>
-             <span className="font-mono text-white">R$ {Number(entry.value).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+             <span className="font-mono text-text-primary">R$ {Number(entry.value).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
            </div>
         ))}
       </div>
@@ -73,7 +73,7 @@ const mockKpis = [
 
 // --- COMPONENTS ---
 const Card = ({ children, className = '', ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={`bg-bg-card border border-border rounded-sm p-6 shadow-sm ${className}`} {...props}>
+  <div className={`card ${className}`} {...props}>
     {children}
   </div>
 );
@@ -83,18 +83,18 @@ const ProductRow: React.FC<{ p: any, isSupabase?: boolean }> = ({ p, isSupabase 
   const roas = p.cost > 0 ? p.rev / p.cost : 0;
   return (
     <React.Fragment>
-      <tr onClick={() => setExpanded(!expanded)} className="hover:bg-[#111113] transition-colors cursor-pointer group border-b border-[#222225]/50">
-        <td className="p-4 text-xs text-[#E4E3E0] max-w-[200px] truncate" title={p.name}>
+      <tr onClick={() => setExpanded(!expanded)} className="hover:bg-bg-card transition-colors cursor-pointer group border-b border-border/50">
+        <td className="p-4 text-[0.875rem] font-normal text-text-secondary max-w-[200px] truncate" title={p.name}>
           <div className="flex items-center gap-2">
             <ChevronRight className={`w-3 h-3 shrink-0 text-text-secondary transition-transform ${expanded ? 'rotate-90' : ''}`} />
             <div className="flex flex-col">
               <span className="truncate font-medium">{p.name}</span>
-              {!isSupabase && <span className="text-[10px] text-[#52525B]">Sessões: {p.sessions || 0}</span>}
+              {!isSupabase && <span className="text-[0.75rem] text-text-muted">Sessões: {p.sessions || 0}</span>}
             </div>
           </div>
         </td>
-        <td className="p-4 text-xs text-right font-mono text-[#8E9299]">{p.qty}</td>
-        <td className="p-4 text-xs text-right font-mono">
+        <td className="p-4 text-[0.875rem] font-medium tabular-nums text-right text-text-primary text-text-label">{p.qty}</td>
+        <td className="p-4 text-[0.875rem] font-medium tabular-nums text-right text-text-primary">
            {isSupabase ? (
              <span className="text-[10px] text-text-secondary uppercase">Supabase</span>
            ) : (
@@ -103,13 +103,13 @@ const ProductRow: React.FC<{ p: any, isSupabase?: boolean }> = ({ p, isSupabase 
              </span>
            )}
         </td>
-        <td className="p-4 text-xs text-right font-mono text-primary font-semibold">R$ {p.rev.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+        <td className="p-4 text-[0.875rem] font-medium tabular-nums text-right text-text-primary text-primary font-semibold">R$ {p.rev.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
       </tr>
       {expanded && p.campaigns && p.campaigns.length > 0 && (
-        <tr className="bg-[#0f0f11]">
+        <tr className="bg-bg-section">
           <td colSpan={4} className="p-0">
-            <div className="px-4 py-3 border-l-2 border-[#333] ml-4 bg-[#0a0a0a]">
-              <div className="text-[10px] text-text-secondary uppercase tracking-widest mb-2 font-medium">Vendas por Campanha/Origem</div>
+            <div className="px-4 py-3 border-l-2 border-border ml-4 bg-bg-sidebar">
+              <div className="text-[0.75rem] font-semibold uppercase tracking-[0.05em] text-text-label mb-2 font-medium">Vendas por Campanha/Origem</div>
               <div className="space-y-2">
                 {p.campaigns.map((c: any, idx: number) => (
                   <div key={idx} className="flex justify-between items-center text-xs">
@@ -732,21 +732,21 @@ export default function App() {
   const { todayPieData, vendasHojeTotal, cadastrosHojeTotal } = getTodayStats();
 
   return (
-    <div className="min-h-screen bg-bg-app text-text-main font-sans selection:bg-primary selection:text-white pb-12">
+    <div className="min-h-screen bg-bg-page text-text-main font-sans selection:bg-primary selection:text-text-primary pb-12">
       {/* Top Navigation / Header */}
-      <header className="border-b border-border bg-bg-app/80 backdrop-blur-md z-50">
+      <header className="border-b border-border bg-bg-page/80 backdrop-blur-md z-50">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center relative">
           
           <div className="absolute left-1/2 -translate-x-1/2 z-0 flex flex-col items-center top-2">
-             <img src="https://jndvesrtqewjqvarfaox.supabase.co/storage/v1/object/public/Logos/625949743_18077241884595017_7660496256666720708_n.jpg" alt="Logo Central" className="w-20 h-20 rounded-full border border-[#222225] object-cover" />
-             <span className="text-xs font-semibold text-white mt-1">Dashboard Cultura</span>
+             <img src="https://jndvesrtqewjqvarfaox.supabase.co/storage/v1/object/public/Logos/625949743_18077241884595017_7660496256666720708_n.jpg" alt="Logo Central" className="w-20 h-20 rounded-full border border-border object-cover" />
+             <span className="text-xs font-semibold text-text-primary mt-1">Dashboard Cultura</span>
           </div>
           
           <div className="flex items-center gap-2 ml-auto z-10">
             <div className="relative">
               <button 
                   onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-sm border border-border bg-bg-card hover:brightness-110 transition-colors text-sm font-medium focus:outline-none"
+                  className="flex items-center gap-2 px-4 py-2 rounded-[8px] border border-border bg-bg-card hover:brightness-110 transition-colors text-sm font-medium focus:outline-none"
               >
                 <CalendarDays className="w-4 h-4 text-text-secondary" />
                 <span>{dateRangeLabels[dateRange]}</span>
@@ -754,7 +754,7 @@ export default function App() {
               </button>
               
               {isDateDropdownOpen && (
-                <div className="absolute top-12 right-0 w-64 bg-[#111113] border border-[#222225] rounded-xl shadow-xl z-50 p-2 text-sm">
+                <div className="absolute top-12 right-0 w-64 bg-bg-card border border-border rounded-[14px] shadow-xl z-50 p-2 text-sm">
                    {Object.entries(dateRangeLabels).map(([key, label]) => (
                      <button
                         key={key}
@@ -762,30 +762,30 @@ export default function App() {
                           setDateRange(key); 
                           if(key !== 'custom') setIsDateDropdownOpen(false); 
                         }}
-                        className={`w-full text-left px-4 py-2.5 rounded-lg hover:bg-[#222225] transition-colors focus:outline-none ${dateRange === key ? 'bg-[#1A1A1D] font-medium text-white' : 'text-[#8E9299]'}`}
+                        className={`w-full text-left px-4 py-2.5 rounded-[14px] hover:bg-bg-sidebar transition-colors focus:outline-none ${dateRange === key ? 'bg-[#1E1E1E] font-medium text-text-primary' : 'text-text-label'}`}
                      >
                        {label}
                      </button>
                    ))}
 
                    {dateRange === 'custom' && (
-                     <div className="mt-2 pt-3 border-t border-[#222225] flex flex-col gap-3 px-2 pb-1">
+                     <div className="mt-2 pt-3 border-t border-border flex flex-col gap-3 px-2 pb-1">
                        <div className="flex flex-col gap-1">
-                         <label className="text-xs text-[#8E9299]">Data de Início</label>
+                         <label className="text-[0.875rem] font-medium text-text-label">Data de Início</label>
                          <input 
                            type="date" 
                            value={customStart} 
                            onChange={e => setCustomStart(e.target.value)} 
-                           className="bg-[#050505] border border-[#222225] text-white px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-[#8E9299]" 
+                           className="bg-bg-input border border-border text-text-primary px-3 py-2 rounded-[14px] text-xs focus:outline-none focus:border-primary" 
                          />
                        </div>
                        <div className="flex flex-col gap-1">
-                         <label className="text-xs text-[#8E9299]">Data de Fim</label>
+                         <label className="text-[0.875rem] font-medium text-text-label">Data de Fim</label>
                          <input 
                            type="date" 
                            value={customEnd} 
                            onChange={e => setCustomEnd(e.target.value)} 
-                           className="bg-[#050505] border border-[#222225] text-white px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-[#8E9299]" 
+                           className="bg-bg-input border border-border text-text-primary px-3 py-2 rounded-[14px] text-xs focus:outline-none focus:border-primary" 
                          />
                        </div>
                        <button 
@@ -793,7 +793,7 @@ export default function App() {
                            setAppliedCustomDate({ start: customStart, end: customEnd });
                            setIsDateDropdownOpen(false);
                          }}
-                         className="mt-1 bg-white text-black py-2 rounded-lg text-xs font-medium hover:bg-gray-200 transition-colors"
+                         className="mt-1 bg-primary text-bg-page py-2 rounded-[8px] text-[0.8125rem] font-semibold hover:bg-primary-dark transition-colors"
                        >
                          Aplicar Filtro
                        </button>
@@ -812,9 +812,9 @@ export default function App() {
 
         {sheetData.length > 0 && (
           <Card className="mb-8">
-            <h3 className="text-sm font-medium text-[#8E9299] uppercase tracking-wider mb-4">Ad Names (Planilha)</h3>
+            <h3 className="text-sm font-medium text-text-label uppercase tracking-wider mb-4">Ad Names (Planilha)</h3>
             <div className="h-40 overflow-y-auto space-y-2">
-                {sheetData.map((name, i) => <div key={i} className="text-white text-sm">{name}</div>)}
+                {sheetData.map((name, i) => <div key={i} className="text-text-primary text-sm">{name}</div>)}
             </div>
           </Card>
         )}
@@ -823,16 +823,16 @@ export default function App() {
         
         {/* SETUP BANNER - Totalmente removido para Cultura */}
         {dataStatus === 'logged_out' && selectedCompanyId !== 'cultura' && (
-          <div className="bg-[#111113] border border-[#222225] text-white rounded-2xl p-8 flex flex-col md:flex-row gap-6 items-center justify-between">
+          <div className="bg-bg-card border border-border text-text-primary rounded-[14px] p-8 flex flex-col md:flex-row gap-6 items-center justify-between">
             <div className="flex-1">
               <h3 className="text-xl font-medium mb-2">Conectar Google Analytics</h3>
-              <p className="text-sm text-[#8E9299] max-w-2xl mb-4">
+              <p className="text-sm text-text-label max-w-2xl mb-4">
                 Para visualizar seus dados reais da propriedade {selectedCompany.name} ({propertyId}), conecte sua conta Google. Esta autorização é segura e usada apenas para leitura de dados de relatórios. Ela será salva no seu navegador para que você não precise aprovar toda vez.
               </p>
             </div>
             <button 
                 onClick={handleConnect}
-                className="flex items-center gap-2 px-6 py-3 rounded-sm bg-primary text-white hover:brightness-110 transition-colors font-medium whitespace-nowrap"
+                className="flex items-center gap-2 px-6 py-3 rounded-[8px] bg-primary text-[#0D0D0D] font-semibold tracking-[0.02em] hover:bg-[#E6BE5A] transition-colors font-medium whitespace-nowrap"
             >
               Conectar Conta Google
             </button>
@@ -840,8 +840,8 @@ export default function App() {
         )}
         
         {dataStatus === 'error' && (
-          <div className="bg-primary/10 border border-primary/20 text-primary rounded-2xl p-6">
-            <h3 className="text-lg font-medium mb-2 text-primary">Erro na Consulta da API</h3>
+          <div className="bg-primary/10 border border-primary/20 text-primary rounded-[14px] p-6">
+            <h3 className="text-[1.5rem] font-serif font-normal text-text-primary mb-2 text-primary">Erro na Consulta da API</h3>
             <p className="text-sm">{errorMessage}</p>
           </div>
         )}
@@ -849,9 +849,9 @@ export default function App() {
         <div className="mb-8">
           <h2 className="text-3xl font-light tracking-tight mb-2">
             Performance Overview 
-            {dataStatus === 'loading' && <Loader2 className="inline-block ml-4 w-5 h-5 animate-spin text-[#8E9299]" />}
+            {dataStatus === 'loading' && <Loader2 className="inline-block ml-4 w-5 h-5 animate-spin text-text-label" />}
           </h2>
-          <p className="text-[#8E9299]">Blended data across all channels.</p>
+          <p className="text-text-label">Blended data across all channels.</p>
         </div>
 
         {/* GRÁFICO DE RECEITA TEMPORAL - Principal */}
@@ -859,12 +859,12 @@ export default function App() {
           <Card className="mb-8 p-6 bg-gradient-to-br from-[#111113] to-[#0A0A0A]">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-sm font-medium text-[#8E9299] uppercase tracking-wider mb-1">Performance Histórica</h3>
-                <p className="text-2xl font-semibold">Receita Diária (Faturamento Real)</p>
+                <h3 className="text-sm font-medium text-text-label uppercase tracking-wider mb-1">Performance Histórica</h3>
+                <p className="text-[2.25rem] font-bold tabular-nums tracking-tight">Receita Diária (Faturamento Real)</p>
               </div>
               <div className="flex gap-4 text-right">
                 <div>
-                   <p className="text-[10px] text-[#52525B] uppercase font-bold">Máximo Diário</p>
+                   <p className="text-[0.75rem] text-text-muted uppercase font-bold">Máximo Diário</p>
                    <p className="text-lg font-mono text-primary">R$ {Math.max(...channelData.trendData.map((d: any) => d.value)).toLocaleString('pt-BR')}</p>
                 </div>
               </div>
@@ -907,30 +907,30 @@ export default function App() {
                       if (active && payload && payload.length) {
                         const data = payload[0].payload;
                         return (
-                          <div className="bg-[#111113] border border-[#222225] p-4 rounded-lg shadow-2xl text-[11px] min-w-[180px] backdrop-blur-sm bg-black/80">
-                            <p className="text-[#8E9299] mb-3 font-medium border-b border-white/5 pb-2">{label}</p>
+                          <div className="bg-bg-card border border-border p-4 rounded-[14px] shadow-2xl text-[11px] min-w-[180px] backdrop-blur-sm bg-black/80">
+                            <p className="text-text-label mb-3 font-medium border-b border-white/5 pb-2">{label}</p>
                             <div className="space-y-2 mb-3">
                               <div className="flex justify-between items-center">
-                                <span className="text-[#8E9299]">Faturamento:</span>
+                                <span className="text-text-label">Faturamento:</span>
                                 <span className="text-primary font-bold ml-4">R$ {Number(data.value || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                               </div>
                               <div className="flex justify-between items-center">
-                                <span className="text-[#8E9299]">Vendas:</span>
+                                <span className="text-text-label">Vendas:</span>
                                 <span className="text-primary font-bold ml-4">{data.salesCount}</span>
                               </div>
                               <div className="flex justify-between items-center">
-                                <span className="text-[#8E9299]">Novos Leads:</span>
+                                <span className="text-text-label">Novos Leads:</span>
                                 <span className="text-primary font-bold ml-4">{data.leads}</span>
                               </div>
                             </div>
                             
                             {data.products && data.products.length > 0 && (
                               <div className="pt-2 border-t border-white/5 space-y-1.5">
-                                <p className="text-[#52525B] uppercase text-[9px] font-bold tracking-widest mb-1">Vendas por Produto:</p>
+                                <p className="text-text-muted uppercase text-[9px] font-bold tracking-widest mb-1">Vendas por Produto:</p>
                                 {data.products.map((p: any, idx: number) => (
                                   <div key={idx} className="flex justify-between gap-4 items-center">
                                     <span className="text-text-secondary truncate max-w-[140px] italic">{p.name}</span>
-                                    <span className="text-white font-mono bg-white/5 px-1.5 rounded text-[10px]">{p.qty}x</span>
+                                    <span className="text-text-primary font-mono bg-white/5 px-1.5 rounded text-[10px]">{p.qty}x</span>
                                   </div>
                                 ))}
                               </div>
@@ -962,14 +962,14 @@ export default function App() {
           {kpis.map((kpi, idx) => (
             <Card key={idx} className="relative overflow-hidden group hover:border-primary/50 transition-colors p-5">
               <div className="flex justify-between items-start mb-3">
-                <div className="p-2 bg-primary/10 rounded-sm transition-colors text-primary">
+                <div className="p-2 bg-primary/10 rounded-[8px] transition-colors text-primary">
                   <kpi.icon className="w-5 h-5" />
                 </div>
               </div>
               <div>
-                <p className="text-xs text-text-secondary mb-1 font-medium">{kpi.title}</p>
-                <h3 className="text-2xl font-semibold tracking-tight">{kpi.value}</h3>
-                <p className="text-xs text-[#52525B] mt-1">{kpi.trend}</p>
+                <p className="text-[0.75rem] font-medium text-text-label uppercase tracking-[0.05em] mb-1">{kpi.title}</p>
+                <h3 className="text-[2.25rem] font-bold tabular-nums tracking-tight tracking-tight">{kpi.value}</h3>
+                <p className="text-xs text-text-muted mt-1">{kpi.trend}</p>
               </div>
               <div className="absolute -right-6 -bottom-6 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity text-primary">
                 <kpi.icon className="w-24 h-24" />
@@ -1010,13 +1010,13 @@ export default function App() {
                         if (active && payload && payload.length) {
                           const data = payload[0].payload;
                           return (
-                            <div className="bg-[#111113] border border-[#222225] p-3 rounded-lg shadow-xl outline-none">
+                            <div className="bg-bg-card border border-border p-3 rounded-[14px] shadow-xl outline-none">
                               <div className="flex items-center justify-between gap-4 text-sm">
                                 <div className="flex items-center gap-2">
                                   <div className="w-2 h-2 rounded-full" style={{ backgroundColor: data.color }} />
-                                  <span className="text-[#8E9299]">Status: {data.name}</span>
+                                  <span className="text-text-label">Status: {data.name}</span>
                                 </div>
-                                <span className="font-mono text-white text-lg font-bold">{data.value}</span>
+                                <span className="font-mono text-text-primary text-[24px] font-serif font-normal tracking-[-0.01em]">{data.value}</span>
                               </div>
                             </div>
                           );
@@ -1095,21 +1095,21 @@ export default function App() {
         {selectedCustomerDetail && (
           <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setSelectedCustomerDetail(null)}>
             <Card className="max-w-lg w-full p-8 relative animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
-                <button onClick={() => setSelectedCustomerDetail(null)} className="absolute top-4 right-4 text-text-secondary hover:text-white">✕</button>
-                <h3 className="text-sm font-medium text-primary uppercase tracking-widest mb-2 flex items-center gap-2">
+                <button onClick={() => setSelectedCustomerDetail(null)} className="absolute top-4 right-4 text-text-secondary hover:text-text-primary">✕</button>
+                <h3 className="text-[0.8125rem] font-semibold text-text-secondary uppercase tracking-[0.06em] text-primary uppercase tracking-widest mb-2 flex items-center gap-2">
                      <Award className="w-4 h-4" /> Perfil Financeiro
                 </h3>
-                <p className="text-3xl font-bold mb-1">{selectedCustomerDetail.name}</p>
+                <p className="text-[2.25rem] font-bold tabular-nums tracking-tight mb-1">{selectedCustomerDetail.name}</p>
                 <p className="text-text-secondary text-sm mb-6">ID: {selectedCustomerDetail.id}</p>
                 
                 <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-white/5 p-4 rounded-lg">
+                    <div className="bg-white/5 p-4 rounded-[14px]">
                         <p className="text-[10px] text-text-secondary uppercase">Receita Total</p>
                         <p className="text-lg font-mono text-primary">R$ {selectedCustomerDetail.rev.toLocaleString('pt-BR')}</p>
                     </div>
-                    <div className="bg-white/5 p-4 rounded-lg">
+                    <div className="bg-white/5 p-4 rounded-[14px]">
                         <p className="text-[10px] text-text-secondary uppercase">Vendas</p>
-                        <p className="text-lg font-mono text-white">{selectedCustomerDetail.sales}x</p>
+                        <p className="text-lg font-mono text-text-primary">{selectedCustomerDetail.sales}x</p>
                     </div>
                 </div>
                 
@@ -1118,7 +1118,7 @@ export default function App() {
                     <div className="space-y-2">
                         {selectedCustomerDetail.purchases.map((p: any, idx: number) => (
                             <div key={idx} className="flex justify-between p-2 rounded bg-white/5 text-xs">
-                                <span className="text-white truncate max-w-[200px]">{p.cursoName}</span>
+                                <span className="text-text-primary truncate max-w-[200px]">{p.cursoName}</span>
                                 <span className="font-mono text-primary">R$ {Number(p.valor).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                             </div>
                         ))}
@@ -1137,9 +1137,9 @@ export default function App() {
               </h3>
               <div className="space-y-3">
                 {channelData.topCustomers.map((c: any, i: number) => (
-                    <div key={i} onClick={() => setSelectedCustomerDetail(c)} className="flex items-center justify-between p-3 rounded-lg bg-black/40 hover:bg-[#1A1A1D] cursor-pointer transition-colors border border-[#222225]">
+                    <div key={i} onClick={() => setSelectedCustomerDetail(c)} className="flex items-center justify-between p-3 rounded-[14px] bg-black/40 hover:bg-[#1E1E1E] cursor-pointer transition-colors border border-border">
                         <div className="max-w-[70%]">
-                          <p className="text-xs text-white truncate font-medium">{c.name}</p>
+                          <p className="text-xs text-text-primary truncate font-medium">{c.name}</p>
                           <p className="text-[10px] text-text-secondary">{c.sales} vendas</p>
                         </div>
                         <p className="text-xs text-primary font-mono font-bold">R$ {c.rev.toLocaleString('pt-BR')}</p>
@@ -1163,8 +1163,8 @@ export default function App() {
                       <span className="text-[10px] bg-primary/10 text-primary px-2 py-1 rounded-full border border-primary/20 flex items-center gap-1">
                         <Activity className="w-3 h-3" /> Origem Provável (Primeiro Contato)
                       </span>
-                      <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-[#111113] border border-[#222225] rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 text-[11px] leading-relaxed">
-                        <p className="text-white font-bold mb-1">Como funciona?</p>
+                      <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-bg-card border border-border rounded-[14px] shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 text-[11px] leading-relaxed">
+                        <p className="text-text-primary font-bold mb-1">Como funciona?</p>
                         <p className="text-text-secondary">Quando uma venda não possui rastreio UTM direto no checkout, buscamos a origem original do usuário no cadastro (First Click). Isso recupera faturamento que antes ficaria "Sem Rastreio".</p>
                       </div>
                     </div>
@@ -1208,27 +1208,27 @@ export default function App() {
                     { label: 'Vendas Realizadas', value: channelData.total.sales, color: 'bg-primary/20', icon: ShoppingCart, pct: channelData.total.leads > 0 ? (channelData.total.sales / channelData.total.leads * 100).toFixed(1) : 0 },
                   ].filter(Boolean).map((step: any, i, arr) => (
                     <div key={i} className="relative">
-                      <div className={`p-4 rounded-xl border border-white/5 ${step.color} flex items-center justify-between`}>
+                      <div className={`p-4 rounded-[14px] border border-white/5 ${step.color} flex items-center justify-between`}>
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-black/20 flex items-center justify-center text-white">
+                          <div className="w-10 h-10 rounded-full bg-black/20 flex items-center justify-center text-text-primary">
                             <step.icon className="w-5 h-5" />
                           </div>
                           <div>
-                            <p className="text-[10px] text-[#8E9299] font-medium uppercase tracking-wider">{step.label}</p>
+                            <p className="text-[10px] text-text-label font-medium uppercase tracking-wider">{step.label}</p>
                             <p className="text-xl font-mono">{step.value.toLocaleString('pt-BR')}</p>
                           </div>
                         </div>
                         {step.pct !== undefined && (
                           <div className="text-right">
-                            <p className="text-[10px] text-[#8E9299] mb-1 font-medium">{selectedCompanyId === 'cultura' ? 'Conversão' : 'Tx. Conversão'}</p>
+                            <p className="text-[10px] text-text-label mb-1 font-medium">{selectedCompanyId === 'cultura' ? 'Conversão' : 'Tx. Conversão'}</p>
                             <span className="text-xs font-bold bg-white/10 px-2 py-1 rounded-md">{step.pct}%</span>
                           </div>
                         )}
                       </div>
                       {i < arr.length - 1 && (
                         <div className="flex justify-center -my-2 relative z-10">
-                          <div className="bg-[#222225] p-1 rounded-full border border-[#333336]">
-                             <ChevronDown className="w-3 h-3 text-[#8E9299]" />
+                          <div className="bg-bg-sidebar p-1 rounded-full border border-border">
+                             <ChevronDown className="w-3 h-3 text-text-label" />
                           </div>
                         </div>
                       )}
@@ -1236,8 +1236,8 @@ export default function App() {
                   ))}
                </div>
                {selectedCompanyId !== 'cultura' && (
-                 <div className="mt-6 pt-6 border-t border-[#222225] flex justify-between items-center">
-                   <span className="text-xs text-[#8E9299]">Tx. de Venda Global</span>
+                 <div className="mt-6 pt-6 border-t border-border flex justify-between items-center">
+                   <span className="text-[0.875rem] font-medium text-text-label">Tx. de Venda Global</span>
                    <span className="text-sm font-bold text-primary">
                       {channelData.total.sessions > 0 ? (channelData.total.sales / channelData.total.sessions * 100).toFixed(2) : 0}%
                    </span>
@@ -1253,7 +1253,7 @@ export default function App() {
             <Card className="p-6">
                <div className="flex items-center justify-between mb-8">
                   <div>
-                    <h4 className="text-sm font-medium text-white flex items-center gap-2">
+                    <h4 className="text-sm font-medium text-text-primary flex items-center gap-2">
                        <CreditCard className="w-4 h-4 text-primary" /> Métodos de Pagamento
                     </h4>
                     <p className="text-[11px] text-text-secondary mt-1">Volume financeiro por tipo de transação</p>
@@ -1294,10 +1294,10 @@ export default function App() {
                         <div key={i} className="flex items-center justify-between group">
                           <div className="flex items-center gap-4">
                             <div className={`w-3 h-3 rounded-full ${colors[i % 6]}`} />
-                            <span className="text-sm text-text-secondary group-hover:text-white transition-colors">{pm.name}</span>
+                            <span className="text-sm text-text-secondary group-hover:text-text-primary transition-colors">{pm.name}</span>
                           </div>
                           <div className="text-right">
-                             <p className="text-sm font-mono font-bold text-white">R$ {pm.value.toLocaleString('pt-BR')}</p>
+                             <p className="text-sm font-mono font-bold text-text-primary">R$ {pm.value.toLocaleString('pt-BR')}</p>
                              <p className="text-[11px] text-text-secondary">{pct}% do total</p>
                           </div>
                         </div>
@@ -1314,7 +1314,7 @@ export default function App() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
              {/* ... col 1 ... */}
              <Card className="p-0 overflow-hidden">
-                <div className="p-5 border-b border-[#222225] flex items-center justify-between bg-gradient-to-r from-[#111113] to-transparent">
+                <div className="p-5 border-b border-border flex items-center justify-between bg-gradient-to-r from-[#111113] to-transparent">
                    <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
                       <Award className="w-4 h-4 text-primary" /> Anúncios Ganhadores (Escalar)
                    </h4>
@@ -1322,11 +1322,11 @@ export default function App() {
                 </div>
                 <div className="max-h-[400px] overflow-y-auto">
                    <table className="w-full text-left">
-                      <thead className="bg-[#111113]/50 sticky top-0 z-10">
+                      <thead className="bg-bg-card/50 sticky top-0 z-10">
                         <tr>
-                          <th className="p-4 text-[10px] text-[#52525B] uppercase font-bold">Campanha / Anúncio</th>
-                          <th className="p-4 text-[10px] text-[#52525B] uppercase font-bold text-right">Vendas</th>
-                          <th className="p-4 text-[10px] text-[#52525B] uppercase font-bold text-right">Receita</th>
+                          <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold">Campanha / Anúncio</th>
+                          <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">Vendas</th>
+                          <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">Receita</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[#222225]/50">
@@ -1334,10 +1334,10 @@ export default function App() {
                            <tr key={i} className="hover:bg-white/5 transition-colors">
                               <td className="p-4 flex items-center gap-3">
                                  <div className={`w-1.5 h-1.5 rounded-full ${win.source === 'meta' ? 'bg-primary' : 'bg-primary'}`} />
-                                 <span className="text-xs text-[#FAFAFA] truncate max-w-[240px]" title={win.name}>{win.name}</span>
+                                 <span className="text-xs text-text-primary truncate max-w-[240px]" title={win.name}>{win.name}</span>
                               </td>
-                              <td className="p-4 text-xs font-mono text-center">{win.sales}</td>
-                              <td className="p-4 text-xs font-mono text-right text-primary">R$ {win.rev.toLocaleString('pt-BR')}</td>
+                              <td className="p-4 text-[0.875rem] font-medium tabular-nums text-text-primary text-center">{win.sales}</td>
+                              <td className="p-4 text-[0.875rem] font-medium tabular-nums text-text-primary text-right text-primary">R$ {win.rev.toLocaleString('pt-BR')}</td>
                            </tr>
                         )) : (
                           <tr>
@@ -1352,23 +1352,23 @@ export default function App() {
              </Card>
 
              <Card className="p-0 overflow-hidden">
-                <div className="p-5 border-b border-[#222225] flex items-center justify-between bg-gradient-to-r from-[#111113] to-transparent">
+                <div className="p-5 border-b border-border flex items-center justify-between bg-gradient-to-r from-[#111113] to-transparent">
                    <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
                       <ShoppingCart className="w-4 h-4" /> Performance por Produto
                    </h4>
-                   <span className="text-[10px] text-[#8E9299]">Ordenado por Receita</span>
+                   <span className="text-[10px] text-text-label">Ordenado por Receita</span>
                 </div>
                 <div className="max-h-[400px] overflow-y-auto">
                    <table className="w-full text-left border-collapse">
-                      <thead className="bg-[#111113]/50 sticky top-0 z-10">
+                      <thead className="bg-bg-card/50 sticky top-0 z-10">
                         <tr>
-                          <th className="p-4 text-[10px] text-[#52525B] uppercase font-bold">Infoproduto</th>
-                          <th className="p-4 text-[10px] text-[#52525B] uppercase font-bold text-right">Vendas</th>
-                          <th className="p-4 text-[10px] text-[#52525B] uppercase font-bold text-right">ROAS</th>
-                          <th className="p-4 text-[10px] text-[#52525B] uppercase font-bold text-right">Receita</th>
+                          <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold">Infoproduto</th>
+                          <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">Vendas</th>
+                          <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">ROAS</th>
+                          <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">Receita</th>
                         </tr>
                       </thead>
-                      <tbody className="bg-[#111113]/20">
+                      <tbody className="bg-bg-card/20">
                         {(channelData.totalProducts || [])
                           .map((p: any, i: number) => (
                              <ProductRow key={i} p={{ ...p, cost: 0 }} isSupabase={selectedCompanyId === 'cultura'} />
@@ -1421,10 +1421,10 @@ export default function App() {
 
             <Card className="p-6 flex flex-col items-center justify-center">
               <div className="text-center">
-                <h4 className="text-sm font-medium text-text-secondary mb-4 flex items-center gap-2 justify-center">
+                <h4 className="text-[0.8125rem] font-semibold text-text-secondary uppercase tracking-[0.06em] mb-4 flex items-center gap-2 justify-center">
                   <Users className="w-4 h-4" /> Cadastros de Hoje
                 </h4>
-                <div className="text-6xl font-light tracking-tighter text-primary">
+                <div className="text-[3rem] font-bold tabular-nums text-primary">
                   {cadastrosHojeTotal}
                 </div>
                 <p className="text-xs text-text-secondary mt-2 uppercase tracking-wide">Novos Leads Captados</p>
@@ -1438,7 +1438,7 @@ export default function App() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
              <Card className="p-0 overflow-hidden border-primary/20">
                 <div className="p-5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between bg-white/5 gap-2">
-                   <h4 className="text-sm font-medium text-primary flex items-center gap-2 shrink-0">
+                   <h4 className="text-[0.8125rem] font-semibold text-text-secondary uppercase tracking-[0.06em] text-primary flex items-center gap-2 shrink-0">
                       <CreditCard className="w-4 h-4" /> Vendas Recentes (Checkouts)
                    </h4>
                 </div>
@@ -1464,11 +1464,11 @@ export default function App() {
                               className={`p-4 flex items-center justify-between hover:bg-white/[0.04] cursor-pointer transition-colors ${isExpanded ? 'bg-white/[0.03]' : ''}`}
                             >
                               <div className="flex items-center gap-3">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isExpanded ? 'bg-primary text-black' : 'bg-primary/10 text-primary'}`}>
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isExpanded ? 'bg-primary text-[#0D0D0D]' : 'bg-primary/10 text-primary'}`}>
                                     <DollarSign className="w-4 h-4" />
                                 </div>
                                 <div className="max-w-[150px] sm:max-w-none">
-                                    <p className="text-xs font-medium text-white truncate">{lead?.nome || 'Usuário #' + checkout.id_usuario}</p>
+                                    <p className="text-xs font-medium text-text-primary truncate">{lead?.nome || 'Usuário #' + checkout.id_usuario}</p>
                                     <p className="text-[10px] text-text-secondary truncate">{curso?.nome || 'Curso #' + checkout.id_curso}</p>
                                 </div>
                               </div>
@@ -1497,11 +1497,11 @@ export default function App() {
                                     <div className="space-y-4 pl-3">
                                       <div className="flex flex-col gap-1">
                                         <span className="text-[9px] text-text-secondary uppercase font-medium">E-mail de Cadastro</span>
-                                        <span className="text-sm text-white font-medium select-all break-all">{lead?.email || 'Não informado'}</span>
+                                        <span className="text-sm text-text-primary font-medium select-all break-all">{lead?.email || 'Não informado'}</span>
                                       </div>
                                       <div className="flex flex-col gap-1">
                                         <span className="text-[9px] text-text-secondary uppercase font-medium">WhatsApp / Telefone</span>
-                                        <span className="text-sm text-white font-mono">{lead?.telefone || 'Não informado'}</span>
+                                        <span className="text-sm text-text-primary font-mono">{lead?.telefone || 'Não informado'}</span>
                                       </div>
                                     </div>
                                   </div>
@@ -1515,7 +1515,7 @@ export default function App() {
                                     <div className="space-y-4 pl-3">
                                       <div className="flex flex-col gap-1">
                                         <span className="text-[9px] text-text-secondary uppercase font-medium text-primary">Data de Primeiro Contato</span>
-                                        <span className="text-sm text-white">{regDate ? regDate.toLocaleString('pt-BR') : '---'}</span>
+                                        <span className="text-sm text-text-primary">{regDate ? regDate.toLocaleString('pt-BR') : '---'}</span>
                                       </div>
                                       <div className="flex flex-col gap-1">
                                         <span className="text-[9px] text-text-secondary uppercase font-medium text-primary">Janela de Decisão</span>
@@ -1535,9 +1535,9 @@ export default function App() {
                                     <div className="space-y-5 pl-3">
                                       <div>
                                         <span className="text-[9px] text-text-secondary uppercase font-medium block mb-2">Canal de Origem</span>
-                                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/20">
+                                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-[14px] bg-primary/10 border border-primary/20">
                                           <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                                          <span className="text-xs text-indigo-300 font-bold">
+                                          <span className="text-xs text-primary font-bold">
                                             {getFriendlyChannel(checkout.utm_source || lead?.utm_source_cadastro, checkout.utm_medium || lead?.utm_medium_cadastro, checkout.utm_campaign || lead?.utm_campaign_cadastro, checkout.utm_content || lead?.utm_content_cadastro)}
                                           </span>
                                         </div>
@@ -1557,10 +1557,10 @@ export default function App() {
                                       </div>
 
                                       {!checkout.utm_source && lead?.utm_source_cadastro && (
-                                        <div className="mt-4 p-3 rounded-xl bg-white/5 border border-primary/20 flex items-start gap-3">
+                                        <div className="mt-4 p-3 rounded-[14px] bg-white/5 border border-primary/20 flex items-start gap-3">
                                           <Activity className="w-4 h-4 text-primary shrink-0" />
                                           <p className="text-[10px] text-primary leading-relaxed font-medium">
-                                            Venda sem rastreio direto. Atribuição recuperada através do <span className="underline decoration-amber-500/50">Primeiro Contato</span> do lead na base.
+                                            Venda sem rastreio direto. Atribuição recuperada através do <span className="underline decoration-primary/50">Primeiro Contato</span> do lead na base.
                                           </p>
                                         </div>
                                       )}
@@ -1578,7 +1578,7 @@ export default function App() {
 
              <Card className="p-0 overflow-hidden border-primary/20">
                 <div className="p-5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between bg-white/5 gap-2">
-                   <h4 className="text-sm font-medium text-primary flex items-center gap-2 shrink-0">
+                   <h4 className="text-[0.8125rem] font-semibold text-text-secondary uppercase tracking-[0.06em] text-primary flex items-center gap-2 shrink-0">
                       <Users className="w-4 h-4" /> Novos Leads (Cadastros)
                    </h4>
                 </div>
@@ -1604,12 +1604,12 @@ export default function App() {
                             className={`p-4 flex items-center justify-between hover:bg-white/[0.04] cursor-pointer transition-colors ${isExpanded ? 'bg-white/[0.03]' : ''}`}
                           >
                             <div className="flex items-center gap-3">
-                               <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isExpanded ? 'bg-primary text-white' : hasPurchased ? 'bg-primary/20 text-primary' : 'bg-primary/10 text-primary'}`}>
+                               <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isExpanded ? 'bg-primary text-text-primary' : hasPurchased ? 'bg-primary/20 text-primary' : 'bg-primary/10 text-primary'}`}>
                                   <Users className="w-4 h-4" />
                                </div>
                                <div>
                                   <div className="flex items-center gap-2">
-                                    <p className="text-xs font-medium text-white">{lead.nome || lead.email || 'Lead #' + lead.id_usuario}</p>
+                                    <p className="text-xs font-medium text-text-primary">{lead.nome || lead.email || 'Lead #' + lead.id_usuario}</p>
                                     {hasPurchased && (
                                       <span className="text-[8px] bg-primary/10 text-primary border border-primary/30 px-1.5 py-0.5 rounded-full font-black tracking-widest">
                                         CLIENTE
@@ -1635,17 +1635,17 @@ export default function App() {
                                   <div>
                                     <p className="text-[9px] text-text-secondary uppercase font-bold tracking-widest mb-2">Informações de Contato</p>
                                     <div className="space-y-1.5">
-                                      <p className="text-[11px] text-white flex justify-between"><span className="text-[#525252]">E-mail:</span> <span className="font-medium select-all">{lead.email || 'N/A'}</span></p>
-                                      <p className="text-[11px] text-white flex justify-between"><span className="text-[#525252]">Tel/Cel:</span> <span className="font-mono">{lead.telefone || 'N/A'}</span></p>
-                                      <p className="text-[11px] text-white flex justify-between"><span className="text-[#525252]">Local:</span> <span>{lead.cidade ? `${lead.cidade} - ${lead.estado || ''}` : 'Não identificado'}</span></p>
+                                      <p className="text-[11px] text-text-primary flex justify-between"><span className="text-[#525252]">E-mail:</span> <span className="font-medium select-all">{lead.email || 'N/A'}</span></p>
+                                      <p className="text-[11px] text-text-primary flex justify-between"><span className="text-[#525252]">Tel/Cel:</span> <span className="font-mono">{lead.telefone || 'N/A'}</span></p>
+                                      <p className="text-[11px] text-text-primary flex justify-between"><span className="text-[#525252]">Local:</span> <span>{lead.cidade ? `${lead.cidade} - ${lead.estado || ''}` : 'Não identificado'}</span></p>
                                     </div>
                                   </div>
 
                                   {hasPurchased && purchase && (
-                                    <div className="p-3 rounded-lg bg-white/5 border border-primary/20">
+                                    <div className="p-3 rounded-[14px] bg-white/5 border border-primary/20">
                                       <p className="text-[9px] text-primary uppercase font-bold tracking-widest mb-2">Conversão Realizada</p>
-                                      <p className="text-[10px] text-emerald-200/80 leading-relaxed">
-                                        Comprou <span className="text-white font-bold italic">"{supabaseCursos.find(c => c.id_curso === purchase.id_curso)?.nome || 'Produto'}"</span> em {new Date(purchase.timestamp || purchase.created_at).toLocaleDateString('pt-BR')}.
+                                      <p className="text-[10px] text-text-secondary leading-relaxed">
+                                        Comprou <span className="text-text-primary font-bold italic">"{supabaseCursos.find(c => c.id_curso === purchase.id_curso)?.nome || 'Produto'}"</span> em {new Date(purchase.timestamp || purchase.created_at).toLocaleDateString('pt-BR')}.
                                       </p>
                                     </div>
                                   )}
@@ -1671,7 +1671,7 @@ export default function App() {
                                       </div>
                                       <div className="flex items-center gap-2 mt-4">
                                         <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                                        <span className="text-[10px] text-indigo-300 font-bold uppercase tracking-tight">Canal: {origin}</span>
+                                        <span className="text-[10px] text-text-muted font-bold uppercase tracking-tight">Canal: {origin}</span>
                                       </div>
                                     </div>
                                   </div>
@@ -1691,7 +1691,7 @@ export default function App() {
         {/* Channels Breakdown */}
         {dataStatus === 'success' && (
           <div className="space-y-6 mt-8">
-            <h2 className="text-2xl font-light tracking-tight mb-4 border-b border-[#222225] pb-2">
+            <h2 className="text-2xl font-light tracking-tight mb-4 border-b border-border pb-2">
               Detalhamento de Canais
             </h2>
             
@@ -1719,75 +1719,75 @@ export default function App() {
               const roasColor = roas > 3 ? 'text-primary' : roas >= 1.5 ? 'text-primary' : roas > 0 ? 'text-primary' : 'text-text-secondary';
 
               return (
-                <Card key={channel.id} className="p-0 overflow-hidden border border-[#222225]">
-                  <div className="p-5 border-b border-[#222225] flex justify-between items-center bg-[#0A0A0A]">
+                <Card key={channel.id} className="p-0 overflow-hidden border border-border">
+                  <div className="p-5 border-b border-border flex justify-between items-center bg-bg-sidebar">
                     <div className="flex items-center gap-3">
                       <span className={`px-3 py-1 text-xs font-medium rounded-full border ${channel.color}`}>
                         {channel.name}
                       </span>
                     </div>
                   </div>
-                  <div className={`grid grid-cols-2 md:grid-cols-5 divide-x divide-y md:divide-y-0 divide-[#222225] bg-[#111113]`}>
+                  <div className={`grid grid-cols-2 md:grid-cols-5 divide-x divide-y md:divide-y-0 divide-[#222225] bg-bg-card`}>
                     <div className="p-4 flex flex-col justify-center">
-                      <span className="text-xs text-[#8E9299] font-medium mb-1">Receita Gerada</span>
-                      <span className="text-lg font-semibold">R$ {data.revenue.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                      <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Receita Gerada</span>
+                      <span className="text-[24px] font-serif font-normal tracking-[-0.01em]">R$ {data.revenue.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
                     </div>
                     {selectedCompanyId === 'cultura' ? (
                       <div className="p-4 flex flex-col justify-center">
-                        <span className="text-xs text-[#8E9299] font-medium mb-1">Total Leads</span>
-                        <span className="text-lg font-semibold text-primary">{data.leads}</span>
+                        <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Total Leads</span>
+                        <span className="text-[24px] font-serif font-normal tracking-[-0.01em] text-primary">{data.leads}</span>
                       </div>
                     ) : (
                       <div className="p-4 flex flex-col justify-center">
-                        <span className="text-xs text-[#8E9299] font-medium mb-1">Custo Total</span>
-                        <span className="text-lg font-semibold text-red-400">R$ {data.cost.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                        <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Custo Total</span>
+                        <span className="text-[24px] font-serif font-normal tracking-[-0.01em] text-red-400">R$ {data.cost.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
                       </div>
                     )}
                     {selectedCompanyId === 'cultura' ? (
                        <div className="p-4 flex flex-col justify-center">
-                        <span className="text-xs text-[#8E9299] font-medium mb-1">Ticket Médio</span>
-                        <span className="text-lg font-semibold text-primary">R$ {avgTicket.toFixed(2)}</span>
+                        <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Ticket Médio</span>
+                        <span className="text-[24px] font-serif font-normal tracking-[-0.01em] text-primary">R$ {avgTicket.toFixed(2)}</span>
                       </div>
                     ) : (
                       <div className="p-4 flex flex-col justify-center">
-                        <span className="text-xs text-[#8E9299] font-medium mb-1">ROAS</span>
-                        <span className={`text-lg font-semibold ${roasColor}`}>{roas.toFixed(2)}x</span>
+                        <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">ROAS</span>
+                        <span className={`text-[24px] font-serif font-normal tracking-[-0.01em] ${roasColor}`}>{roas.toFixed(2)}x</span>
                       </div>
                     )}
                     <div className="p-4 flex flex-col justify-center">
-                      <span className="text-xs text-[#8E9299] font-medium mb-1">Vendas (Qtd)</span>
-                      <span className="text-lg font-semibold">{data.sales}</span>
+                      <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Vendas (Qtd)</span>
+                      <span className="text-[24px] font-serif font-normal tracking-[-0.01em]">{data.sales}</span>
                     </div>
                     {selectedCompanyId === 'cultura' ? (
                        <div className="p-4 flex flex-col justify-center">
-                        <span className="text-xs text-[#8E9299] font-medium mb-1">Conversão Lead/Venda</span>
-                        <span className="text-lg font-semibold text-primary">{data.leads > 0 ? ((data.sales / data.leads) * 100).toFixed(1) : 0}%</span>
+                        <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Conversão Lead/Venda</span>
+                        <span className="text-[24px] font-serif font-normal tracking-[-0.01em] text-primary">{data.leads > 0 ? ((data.sales / data.leads) * 100).toFixed(1) : 0}%</span>
                       </div>
                     ) : (
                       <div className="p-4 flex flex-col justify-center">
-                        <span className="text-xs text-[#8E9299] font-medium mb-1">Taxa de Conversão</span>
-                        <span className="text-lg font-semibold">{cr.toFixed(2)}%</span>
+                        <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Taxa de Conversão</span>
+                        <span className="text-[24px] font-serif font-normal tracking-[-0.01em]">{cr.toFixed(2)}%</span>
                       </div>
                     )}
                   </div>
 
                   {(data.products?.length > 0 || data.campaigns?.length > 0) && (
-                    <div className="p-5 bg-bg-app border-t border-border grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="p-5 bg-bg-page border-t border-border grid grid-cols-1 lg:grid-cols-2 gap-6">
                       {data.products && data.products.length > 0 && (
                         <div>
                           <h4 className="text-sm font-medium mb-3 text-[#A1A1AA] flex items-center gap-2">
                             <Focus className="w-4 h-4" /> Detalhamento de Cursos (Canais)
                           </h4>
-                          <div className="overflow-x-auto rounded-lg border border-[#222225]">
+                          <div className="overflow-x-auto rounded-[14px] border border-border">
                             <table className="w-full text-left">
-                              <thead className="bg-[#111113]">
+                              <thead className="bg-bg-card">
                                 <tr>
-                                  <th className="text-[10px] font-medium text-[#8E9299] p-3 uppercase tracking-wider">Produto</th>
-                                  <th className="text-[10px] font-medium text-[#8E9299] p-3 uppercase tracking-wider text-right">Qtd</th>
-                                  <th className="text-[10px] font-medium text-[#8E9299] p-3 uppercase tracking-wider text-right">Receita</th>
+                                  <th className="text-[10px] font-medium text-text-label p-3 uppercase tracking-wider">Produto</th>
+                                  <th className="text-[10px] font-medium text-text-label p-3 uppercase tracking-wider text-right">Qtd</th>
+                                  <th className="text-[10px] font-medium text-text-label p-3 uppercase tracking-wider text-right">Receita</th>
                                 </tr>
                               </thead>
-                              <tbody className="divide-y divide-[#222225] bg-[#0A0A0A]">
+                              <tbody className="divide-y divide-[#222225] bg-bg-sidebar">
                                 {data.products.map((p: any, i: number) => (
                                   <ProductRow key={i} p={p} isSupabase={selectedCompanyId === 'cultura'} />
                                 ))}
@@ -1802,33 +1802,33 @@ export default function App() {
                           <h4 className="text-sm font-medium mb-3 text-[#A1A1AA] flex items-center gap-2">
                             <TrendingUp className="w-4 h-4" /> Top Campanhas / Origens
                           </h4>
-                          <div className="overflow-x-auto rounded-lg border border-[#222225]">
+                          <div className="overflow-x-auto rounded-[14px] border border-border">
                             <table className="w-full text-left">
-                              <thead className="bg-[#111113]">
+                              <thead className="bg-bg-card">
                                 <tr>
-                                  <th className="text-[10px] font-medium text-[#8E9299] p-3 uppercase tracking-wider">Campanha</th>
-                                  <th className="text-[10px] font-medium text-[#8E9299] p-3 uppercase tracking-wider text-right w-24">Vendas</th>
-                                  <th className="text-[10px] font-medium text-[#8E9299] p-3 uppercase tracking-wider text-right w-24">Taxa %</th>
-                                  <th className="text-[10px] font-medium text-[#8E9299] p-3 uppercase tracking-wider text-right w-32">Receita</th>
+                                  <th className="text-[10px] font-medium text-text-label p-3 uppercase tracking-wider">Campanha</th>
+                                  <th className="text-[10px] font-medium text-text-label p-3 uppercase tracking-wider text-right w-24">Vendas</th>
+                                  <th className="text-[10px] font-medium text-text-label p-3 uppercase tracking-wider text-right w-24">Taxa %</th>
+                                  <th className="text-[10px] font-medium text-text-label p-3 uppercase tracking-wider text-right w-32">Receita</th>
                                 </tr>
                               </thead>
-                              <tbody className="divide-y divide-[#222225] bg-[#0A0A0A]">
+                              <tbody className="divide-y divide-[#222225] bg-bg-sidebar">
                                 {data.campaigns.map((c: any, i: number) => {
                                   const totalCampSales = data.sales || 1;
                                   const pct = (c.sales / totalCampSales) * 100;
                                   return (
-                                  <tr key={i} className="hover:bg-[#111113] transition-colors">
-                                    <td className="p-3 text-xs text-[#E4E3E0] max-w-[200px] truncate" title={c.name}>{c.name}</td>
-                                    <td className="p-3 text-xs text-right font-mono text-[#8E9299]">{c.sales}</td>
-                                    <td className="p-3 text-xs text-right font-mono text-[#8E9299]">
+                                  <tr key={i} className="hover:bg-bg-card transition-colors">
+                                    <td className="p-3 text-[0.875rem] font-normal text-text-secondary max-w-[200px] truncate" title={c.name}>{c.name}</td>
+                                    <td className="p-3 text-[0.875rem] font-medium tabular-nums text-right text-text-primary text-text-label">{c.sales}</td>
+                                    <td className="p-3 text-[0.875rem] font-medium tabular-nums text-right text-text-primary text-text-label">
                                       <div className="flex items-center justify-end gap-2">
-                                        <div className="w-12 h-1.5 bg-[#222225] rounded-full overflow-hidden">
+                                        <div className="w-12 h-1.5 bg-bg-sidebar rounded-full overflow-hidden">
                                           <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }}></div>
                                         </div>
                                         <span className="w-8">{pct.toFixed(0)}%</span>
                                       </div>
                                     </td>
-                                    <td className="p-3 text-xs text-right font-mono text-primary">R$ {c.rev.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+                                    <td className="p-3 text-[0.875rem] font-medium tabular-nums text-right text-text-primary text-primary">R$ {c.rev.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
                                   </tr>
                                 )})}
                               </tbody>
