@@ -312,7 +312,8 @@ export default function App() {
             // 4. Eventos Checkout (TUDO)
             const { data: checkouts, error: err4 } = await supabase
               .from('eventos_checkout')
-              .select('*');
+              .select('*')
+              .order('timestamp', { ascending: false });
             if (err4) throw err4;
             setSupabaseCheckouts(checkouts || []);
 
