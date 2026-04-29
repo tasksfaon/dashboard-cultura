@@ -75,7 +75,7 @@ const mockKpis = [
 
 // --- COMPONENTS ---
 const Card = ({ children, className = '', ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={`bg-[#111113] border border-[#222225] rounded-2xl p-6 ${className}`} {...props}>
+  <div className={`bg-bg-card border border-border rounded-2xl p-6 shadow-sm ${className}`} {...props}>
     {children}
   </div>
 );
@@ -612,13 +612,14 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-[#FAFAFA] font-sans selection:bg-[#F43F5E] selection:text-white pb-12">
+    <div className="min-h-screen bg-bg-app text-text-main font-sans selection:bg-primary selection:text-white pb-12">
       {/* Top Navigation / Header */}
-      <header className="border-b border-[#222225] bg-[#0A0A0A]/80 backdrop-blur-md sticky top-0 z-50">
+      <header className="border-b border-border bg-bg-app/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="relative group">
-            <button className="flex items-center gap-3 hover:opacity-80 transition-opacity focus:outline-none">
-              <img src={selectedCompany.logo} alt="Logo" className="w-10 h-10 rounded-full border border-[#222225] object-cover" />
+          <div className="flex items-center gap-4">
+            <div className="relative group">
+              <button className="flex items-center gap-3 hover:opacity-80 transition-opacity focus:outline-none">
+                <img src={selectedCompany.logo} alt="Logo" className="w-10 h-10 rounded-full border border-[#222225] object-cover" />
                 <div className="flex items-center gap-2">
                   <h1 className="text-xl font-semibold tracking-tight">{selectedCompany.name}</h1>
                 </div>
@@ -636,6 +637,7 @@ export default function App() {
                 ))}
               </div>
             </div>
+          </div>
           
           <div className="flex items-center gap-2">
             <div className="relative">
@@ -1567,7 +1569,7 @@ export default function App() {
                   </div>
 
                   {(data.products?.length > 0 || data.campaigns?.length > 0) && (
-                    <div className="p-5 bg-[#050505] border-t border-[#222225] grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="p-5 bg-bg-app border-t border-border grid grid-cols-1 lg:grid-cols-2 gap-6">
                       {data.products && data.products.length > 0 && (
                         <div>
                           <h4 className="text-sm font-medium mb-3 text-[#A1A1AA] flex items-center gap-2">
