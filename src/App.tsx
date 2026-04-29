@@ -737,22 +737,24 @@ export default function App() {
       {/* Decorative Top Bar */}
       <div className="h-1 w-full bg-gradient-to-r from-transparent via-primary to-transparent opacity-50" />
       {/* Top Navigation / Header */}
-      <header className="border-b border-border bg-bg-page/80 backdrop-blur-md z-[60] pt-10 pb-6 relative">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col items-center relative">
+      <header className="border-b border-border bg-bg-page/80 backdrop-blur-md z-[60] pt-6 md:pt-10 pb-6 relative">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 flex flex-col items-center relative">
           
-          <div className="z-0 flex flex-col items-center mb-4">
-             <img src="https://jndvesrtqewjqvarfaox.supabase.co/storage/v1/object/public/Logos/625949743_18077241884595017_7660496256666720708_n.jpg" alt="Logo Central" className="w-28 h-28 rounded-full border border-border object-cover mb-4 shadow-2xl" />
-             <span className="text-3xl font-serif font-normal italic text-text-primary tracking-[0.08em]">Dashboard Cultura Jurídica</span>
+          <div className="z-0 flex flex-col items-center mb-4 md:mb-6">
+             <img src="https://jndvesrtqewjqvarfaox.supabase.co/storage/v1/object/public/Logos/625949743_18077241884595017_7660496256666720708_n.jpg" alt="Logo Central" className="w-16 h-16 md:w-28 md:h-28 rounded-full border border-border object-cover mb-3 md:mb-4 shadow-2xl" />
+             <span className="text-xl md:text-3xl font-serif font-normal italic text-text-primary tracking-[0.08em] text-center">Dashboard Cultura Jurídica</span>
           </div>
           
-          <div className="flex items-center gap-2 ml-auto z-50 w-full justify-end mt-4 md:mt-0 md:absolute md:top-1/2 md:-translate-y-1/2 md:right-6">
-            <div className="relative">
+          <div className="flex items-center gap-2 z-50 w-full justify-center md:justify-end mt-2 md:mt-0 md:absolute md:top-1/2 md:-translate-y-1/2 md:right-6">
+            <div className="relative w-full md:w-auto flex justify-center">
               <button 
                   onClick={() => setIsDateDropdownOpen(!isDateDropdownOpen)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-[4px] border border-border bg-bg-card hover:brightness-110 transition-colors text-sm font-medium focus:outline-none"
+                  className="flex items-center justify-between md:justify-start gap-2 w-full md:w-auto px-4 py-2 rounded-[4px] border border-border bg-bg-card hover:brightness-110 transition-colors text-sm font-medium focus:outline-none"
               >
-                <CalendarDays className="w-4 h-4 text-text-secondary" />
-                <span>{dateRangeLabels[dateRange]}</span>
+                <div className="flex items-center gap-2">
+                  <CalendarDays className="w-4 h-4 text-text-secondary" />
+                  <span>{dateRangeLabels[dateRange]}</span>
+                </div>
                 <ChevronDown className="w-4 h-4 text-text-secondary" />
               </button>
               
@@ -810,7 +812,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 mt-8 space-y-6">
+      <main className="max-w-7xl mx-auto px-4 md:px-6 mt-6 md:mt-8 space-y-6">
         
 
 
@@ -863,7 +865,7 @@ export default function App() {
                 </div>
               </div>
             </div>
-            <div className="h-64 sm:h-80">
+            <div className="h-48 sm:h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={channelData.trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
@@ -954,16 +956,16 @@ export default function App() {
         {/* KPIs Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           {kpis.map((kpi, idx) => (
-            <Card key={idx} className="relative overflow-hidden group hover:border-primary/50 transition-colors p-5">
-              <div className="flex justify-between items-start mb-3">
-                <div className="p-2 bg-primary/10 rounded-[4px] transition-colors text-primary">
-                  <kpi.icon className="w-5 h-5" />
+            <Card key={idx} className="relative overflow-hidden group hover:border-primary/50 transition-colors p-4 md:p-5">
+              <div className="flex justify-between items-start mb-2 md:mb-3">
+                <div className="p-1.5 md:p-2 bg-primary/10 rounded-[4px] transition-colors text-primary">
+                  <kpi.icon className="w-4 h-4 md:w-5 md:h-5" />
                 </div>
               </div>
               <div>
-                <p className="text-[0.75rem] font-medium text-text-label uppercase tracking-[0.05em] mb-1">{kpi.title}</p>
-                <h3 className="text-[1.5rem] font-bold tabular-nums tracking-tight whitespace-nowrap">{kpi.value}</h3>
-                <p className="text-xs text-text-muted mt-1">{kpi.trend}</p>
+                <p className="text-[10px] md:text-[0.75rem] font-medium text-text-label uppercase tracking-[0.05em] mb-0.5 md:mb-1">{kpi.title}</p>
+                <h3 className="text-[1.25rem] md:text-[1.5rem] font-bold tabular-nums tracking-tight whitespace-nowrap">{kpi.value}</h3>
+                <p className="text-[10px] md:text-xs text-text-muted mt-0.5 md:mt-1">{kpi.trend}</p>
               </div>
               <div className="absolute -right-6 -bottom-6 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity text-primary">
                 <kpi.icon className="w-24 h-24" />
@@ -1088,32 +1090,32 @@ export default function App() {
         {/* DETALHE DO CLIENTE (MODAL) */}
         {selectedCustomerDetail && (
           <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setSelectedCustomerDetail(null)}>
-            <Card className="max-w-lg w-full p-8 relative animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+            <Card className="max-w-lg w-full p-6 md:p-8 relative animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
                 <button onClick={() => setSelectedCustomerDetail(null)} className="absolute top-4 right-4 text-text-secondary hover:text-text-primary">✕</button>
-                <h3 className="text-[0.8125rem] font-semibold text-primary uppercase tracking-[0.15em] mb-2 flex items-center gap-2 border-b border-border/30 pb-2">
-                     <Award className="w-4 h-4" /> Perfil Financeiro
+                <h3 className="text-[0.75rem] md:text-[0.8125rem] font-semibold text-primary uppercase tracking-[0.15em] mb-2 flex items-center gap-2 border-b border-border/30 pb-2">
+                     <Award className="w-3 h-3 md:w-4 md:h-4" /> Perfil Financeiro
                 </h3>
-                <p className="text-[2.25rem] font-bold tabular-nums tracking-tight mb-1">{selectedCustomerDetail.name}</p>
-                <p className="text-text-secondary text-sm mb-6">ID: {selectedCustomerDetail.id}</p>
+                <p className="text-[1.5rem] md:text-[2.25rem] font-bold tabular-nums tracking-tight mb-1">{selectedCustomerDetail.name}</p>
+                <p className="text-text-secondary text-[11px] md:text-sm mb-4 md:mb-6">ID: {selectedCustomerDetail.id}</p>
                 
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-white/5 p-4 rounded-[4px]">
-                        <p className="text-[10px] text-text-secondary uppercase">Receita Total</p>
-                        <p className="text-lg font-mono text-primary">R$ {selectedCustomerDetail.rev.toLocaleString('pt-BR')}</p>
+                <div className="grid grid-cols-2 gap-3 md:gap-4">
+                    <div className="bg-white/5 p-3 md:p-4 rounded-[4px]">
+                        <p className="text-[9px] md:text-[10px] text-text-secondary uppercase">Receita Total</p>
+                        <p className="text-base md:text-lg font-mono text-primary">R$ {selectedCustomerDetail.rev.toLocaleString('pt-BR')}</p>
                     </div>
-                    <div className="bg-white/5 p-4 rounded-[4px]">
-                        <p className="text-[10px] text-text-secondary uppercase">Vendas</p>
-                        <p className="text-lg font-mono text-text-primary">{selectedCustomerDetail.sales}x</p>
+                    <div className="bg-white/5 p-3 md:p-4 rounded-[4px]">
+                        <p className="text-[9px] md:text-[10px] text-text-secondary uppercase">Vendas</p>
+                        <p className="text-base md:text-lg font-mono text-text-primary">{selectedCustomerDetail.sales}x</p>
                     </div>
                 </div>
                 
-                <div className="mt-6">
-                    <p className="text-[10px] text-text-secondary uppercase mb-2">Histórico de Compras</p>
-                    <div className="space-y-2">
+                <div className="mt-6 overflow-hidden">
+                    <p className="text-[9px] md:text-[10px] text-text-secondary uppercase mb-2">Histórico de Compras</p>
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1 scrollbar-hide">
                         {selectedCustomerDetail.purchases.map((p: any, idx: number) => (
-                            <div key={idx} className="flex justify-between p-2 rounded bg-white/5 text-xs">
-                                <span className="text-text-primary truncate max-w-[200px]">{p.cursoName}</span>
-                                <span className="font-mono text-primary">R$ {Number(p.valor).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                            <div key={idx} className="flex justify-between p-2 rounded bg-white/5 text-[10px] md:text-xs">
+                                <span className="text-text-primary truncate max-w-[140px] md:max-w-[200px]">{p.cursoName}</span>
+                                <span className="font-mono text-primary shrink-0">R$ {Number(p.valor).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                             </div>
                         ))}
                     </div>
@@ -1316,8 +1318,8 @@ export default function App() {
                    </h4>
                    <span className="text-[10px] bg-primary/10 text-primary px-2 py-1 rounded border border-primary/20 font-bold">Top ROI</span>
                 </div>
-                <div className="max-h-[400px] overflow-y-auto">
-                   <table className="w-full text-left">
+                <div className="w-full overflow-x-auto scrollbar-hide">
+                   <table className="w-full text-left min-w-[600px]">
                       <thead className="bg-bg-card/50 sticky top-0 z-10">
                         <tr>
                           <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold">Campanha / Anúncio</th>
@@ -1354,8 +1356,8 @@ export default function App() {
                    </h4>
                    <span className="text-[10px] text-text-label">Ordenado por Receita</span>
                 </div>
-                <div className="max-h-[400px] overflow-y-auto">
-                   <table className="w-full text-left border-collapse">
+                <div className="w-full overflow-x-auto scrollbar-hide">
+                   <table className="w-full text-left border-collapse min-w-[600px]">
                       <thead className="bg-bg-card/50 sticky top-0 z-10">
                         <tr>
                           <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold">Infoproduto</th>
@@ -1459,17 +1461,17 @@ export default function App() {
                               onClick={() => setExpandedCheckoutId(isExpanded ? null : checkoutId)}
                               className={`p-4 flex items-center justify-between hover:bg-white/[0.04] cursor-pointer transition-colors ${isExpanded ? 'bg-white/[0.03]' : ''}`}
                             >
-                              <div className="flex items-center gap-3">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isExpanded ? 'bg-primary text-[#0D0D0D]' : 'bg-primary/10 text-primary'}`}>
+                              <div className="flex items-center gap-3 overflow-hidden">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors ${isExpanded ? 'bg-primary text-[#0D0D0D]' : 'bg-primary/10 text-primary'}`}>
                                     <DollarSign className="w-4 h-4" />
                                 </div>
-                                <div className="max-w-[150px] sm:max-w-none">
-                                    <p className="text-xs font-medium text-text-primary truncate">{lead?.nome || 'Usuário #' + checkout.id_usuario}</p>
-                                    <p className="text-[10px] text-text-secondary truncate">{curso?.nome || 'Curso #' + checkout.id_curso}</p>
+                                <div className="overflow-hidden">
+                                    <p className="text-[11px] md:text-xs font-medium text-text-primary truncate">{lead?.nome || 'Usuário #' + checkout.id_usuario}</p>
+                                    <p className="text-[9px] md:text-[10px] text-text-secondary truncate">{curso?.nome || 'Curso #' + checkout.id_curso}</p>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-4">
-                                <div className="text-right hidden sm:block">
+                              <div className="flex items-center gap-2 md:gap-4 shrink-0">
+                                <div className="text-right hidden md:block">
                                    <p className="text-[10px] text-text-secondary">{purchaseDate.toLocaleDateString('pt-BR')}</p>
                                    <p className="text-[9px] text-[#525252] uppercase font-bold">{paymentMethod} / {checkout.status}</p>
                                 </div>
@@ -1599,26 +1601,26 @@ export default function App() {
                             onClick={() => setExpandedLeadId(isExpanded ? null : leadId)}
                             className={`p-4 flex items-center justify-between hover:bg-white/[0.04] cursor-pointer transition-colors ${isExpanded ? 'bg-white/[0.03]' : ''}`}
                           >
-                            <div className="flex items-center gap-3">
-                               <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${isExpanded ? 'bg-primary text-text-primary' : hasPurchased ? 'bg-primary/20 text-primary' : 'bg-primary/10 text-primary'}`}>
+                            <div className="flex items-center gap-3 overflow-hidden">
+                               <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors ${isExpanded ? 'bg-primary text-text-primary' : hasPurchased ? 'bg-primary/20 text-primary' : 'bg-primary/10 text-primary'}`}>
                                   <Users className="w-4 h-4" />
                                </div>
-                               <div>
-                                  <div className="flex items-center gap-2">
-                                    <p className="text-xs font-medium text-text-primary">{lead.nome || lead.email || 'Lead #' + lead.id_usuario}</p>
+                               <div className="overflow-hidden">
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <p className="text-[11px] md:text-xs font-medium text-text-primary truncate max-w-[150px]">{lead.nome || lead.email || 'Lead #' + lead.id_usuario}</p>
                                     {hasPurchased && (
                                       <span className="text-[8px] bg-primary/10 text-primary border border-primary/30 px-1.5 py-0.5 rounded-full font-black tracking-widest">
                                         CLIENTE
                                       </span>
                                     )}
                                   </div>
-                                  <p className="text-[10px] text-text-secondary">{origin}</p>
+                                  <p className="text-[9px] md:text-[10px] text-text-secondary truncate">{origin}</p>
                                </div>
                             </div>
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2 md:gap-4 shrink-0">
                                <div className="text-right">
                                   <p className="text-[10px] text-text-secondary">{new Date(lead.data_cadastro).toLocaleDateString('pt-BR')}</p>
-                                  <p className="text-[9px] text-[#525252] uppercase tracking-tighter">{lead.cidade || 'S/ Cidade'}</p>
+                                  <p className="text-[9px] text-[#525252] uppercase tracking-tighter truncate max-w-[60px] md:max-w-none">{lead.cidade || 'S/ Cidade'}</p>
                                </div>
                                <ChevronDown className={`w-3 h-3 text-[#525252] transition-transform ${isExpanded ? 'rotate-180 text-primary' : ''}`} />
                             </div>
