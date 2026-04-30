@@ -81,6 +81,7 @@ const Card = ({ children, className = '', ...props }: React.HTMLAttributes<HTMLD
 const ProductRow: React.FC<{ p: any, isSupabase?: boolean }> = ({ p, isSupabase }) => {
   const [expanded, setExpanded] = useState(false);
   const roas = p.cost > 0 ? p.rev / p.cost : 0;
+  console.log(`Debug ProductRow: Name: ${p.name}, Cost: ${p.cost}, Rev: ${p.rev}, ROAS: ${roas}`);
   return (
     <React.Fragment>
       <tr onClick={() => setExpanded(!expanded)} className="hover:bg-bg-card transition-colors cursor-pointer group border-b border-border/50">
@@ -95,13 +96,9 @@ const ProductRow: React.FC<{ p: any, isSupabase?: boolean }> = ({ p, isSupabase 
         </td>
         <td className="p-4 text-[0.875rem] font-medium tabular-nums text-right text-text-primary text-text-label">{p.qty}</td>
         <td className="p-4 text-[0.875rem] font-medium tabular-nums text-right text-text-primary">
-           {isSupabase ? (
-             <span className="text-[10px] text-text-secondary uppercase">Supabase</span>
-           ) : (
-             <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${roas > 3 ? 'bg-primary/10 text-primary' : 'bg-gray-500/10 text-text-secondary'}`}>
-               {roas > 0 ? `${roas.toFixed(1)}x` : '-'}
+             <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${roas > 3 ? 'bg-primary/10 text-primary' : (roas > 0 ? 'bg-orange-500/10 text-orange-600' : 'bg-gray-500/10 text-text-secondary')}`}>
+               {roas > 0 ? `${roas.toFixed(1)}x` : '0.0x'}
              </span>
-           )}
         </td>
         <td className="p-4 text-[0.875rem] font-medium tabular-nums text-right text-text-primary text-primary font-semibold">R$ {p.rev.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
       </tr>
@@ -160,6 +157,7 @@ export default function App() {
   const [filteredCheckouts, setFilteredCheckouts] = useState<any[]>([]);
   const [sheetData, setSheetData] = useState<any[]>([]);
   const [metaCosts, setMetaCosts] = useState<any[]>([]);
+  const [distStats, setDistStats] = useState<any>({ cost: 0, revenue: 0, sales: 0, leads: 0 });
 
   useEffect(() => {
     const fetchSheetData = async () => {
@@ -194,20 +192,36 @@ export default function App() {
 
         const headers = rows[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase());
         
-        // Detect indices for Date and Cost based on user specification
-        const dateIndex = headers.findIndex(h => h === 'day' || h.includes('data') || h.includes('date') || h.includes('dia'));
-        const costIndex = headers.findIndex(h => h === 'amount spent' || h.includes('valor') || h.includes('gasto') || h.includes('cost') || h.includes('spend'));
+        // Detect indices for Date, Cost, Campaign, and Ad Name based on user specification
+        const dateIndex = headers.findIndex(h => h === 'day' || h === 'data' || h.includes('date') || h.includes('dia'));
+        const costIndex = headers.findIndex(h => h.includes('spent') || h.includes('gasto') || h.includes('cost') || h.includes('valor'));
+        const campaignIndex = headers.findIndex(h => h.includes('campaign') || h.includes('campanha'));
+        const adNameIndex = headers.findIndex(h => h.includes('ad name') || h.includes('nome do anúncio'));
 
         if (dateIndex === -1 || costIndex === -1) {
-          console.error('Could not find Day or Amount spent columns in Meta Ads sheet', headers);
+          console.error('Could not find Day or Amount spent columns in Meta Ads sheet. Headers found:', headers);
           return;
         }
 
         const parsedCosts = rows.slice(1).map(row => {
-          // Use a more robust split for CSV that handles potential commas inside quotes (though uncommon in simple sheets)
-          const values = row.split(',').map(v => v.replace(/"/g, '').trim());
-          const dateStr = values[dateIndex];
-          const costStr = values[costIndex]?.replace('R$', '').replace(/\./g, '').replace(',', '.').trim();
+          // Robust CSV splitting to handle commas in values if they are quoted
+          const values: string[] = [];
+          let current = '';
+          let inQuotes = false;
+          for (let i = 0; i < row.length; i++) {
+            const char = row[i];
+            if (char === '"') inQuotes = !inQuotes;
+            else if (char === ',' && !inQuotes) {
+              values.push(current.trim());
+              current = '';
+            } else current += char;
+          }
+          values.push(current.trim());
+
+          const dateStr = values[dateIndex]?.replace(/"/g, '');
+          const costStr = values[costIndex]?.replace(/"/g, '').replace('R$', '').replace(/\./g, '').replace(',', '.').trim();
+          const campaign = campaignIndex !== -1 ? values[campaignIndex]?.replace(/"/g, '') : 'Desconhecido';
+          const adName = adNameIndex !== -1 ? values[adNameIndex]?.replace(/"/g, '') : 'Desconhecido';
           const cost = parseFloat(costStr);
 
           if (!dateStr || isNaN(cost)) return null;
@@ -226,14 +240,15 @@ export default function App() {
             dateObj = new Date(dateStr);
           }
 
-          // Ensure valid date
+          // Ensure valid date and normalize to midnight
           if (isNaN(dateObj.getTime())) return null;
+          dateObj.setHours(0, 0, 0, 0);
 
-          return { date: dateObj, cost };
+          return { date: dateObj, cost, campaign, adName };
         }).filter(v => v !== null);
 
-        setMetaCosts(parsedCosts);
-        console.log('Meta Ads Costs extracted:', parsedCosts.length, 'records');
+        setMetaCosts(parsedCosts as any[]);
+        console.log('Meta Ads Costs extracted:', (parsedCosts as any[]).length, 'records');
       } catch (error) {
         console.error('Error fetching Meta Costs sheet:', error);
       }
@@ -476,6 +491,33 @@ export default function App() {
             channelMap.meta.cost = periodMetaCost;
             channelMap.total.cost = periodMetaCost; // For now total cost is just Meta. Google cost would be separate if available.
 
+            // --- DISTRIBUIÇÃO DE CONTEÚDO (Tags: [CUL26], [DIST], [ACE]) ---
+            const distributionTags = ["[CUL26]", "[DIST]", "[ACE]"];
+            const distributionCosts = metaCosts.filter(c => 
+                c.date >= startDate && c.date <= endDate &&
+                distributionTags.some(tag => c.campaign.includes(tag))
+            ).reduce((acc, curr) => acc + curr.cost, 0);
+
+            // Filter checkouts that belong to distribution campaigns
+            const distributionCheckouts = filteredData.filter(c => 
+                distributionTags.some(tag => (c.utm_campaign || '').includes(tag))
+            );
+            const distributionRevenue = distributionCheckouts.reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
+            
+            // Filter leads belonging to distribution campaigns
+            const distributionLeads = filteredCadastros.filter(l => 
+                distributionTags.some(tag => (l.utm_campaign_cadastro || '').includes(tag))
+            ).length;
+
+            setDistStats({
+                cost: distributionCosts,
+                revenue: distributionRevenue,
+                sales: distributionCheckouts.length,
+                leads: distributionLeads
+            });
+
+
+
             // Map para fácil acesso aos cursos
             const cursosMap = new Map<string, any>(cursos.map((c: any) => [c.id_curso, c]));
 
@@ -542,6 +584,32 @@ export default function App() {
               const pt = channelMap.total.products.get(cursoName);
               pt.qty += 1;
               pt.rev += rev;
+            });
+
+            // --- CUSTOS POR PRODUTO ---
+            // Mapping for product costs based on tags
+            metaCosts.forEach(c => {
+                if (c.date >= startDate && c.date <= endDate) {
+                    channelMap.total.products.forEach((p: any, name: string) => {
+                         const ad = c.adName.toUpperCase();
+                         const prod = name.toUpperCase();
+                         
+                         // More flexible matching
+                         const hasCIV = ad.includes('CIV') && ad.includes('26');
+                         const hasPEN = ad.includes('PEN') && ad.includes('26');
+                         const hasACA = ad.includes('ACA') && ad.includes('26');
+
+                         if (hasPEN && prod.includes('PENALIST')) {
+                             p.cost = (p.cost || 0) + c.cost;
+                         }
+                         if (hasCIV && prod.includes('CIVILIST')) {
+                             p.cost = (p.cost || 0) + c.cost;
+                         }
+                         if (hasACA && prod.includes('ACADEMIA')) {
+                             p.cost = (p.cost || 0) + c.cost;
+                         }
+                    });
+                }
             });
 
             // Leads por canal (baseado nos UTMs do cadastro)
@@ -702,8 +770,9 @@ export default function App() {
 
             setKpis([
               { title: 'Receita Total', value: `R$ ${totalRevenue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, trend: 'Faturamento no Período', isUp: true, icon: DollarSign },
-              { title: 'Blended ROAS', value: blendedROAS, trend: 'Retorno s/ Investimento', isUp: true, icon: Activity },
-              { title: 'Blended CPA', value: blendedCPA, trend: 'Custo por Venda', isUp: true, icon: Target },
+              { title: 'Investimento Total', value: `R$ ${periodMetaCost.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, trend: 'Valor Gasto no Período', isUp: true, icon: CreditCard },
+              { title: 'ROAS Geral', value: blendedROAS, trend: 'Retorno do investimento', isUp: true, icon: Activity },
+              { title: 'CPA Geral', value: blendedCPA, trend: 'Custo por Venda', isUp: true, icon: Target },
               { title: 'Total Leads', value: leadsCount.toString(), trend: 'Novos Cadastros', isUp: true, icon: Users },
               { title: 'Vendas Totais', value: salesCount.toString(), trend: 'Checkouts realizados', isUp: true, icon: ShoppingCart },
             ]);
@@ -734,7 +803,7 @@ export default function App() {
     };
 
     fetchAnalytics();
-  }, [tokens, propertyId, dateRange, appliedCustomDate.start, appliedCustomDate.end]);
+  }, [tokens, propertyId, dateRange, appliedCustomDate.start, appliedCustomDate.end, metaCosts]);
 
   const handleConnect = async () => {
     try {
@@ -821,7 +890,7 @@ export default function App() {
       <div className="h-1 w-full bg-gradient-to-r from-transparent via-primary to-transparent opacity-50" />
       {/* Top Navigation / Header */}
       <header className="border-b border-border bg-bg-page/80 backdrop-blur-md z-[60] pt-6 md:pt-10 pb-6 relative">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 flex flex-col items-center relative">
+        <div className="max-w-[95rem] mx-auto px-4 md:px-6 flex flex-col items-center relative">
           
           <div className="z-0 flex flex-col items-center mb-4 md:mb-6">
              <img src="https://jndvesrtqewjqvarfaox.supabase.co/storage/v1/object/public/Logos/625949743_18077241884595017_7660496256666720708_n.jpg" alt="Logo Central" className="w-16 h-16 md:w-28 md:h-28 rounded-full border border-border object-cover mb-3 md:mb-4 shadow-2xl" />
@@ -895,7 +964,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 md:px-6 mt-6 md:mt-8 space-y-6">
+      <main className="max-w-[95rem] mx-auto px-4 md:px-6 mt-6 md:mt-8 space-y-6">
         
 
 
@@ -967,27 +1036,58 @@ export default function App() {
                     minTickGap={30}
                   />
                   <YAxis 
+                    yAxisId="left"
                     stroke="#52525B" 
                     fontSize={10} 
                     tickLine={false} 
                     axisLine={false} 
+                    tickFormatter={(val) => `R$ ${val}`}
+                  />
+                  <YAxis 
+                    yAxisId="right"
+                    orientation="right"
+                    stroke="#52525B" 
+                    fontSize={10} 
+                    tickLine={false} 
+                    axisLine={false}
                   />
                   
                   <Area
+                    yAxisId="left"
                     type="monotone"
-                    dataKey="leads"
+                    dataKey="value"
                     stroke="#DCA61F"
-                    strokeWidth={2}
-                    fill="transparent"
-                    name="Leads"
+                    strokeWidth={3}
+                    fillOpacity={1}
+                    fill="url(#colorRev)"
+                    name="Receita"
                   />
                   <Area
+                    yAxisId="left"
                     type="monotone"
                     dataKey="cost"
                     stroke="#EF4444"
                     strokeWidth={2}
                     fill="transparent"
                     name="Investimento"
+                  />
+                  <Area
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="leads"
+                    stroke="#6366f1"
+                    strokeWidth={2}
+                    fill="transparent"
+                    name="Leads"
+                  />
+                  <Area
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="salesCount"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    fill="transparent"
+                    name="Vendas (Qtd)"
                   />
                   <RechartsTooltip 
                     content={({ active, payload, label }) => {
@@ -1004,6 +1104,10 @@ export default function App() {
                               <div className="flex justify-between items-center">
                                 <span className="text-text-label text-red-400">Investimento Meta:</span>
                                 <span className="text-red-400 font-bold ml-4">R$ {Number(data.cost || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-text-label text-emerald-400">ROAS:</span>
+                                <span className="text-emerald-400 font-bold ml-4">{(data.cost > 0 ? (data.value / data.cost).toFixed(2) : '0.00') + 'x'}</span>
                               </div>
                               <div className="flex justify-between items-center pt-1 border-t border-white/5">
                                 <span className="text-text-label">Vendas:</span>
@@ -1032,16 +1136,6 @@ export default function App() {
                       return null;
                     }}
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="salesCount" 
-                    stroke="#DCA61F" 
-                    strokeWidth={2}
-                    fillOpacity={1} 
-                    fill="url(#colorRev)" 
-                    animationDuration={1500}
-                    name="Vendas"
-                  />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -1049,7 +1143,7 @@ export default function App() {
         )}
 
         {/* KPIs Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-4">
           {kpis.map((kpi, idx) => (
             <Card key={idx} className="relative overflow-hidden group hover:border-primary/50 transition-colors p-4 md:p-5">
               <div className="flex justify-between items-start mb-2 md:mb-3">
@@ -1067,6 +1161,51 @@ export default function App() {
               </div>
             </Card>
           ))}
+        </div>
+
+        {/* Métricas de Distribuição - Campanhas de Distribuição de Conteúdo */}
+        <div className="mt-8">
+            <h2 className="text-xl font-bold mb-6 text-text-primary flex items-center gap-2">
+              <Zap className="w-5 h-5 text-primary" /> Campanhas de distribuição de conteúdo
+            </h2>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+               <Card className="p-5 bg-bg-card border-border flex items-center gap-4 hover:border-primary/30 transition-colors">
+                 <div className="p-3 bg-red-500/10 rounded-full text-red-500">
+                   <CreditCard className="w-5 h-5" />
+                 </div>
+                 <div>
+                   <p className="text-text-label text-xs uppercase font-medium tracking-wide">Investimento</p>
+                   <h3 className="text-xl font-bold tabular-nums">R$ {distStats.cost.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</h3>
+                 </div>
+               </Card>
+               <Card className="p-5 bg-bg-card border-border flex items-center gap-4 hover:border-primary/30 transition-colors">
+                 <div className="p-3 bg-primary/10 rounded-full text-primary">
+                   <DollarSign className="w-5 h-5" />
+                 </div>
+                 <div>
+                   <p className="text-text-label text-xs uppercase font-medium tracking-wide">Receita</p>
+                   <h3 className="text-xl font-bold tabular-nums">R$ {distStats.revenue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</h3>
+                 </div>
+               </Card>
+               <Card className="p-5 bg-bg-card border-border flex items-center gap-4 hover:border-primary/30 transition-colors">
+                 <div className="p-3 bg-emerald-500/10 rounded-full text-emerald-500">
+                   <ShoppingCart className="w-5 h-5" />
+                 </div>
+                 <div>
+                   <p className="text-text-label text-xs uppercase font-medium tracking-wide">Vendas</p>
+                   <h3 className="text-xl font-bold tabular-nums">{distStats.sales}</h3>
+                 </div>
+               </Card>
+               <Card className="p-5 bg-bg-card border-border flex items-center gap-4 hover:border-primary/30 transition-colors">
+                 <div className="p-3 bg-blue-500/10 rounded-full text-blue-500">
+                   <Users className="w-5 h-5" />
+                 </div>
+                 <div>
+                   <p className="text-text-label text-xs uppercase font-medium tracking-wide">Leads</p>
+                   <h3 className="text-xl font-bold tabular-nums">{distStats.leads}</h3>
+                 </div>
+               </Card>
+            </div>
         </div>
 
         {/* Insights de Distribuição */}
@@ -1464,7 +1603,7 @@ export default function App() {
                       <tbody className="bg-bg-card/20">
                         {(channelData.totalProducts || [])
                           .map((p: any, i: number) => (
-                             <ProductRow key={i} p={{ ...p, cost: 0 }} isSupabase={selectedCompanyId === 'cultura'} />
+                             <ProductRow key={i} p={p} isSupabase={selectedCompanyId === 'cultura'} />
                           ))}
                       </tbody>
                    </table>
