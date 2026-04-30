@@ -1168,7 +1168,7 @@ export default function App() {
             <h2 className="text-xl font-bold mb-6 text-text-primary flex items-center gap-2">
               <Zap className="w-5 h-5 text-primary" /> Campanhas de distribuição de conteúdo
             </h2>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                <Card className="p-5 bg-bg-card border-border flex items-center gap-4 hover:border-primary/30 transition-colors">
                  <div className="p-3 bg-red-500/10 rounded-full text-red-500">
                    <CreditCard className="w-5 h-5" />
