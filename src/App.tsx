@@ -159,6 +159,7 @@ export default function App() {
   const [supabaseCheckouts, setSupabaseCheckouts] = useState<any[]>([]);
   const [filteredCheckouts, setFilteredCheckouts] = useState<any[]>([]);
   const [sheetData, setSheetData] = useState<any[]>([]);
+  const [metaCosts, setMetaCosts] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchSheetData = async () => {
@@ -182,7 +183,64 @@ export default function App() {
         console.error('Error fetching sheet:', error);
       }
     };
+
+    const fetchMetaCosts = async () => {
+      const url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRipHb2qYPRUNldUPch9vewcpC4DI_hSzDw8yZmhx0R4UO_SgFPgd2jmCdRqhwhdeuek6x9lmiHDVQo/pub?output=csv';
+      try {
+        const response = await fetch(url);
+        const csvText = await response.text();
+        const rows = csvText.split('\n');
+        if (rows.length < 2) return;
+
+        const headers = rows[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase());
+        
+        // Detect indices for Date and Cost based on user specification
+        const dateIndex = headers.findIndex(h => h === 'day' || h.includes('data') || h.includes('date') || h.includes('dia'));
+        const costIndex = headers.findIndex(h => h === 'amount spent' || h.includes('valor') || h.includes('gasto') || h.includes('cost') || h.includes('spend'));
+
+        if (dateIndex === -1 || costIndex === -1) {
+          console.error('Could not find Day or Amount spent columns in Meta Ads sheet', headers);
+          return;
+        }
+
+        const parsedCosts = rows.slice(1).map(row => {
+          // Use a more robust split for CSV that handles potential commas inside quotes (though uncommon in simple sheets)
+          const values = row.split(',').map(v => v.replace(/"/g, '').trim());
+          const dateStr = values[dateIndex];
+          const costStr = values[costIndex]?.replace('R$', '').replace(/\./g, '').replace(',', '.').trim();
+          const cost = parseFloat(costStr);
+
+          if (!dateStr || isNaN(cost)) return null;
+
+          // Normalize date format - explicit parsing to avoid timezone shifts
+          let dateObj: Date;
+          if (dateStr.includes('-')) {
+            // YYYY-MM-DD
+            const [y, m, d] = dateStr.split('-');
+            dateObj = new Date(Number(y), Number(m) - 1, Number(d));
+          } else if (dateStr.includes('/')) {
+            // DD/MM/YYYY
+            const [d, m, y] = dateStr.split('/');
+            dateObj = new Date(Number(y), Number(m) - 1, Number(d));
+          } else {
+            dateObj = new Date(dateStr);
+          }
+
+          // Ensure valid date
+          if (isNaN(dateObj.getTime())) return null;
+
+          return { date: dateObj, cost };
+        }).filter(v => v !== null);
+
+        setMetaCosts(parsedCosts);
+        console.log('Meta Ads Costs extracted:', parsedCosts.length, 'records');
+      } catch (error) {
+        console.error('Error fetching Meta Costs sheet:', error);
+      }
+    };
+
     fetchSheetData();
+    fetchMetaCosts();
   }, []);
 
   const selectedCompany = companies.find(c => c.id === selectedCompanyId) || companies[0];
@@ -408,6 +466,16 @@ export default function App() {
             });
             channelMap.total = { revenue: totalRevenue, sales: salesCount, leads: leadsCount, sessions: 0, cost: 0, products: new Map() };
 
+            // Integration of Meta Ads Costs from Spreadsheet
+            const periodMetaCost = metaCosts.reduce((acc, curr) => {
+              if (curr.date >= startDate && curr.date <= endDate) {
+                return acc + curr.cost;
+              }
+              return acc;
+            }, 0);
+            channelMap.meta.cost = periodMetaCost;
+            channelMap.total.cost = periodMetaCost; // For now total cost is just Meta. Google cost would be separate if available.
+
             // Map para fácil acesso aos cursos
             const cursosMap = new Map<string, any>(cursos.map((c: any) => [c.id_curso, c]));
 
@@ -490,13 +558,24 @@ export default function App() {
               .sort((a, b) => b.rev - a.rev);
 
             // --- TREND DATA (Receita, Leads e Produtos por Dia) ---
-            const trendMap = new Map<string, { value: number, salesCount: number, leads: number, products: Map<string, number> }>();
+            const trendMap = new Map<string, { value: number, salesCount: number, leads: number, cost: number, products: Map<string, number> }>();
             
+            // Adicionar custos (Meta Ads) ao trendMap
+            metaCosts.forEach(c => {
+              if (c.date >= startDate && c.date <= endDate) {
+                const dateStr = c.date.toLocaleDateString('pt-BR');
+                if (!trendMap.has(dateStr)) {
+                  trendMap.set(dateStr, { value: 0, salesCount: 0, leads: 0, cost: 0, products: new Map() });
+                }
+                trendMap.get(dateStr)!.cost += c.cost;
+              }
+            });
+
             // Inicializar com checkouts (vendas)
             filteredData.forEach(c => {
               const dateStr = new Date(c.timestamp || c.created_at).toLocaleDateString('pt-BR');
               if (!trendMap.has(dateStr)) {
-                trendMap.set(dateStr, { value: 0, salesCount: 0, leads: 0, products: new Map() });
+                trendMap.set(dateStr, { value: 0, salesCount: 0, leads: 0, cost: 0, products: new Map() });
               }
               const dayData = trendMap.get(dateStr)!;
               dayData.value += (Number(c.valor) || 0);
@@ -511,7 +590,7 @@ export default function App() {
             filteredCadastros.forEach(lead => {
               const dateStr = new Date(lead.data_cadastro).toLocaleDateString('pt-BR');
               if (!trendMap.has(dateStr)) {
-                trendMap.set(dateStr, { value: 0, salesCount: 0, leads: 0, products: new Map() });
+                trendMap.set(dateStr, { value: 0, salesCount: 0, leads: 0, cost: 0, products: new Map() });
               }
               trendMap.get(dateStr)!.leads += 1;
             });
@@ -522,6 +601,7 @@ export default function App() {
                 value: data.value,
                 salesCount: data.salesCount,
                 leads: data.leads,
+                cost: data.cost,
                 products: Array.from(data.products.entries()).map(([name, qty]) => ({ name, qty }))
               }))
               .sort((a, b) => {
@@ -617,11 +697,14 @@ export default function App() {
               hasFallback: fallbackCount > 0
             });
 
+            const blendedROAS = periodMetaCost > 0 ? (totalRevenue / periodMetaCost).toFixed(2) + 'x' : '0.00x';
+            const blendedCPA = salesCount > 0 ? `R$ ${(periodMetaCost / salesCount).toFixed(2)}` : 'R$ 0,00';
+
             setKpis([
               { title: 'Receita Total', value: `R$ ${totalRevenue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, trend: 'Faturamento no Período', isUp: true, icon: DollarSign },
-              { title: 'Ticket Médio', value: `R$ ${(salesCount > 0 ? totalRevenue / salesCount : 0).toFixed(2)}`, trend: 'Venda Média', isUp: true, icon: Activity },
+              { title: 'Blended ROAS', value: blendedROAS, trend: 'Retorno s/ Investimento', isUp: true, icon: Activity },
+              { title: 'Blended CPA', value: blendedCPA, trend: 'Custo por Venda', isUp: true, icon: Target },
               { title: 'Total Leads', value: leadsCount.toString(), trend: 'Novos Cadastros', isUp: true, icon: Users },
-              { title: 'Conversão Lead/Venda', value: `${(leadsCount > 0 ? (salesCount / leadsCount) * 100 : 0).toFixed(2)}%`, trend: 'Eficiência de Vendas', isUp: true, icon: TrendingUp },
               { title: 'Vendas Totais', value: salesCount.toString(), trend: 'Checkouts realizados', isUp: true, icon: ShoppingCart },
             ]);
 
@@ -898,12 +981,20 @@ export default function App() {
                     fill="transparent"
                     name="Leads"
                   />
+                  <Area
+                    type="monotone"
+                    dataKey="cost"
+                    stroke="#EF4444"
+                    strokeWidth={2}
+                    fill="transparent"
+                    name="Investimento"
+                  />
                   <RechartsTooltip 
                     content={({ active, payload, label }) => {
                       if (active && payload && payload.length) {
                         const data = payload[0].payload;
                         return (
-                          <div className="bg-bg-card border border-border p-4 rounded-[4px] shadow-2xl text-[11px] min-w-[180px] backdrop-blur-sm bg-black/80">
+                          <div className="bg-bg-card border border-border p-4 rounded-[4px] shadow-2xl text-[11px] min-w-[200px] backdrop-blur-sm bg-black/80">
                             <p className="text-text-label mb-3 font-medium border-b border-white/5 pb-2">{label}</p>
                             <div className="space-y-2 mb-3">
                               <div className="flex justify-between items-center">
@@ -911,6 +1002,10 @@ export default function App() {
                                 <span className="text-primary font-bold ml-4">R$ {Number(data.value || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                               </div>
                               <div className="flex justify-between items-center">
+                                <span className="text-text-label text-red-400">Investimento Meta:</span>
+                                <span className="text-red-400 font-bold ml-4">R$ {Number(data.cost || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                              </div>
+                              <div className="flex justify-between items-center pt-1 border-t border-white/5">
                                 <span className="text-text-label">Vendas:</span>
                                 <span className="text-primary font-bold ml-4">{data.salesCount}</span>
                               </div>
@@ -1730,43 +1825,40 @@ export default function App() {
                       <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Receita Gerada</span>
                       <span className="text-[24px] font-bold">R$ {data.revenue.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
                     </div>
-                    {selectedCompanyId === 'cultura' ? (
+                    
+                    {channel.id === 'meta' && data.cost > 0 ? (
                       <div className="p-4 flex flex-col justify-center">
-                        <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Total Leads</span>
-                        <span className="text-[24px] font-bold text-primary">{data.leads}</span>
+                        <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Investimento Meta</span>
+                        <span className="text-[24px] font-bold text-red-500">R$ {data.cost.toLocaleString('pt-BR', {minimumFractionDigits:2})}</span>
                       </div>
                     ) : (
                       <div className="p-4 flex flex-col justify-center">
-                        <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Custo Total</span>
-                        <span className="text-[24px] font-bold text-red-400">R$ {data.cost.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                        <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">{selectedCompanyId === 'cultura' ? 'Total Leads' : 'Custo Total'}</span>
+                        <span className="text-[24px] font-bold text-primary">{selectedCompanyId === 'cultura' ? data.leads : `R$ ${data.cost.toLocaleString('pt-BR')}`}</span>
                       </div>
                     )}
-                    {selectedCompanyId === 'cultura' ? (
-                       <div className="p-4 flex flex-col justify-center">
-                        <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Ticket Médio</span>
-                        <span className="text-[24px] font-bold text-primary">R$ {avgTicket.toFixed(2)}</span>
-                      </div>
-                    ) : (
+
+                    {channel.id === 'meta' && data.cost > 0 ? (
                       <div className="p-4 flex flex-col justify-center">
-                        <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">ROAS</span>
+                        <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">ROAS Meta</span>
                         <span className={`text-[24px] font-bold ${roasColor}`}>{roas.toFixed(2)}x</span>
                       </div>
-                    )}
-                    <div className="p-4 flex flex-col justify-center">
-                      <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Vendas (Qtd)</span>
-                      <span className="text-[24px] font-bold">{data.sales}</span>
-                    </div>
-                    {selectedCompanyId === 'cultura' ? (
-                       <div className="p-4 flex flex-col justify-center">
-                        <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Conversão Lead/Venda</span>
-                        <span className="text-[24px] font-bold text-primary">{data.leads > 0 ? ((data.sales / data.leads) * 100).toFixed(1) : 0}%</span>
-                      </div>
                     ) : (
                       <div className="p-4 flex flex-col justify-center">
-                        <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Taxa de Conversão</span>
-                        <span className="text-[24px] font-bold">{cr.toFixed(2)}%</span>
+                        <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">{selectedCompanyId === 'cultura' ? 'Ticket Médio' : 'ROAS'}</span>
+                        <span className={`text-[24px] font-bold ${selectedCompanyId === 'cultura' ? '' : roasColor}`}>{selectedCompanyId === 'cultura' ? `R$ ${avgTicket.toFixed(2)}` : `${roas.toFixed(2)}x`}</span>
                       </div>
                     )}
+
+                    <div className="p-4 flex flex-col justify-center">
+                      <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">{channel.id === 'meta' && data.cost > 0 ? 'CPA Meta' : 'Vendas (Qtd)'}</span>
+                      <span className="text-[24px] font-bold">{channel.id === 'meta' && data.cost > 0 ? `R$ ${cpa.toFixed(2)}` : data.sales}</span>
+                    </div>
+
+                    <div className="p-4 flex flex-col justify-center">
+                      <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">{selectedCompanyId === 'cultura' ? 'Conversão' : 'Taxa de Conversão'}</span>
+                      <span className="text-[24px] font-bold">{selectedCompanyId === 'cultura' ? (data.leads > 0 ? ((data.sales / data.leads) * 100).toFixed(1) : 0) + '%' : cr.toFixed(2) + '%'}</span>
+                    </div>
                   </div>
 
                   {(data.products?.length > 0 || data.campaigns?.length > 0) && (
