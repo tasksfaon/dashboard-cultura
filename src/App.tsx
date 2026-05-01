@@ -18,6 +18,16 @@ const COLORS = {
 
 const CHART_COLORS = ['#DCA61F', '#A3A3A3', '#737373', '#525252', '#404040', '#E5E5E5', '#FFFFFF', '#D4D4D4', '#262626', '#171717'];
 
+// Corrige conversão de timezone (UTC to Local) para dados vindos do Supabase
+const parseSupabaseDate = (dateVal: string | null | undefined): Date => {
+  if (!dateVal) return new Date();
+  let str = dateVal.replace(' ', 'T');
+  if (!/(Z|[+-]\d{2}(:?\d{2})?)$/.test(str)) {
+    str += 'Z';
+  }
+  return new Date(str);
+};
+
 const PieChartLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, value, index, name, percent }: any) => {
   const RADIAN = Math.PI / 180;
   const radius = outerRadius * 1.1;
@@ -439,9 +449,7 @@ export default function App() {
               const dateVal = c.timestamp || c.created_at;
               if (!dateVal) return false;
               
-              // Normalize to valid ISO by adding 'Z' if there is an offset or nothing. 
-              // The database has '+00' which is already valid, but replacing ' ' with 'T' handles PostgreSQL string format
-              const itemDate = new Date(dateVal.replace(' ', 'T'));
+              const itemDate = parseSupabaseDate(dateVal);
               
               return itemDate >= startDate && itemDate <= endDate;
             });
@@ -451,7 +459,7 @@ export default function App() {
               const dateVal = c.data_cadastro;
               if (!dateVal) return false;
               
-              const itemDate = new Date(dateVal.replace(' ', 'T'));
+              const itemDate = parseSupabaseDate(dateVal);
               return itemDate >= startDate && itemDate <= endDate;
             });
 
@@ -641,7 +649,7 @@ export default function App() {
 
             // Inicializar com checkouts (vendas)
             filteredData.forEach(c => {
-              const dateStr = new Date(c.timestamp || c.created_at).toLocaleDateString('pt-BR');
+              const dateStr = parseSupabaseDate(c.timestamp || c.created_at).toLocaleDateString('pt-BR');
               if (!trendMap.has(dateStr)) {
                 trendMap.set(dateStr, { value: 0, salesCount: 0, leads: 0, cost: 0, products: new Map() });
               }
@@ -656,7 +664,7 @@ export default function App() {
 
             // Mesclar com cadastros (leads)
             filteredCadastros.forEach(lead => {
-              const dateStr = new Date(lead.data_cadastro).toLocaleDateString('pt-BR');
+              const dateStr = parseSupabaseDate(lead.data_cadastro).toLocaleDateString('pt-BR');
               if (!trendMap.has(dateStr)) {
                 trendMap.set(dateStr, { value: 0, salesCount: 0, leads: 0, cost: 0, products: new Map() });
               }
@@ -848,7 +856,7 @@ export default function App() {
     const checkoutsToday = supabaseCheckouts.filter(c => {
       const dateVal = c.timestamp || c.created_at;
       if (!dateVal) return false;
-      const d = new Date(dateVal.replace(' ', 'T'));
+      const d = parseSupabaseDate(dateVal);
       return d.getFullYear() === today.getFullYear() && 
              d.getMonth() === today.getMonth() && 
              d.getDate() === today.getDate();
@@ -869,7 +877,7 @@ export default function App() {
     const cadastrosToday = supabaseCadastros.filter(c => {
       const dateVal = c.data_cadastro;
       if (!dateVal) return false;
-      const d = new Date(dateVal.replace(' ', 'T'));
+      const d = parseSupabaseDate(dateVal);
       return d.getFullYear() === today.getFullYear() && 
              d.getMonth() === today.getMonth() && 
              d.getDate() === today.getDate();
@@ -1682,8 +1690,8 @@ export default function App() {
                        const checkoutId = checkout.id || checkout.timestamp || i.toString();
                        const isExpanded = expandedCheckoutId === checkoutId;
                        
-                       const purchaseDate = new Date(checkout.timestamp || checkout.created_at);
-                       const regDate = lead ? new Date(lead.data_cadastro) : null;
+                       const purchaseDate = parseSupabaseDate(checkout.timestamp || checkout.created_at);
+                       const regDate = lead ? parseSupabaseDate(lead.data_cadastro) : null;
                        const timeToConversion = lead ? formatTimeDiff(lead.data_cadastro, checkout.timestamp || checkout.created_at) : 'N/A';
                        
                        const origin = checkout.utm_source || lead?.utm_source_cadastro || 'Direto / S. Rastreio';
@@ -1853,7 +1861,7 @@ export default function App() {
                             </div>
                             <div className="flex items-center gap-2 md:gap-4 shrink-0">
                                <div className="text-right">
-                                  <p className="text-[10px] text-text-secondary">{new Date(lead.data_cadastro).toLocaleDateString('pt-BR')}</p>
+                                  <p className="text-[10px] text-text-secondary">{parseSupabaseDate(lead.data_cadastro).toLocaleDateString('pt-BR')}</p>
                                   <p className="text-[9px] text-[#525252] uppercase tracking-tighter truncate max-w-[60px] md:max-w-none">{lead.cidade || 'S/ Cidade'}</p>
                                </div>
                                <ChevronDown className={`w-3 h-3 text-[#525252] transition-transform ${isExpanded ? 'rotate-180 text-primary' : ''}`} />
@@ -1877,7 +1885,7 @@ export default function App() {
                                     <div className="p-3 rounded-[4px] bg-white/5 border border-primary/20">
                                       <p className="text-[9px] text-primary uppercase font-bold tracking-widest mb-2">Conversão Realizada</p>
                                       <p className="text-[10px] text-text-secondary leading-relaxed">
-                                        Comprou <span className="text-text-primary font-bold italic">"{supabaseCursos.find(c => c.id_curso === purchase.id_curso)?.nome || 'Produto'}"</span> em {new Date(purchase.timestamp || purchase.created_at).toLocaleDateString('pt-BR')}.
+                                        Comprou <span className="text-text-primary font-bold italic">"{supabaseCursos.find(c => c.id_curso === purchase.id_curso)?.nome || 'Produto'}"</span> em {parseSupabaseDate(purchase.timestamp || purchase.created_at).toLocaleDateString('pt-BR')}.
                                       </p>
                                     </div>
                                   )}
