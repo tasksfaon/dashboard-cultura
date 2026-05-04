@@ -1861,7 +1861,11 @@ export default function App() {
                             </div>
                             <div className="flex items-center gap-2 md:gap-4 shrink-0">
                                <div className="text-right">
-                                  <p className="text-[10px] text-text-secondary">{parseSupabaseDate(lead.data_cadastro).toLocaleDateString('pt-BR')}</p>
+                                  <p className="text-[10px] text-text-secondary">
+                                    {parseSupabaseDate(lead.data_cadastro).toLocaleDateString('pt-BR')} 
+                                    {' '} 
+                                    {parseSupabaseDate(lead.data_cadastro).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                  </p>
                                   <p className="text-[9px] text-[#525252] uppercase tracking-tighter truncate max-w-[60px] md:max-w-none">{lead.cidade || 'S/ Cidade'}</p>
                                </div>
                                <ChevronDown className={`w-3 h-3 text-[#525252] transition-transform ${isExpanded ? 'rotate-180 text-primary' : ''}`} />
