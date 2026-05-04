@@ -803,6 +803,10 @@ export default function App() {
                    camp = 'Meta Ads';
                } else if (camp === 'ig') {
                    camp = 'Link na bio do Instagram';
+               } else if (camp === 'busca-organica') {
+                   camp = 'Orgânico/sem rastreio';
+               } else if (camp === 'comercial') {
+                   camp = 'Comercial';
                }
                if (!campaignMap.has(camp)) campaignMap.set(camp, { name: camp, sales: 0, rev: 0, source: '' });
                const stats = campaignMap.get(camp);
