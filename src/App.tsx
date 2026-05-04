@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   TrendingUp, Users, DollarSign, Activity, Focus,
   ArrowUpRight, ArrowDownRight, Filter, CalendarDays, Loader2, KeyRound, ChevronDown, ChevronRight, PieChart as PieChartIcon, BarChart2,
-  Zap, Target, ShoppingCart, Award, CreditCard
+  Zap, Target, ShoppingCart, Award, CreditCard, Clock
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
@@ -308,6 +308,8 @@ export default function App() {
     const med = (medium || '').toLowerCase();
     const camp = (campaign || '').toLowerCase();
     const cont = (content || '').toLowerCase();
+
+    if (src === 'ig' && med === 'social' && cont === 'link_in_bio') return 'Link na bio do Instagram';
 
     if (src.includes('manychat')) return 'Manychat';
     if (src.includes('rdstation') || src.includes('rd_station')) return 'RD Station';
@@ -689,7 +691,12 @@ export default function App() {
             // Atribuição de "Campanhas" (Winning Ads)
             const campaignMap = new Map();
             filteredData.forEach(c => {
-               const camp = c.utm_campaign || c.utm_source || 'Desconhecido';
+               let camp = c.utm_campaign || c.utm_source || 'Desconhecido';
+               if ((c.utm_source || '').toLowerCase().includes('meta_ads')) {
+                   camp = 'Meta Ads';
+               } else if (camp === 'ig') {
+                   camp = 'Link na bio do Instagram';
+               }
                if (!campaignMap.has(camp)) campaignMap.set(camp, { name: camp, sales: 0, rev: 0, source: '' });
                const stats = campaignMap.get(camp);
                stats.sales += 1;
@@ -776,6 +783,41 @@ export default function App() {
             const blendedROAS = periodMetaCost > 0 ? (totalRevenue / periodMetaCost).toFixed(2) + 'x' : '0.00x';
             const blendedCPA = salesCount > 0 ? `R$ ${(periodMetaCost / salesCount).toFixed(2)}` : 'R$ 0,00';
 
+            let totalConvMs = 0;
+            let convCount = 0;
+            
+            filteredData.forEach(c => {
+               if (c.id_usuario) {
+                  const lead = cadastros.find(l => l.id_usuario === c.id_usuario);
+                  if (lead && lead.data_cadastro && (c.timestamp || c.created_at)) {
+                     const cDate = parseSupabaseDate(c.timestamp || c.created_at);
+                     const lDate = parseSupabaseDate(lead.data_cadastro);
+                     const diff = cDate.getTime() - lDate.getTime();
+                     if (diff > 0) { // Only count valid positive diffs
+                       totalConvMs += diff;
+                       convCount++;
+                     }
+                  }
+               }
+            });
+
+            let avgConvTime = 'N/A';
+            if (convCount > 0) {
+               const avgMs = totalConvMs / convCount;
+               const diffHrs = Math.floor(avgMs / (1000 * 60 * 60));
+               if (diffHrs < 24) {
+                 if (diffHrs === 0) {
+                   const mins = Math.floor(avgMs / (1000 * 60));
+                   avgConvTime = `${mins}min`;
+                 } else {
+                   avgConvTime = `${diffHrs}h`;
+                 }
+               } else {
+                 const days = Math.floor(diffHrs / 24);
+                 avgConvTime = `${days} d`;
+               }
+            }
+
             setKpis([
               { title: 'Receita Total', value: `R$ ${totalRevenue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, trend: 'Faturamento no Período', isUp: true, icon: DollarSign },
               { title: 'Investimento Total', value: `R$ ${periodMetaCost.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, trend: 'Valor Gasto no Período', isUp: true, icon: CreditCard },
@@ -783,6 +825,7 @@ export default function App() {
               { title: 'CPA Geral', value: blendedCPA, trend: 'Custo por Venda', isUp: true, icon: Target },
               { title: 'Total Leads', value: leadsCount.toString(), trend: 'Novos Cadastros', isUp: true, icon: Users },
               { title: 'Vendas Totais', value: salesCount.toString(), trend: 'Checkouts realizados', isUp: true, icon: ShoppingCart },
+              { title: 'Tempo Médio de Conversão', value: avgConvTime, trend: 'Lead até a Compra', isUp: true, icon: Clock },
             ]);
 
             setDataStatus('success');
@@ -1151,7 +1194,7 @@ export default function App() {
         )}
 
         {/* KPIs Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-2 md:gap-4">
           {kpis.map((kpi, idx) => (
             <Card key={idx} className="relative overflow-hidden group hover:border-primary/50 transition-colors p-4 md:p-5">
               <div className="flex justify-between items-start mb-2 md:mb-3">
@@ -1556,7 +1599,7 @@ export default function App() {
              <Card className="p-0 overflow-hidden">
                 <div className="p-5 border-b border-border flex items-center justify-between bg-gradient-to-r from-[#111113] to-transparent">
                    <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
-                      <Award className="w-4 h-4 text-primary" /> Anúncios Ganhadores (Escalar)
+                      <Award className="w-4 h-4 text-primary" /> Fontes de Aquisição
                    </h4>
                    <span className="text-[10px] bg-primary/10 text-primary px-2 py-1 rounded border border-primary/20 font-bold">Top ROI</span>
                 </div>
