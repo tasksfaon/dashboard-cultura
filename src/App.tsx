@@ -825,7 +825,7 @@ export default function App() {
               { title: 'CPA Geral', value: blendedCPA, trend: 'Custo por Venda', isUp: true, icon: Target },
               { title: 'Total Leads', value: leadsCount.toString(), trend: 'Novos Cadastros', isUp: true, icon: Users },
               { title: 'Vendas Totais', value: salesCount.toString(), trend: 'Checkouts realizados', isUp: true, icon: ShoppingCart },
-              { title: 'Tempo Médio de Conversão', value: avgConvTime, trend: 'Lead até a Compra', isUp: true, icon: Clock },
+              { title: 'Tempo Médio de Conversão', value: avgConvTime, trend: 'Cadastro até a compra', isUp: true, icon: Clock },
             ]);
 
             setDataStatus('success');
