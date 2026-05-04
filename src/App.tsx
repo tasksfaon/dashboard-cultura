@@ -814,7 +814,7 @@ export default function App() {
                  }
                } else {
                  const days = Math.floor(diffHrs / 24);
-                 avgConvTime = `${days} d`;
+                 avgConvTime = `${days} dia${days !== 1 ? 's' : ''}`;
                }
             }
 
