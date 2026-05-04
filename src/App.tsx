@@ -395,12 +395,65 @@ export default function App() {
             setSupabaseCursos(cursos || []);
 
             // 4. Eventos Checkout (TUDO)
-            const { data: checkouts, error: err4 } = await supabase
+            const { data: checkoutsRaw, error: err4 } = await supabase
               .from('eventos_checkout')
               .select('*')
               .order('timestamp', { ascending: false });
             if (err4) throw err4;
-            setSupabaseCheckouts(checkouts || []);
+
+            // Deduplicate combo checkouts (same timestamp + user + value)
+            const deduplicatedCheckouts: any[] = [];
+            const checkoutMap = new Map();
+            (checkoutsRaw || []).forEach((c: any) => {
+               const dateVal = c.timestamp || c.created_at;
+               if (!dateVal || !c.id_usuario) {
+                 deduplicatedCheckouts.push(c);
+                 return;
+               }
+               // Group by YYYY-MM-DD to handle webhook delays for the same transaction
+               const dayGroup = new Date(dateVal).toISOString().substring(0, 10);
+               const key = `${c.id_usuario}_${dayGroup}_${c.valor}`;
+               if (checkoutMap.has(key)) {
+                  const existing = checkoutMap.get(key);
+                  
+                  // Collect the course names that make up this combo
+                  const existingCurso = cursos?.find((cur: any) => cur.id_curso === existing.id_curso);
+                  const newCurso = cursos?.find((cur: any) => cur.id_curso === c.id_curso);
+                  
+                  if (!existing._comboParts) {
+                    existing._comboParts = [];
+                    if (existingCurso) existing._comboParts.push(existingCurso.nome.toLowerCase());
+                  }
+                  if (newCurso) existing._comboParts.push(newCurso.nome.toLowerCase());
+
+                  // Now, try to find a course in `cursos` that contains ALL of these parts in its name!
+                  // That would be the actual "combo" course.
+                  const parts = existing._comboParts;
+                  const comboMatch = cursos?.find((cur: any) => {
+                     const lowerName = cur.nome.toLowerCase();
+                     // See if this course name contains all the parts (like "clube dos penalistas" AND "clube dos civilistas")
+                     // We ignore courses that only have one part if we have multiple parts
+                     if (parts.length > 1 && parts.every((p: string) => lowerName.includes(p.replace(/clube dos /g, '').replace(/clube /g, '').trim()))) {
+                         return true;
+                     }
+                     return false;
+                  });
+
+                  if (comboMatch) {
+                     existing.id_curso = comboMatch.id_curso; // Assign the real combo ID!
+                  }
+               } else {
+                  checkoutMap.set(key, { ...c });
+               }
+            });
+
+            const checkouts = [...deduplicatedCheckouts, ...Array.from(checkoutMap.values())].sort((a: any, b: any) => {
+               const dateA = new Date(a.timestamp || a.created_at || 0).getTime();
+               const dateB = new Date(b.timestamp || b.created_at || 0).getTime();
+               return dateB - dateA;
+            });
+
+            setSupabaseCheckouts(checkouts);
 
             // --- FILTRAGEM POR DATA (JS) ---
             const now = new Date();
