@@ -28,6 +28,22 @@ const parseSupabaseDate = (dateVal: string | null | undefined): Date => {
   return new Date(str);
 };
 
+const getBRLDate = (val: string | Date | null | undefined): Date => {
+  if (!val) return new Date();
+  const d = (val instanceof Date) ? val : parseSupabaseDate(val);
+  // Shift to Brazil Time (UTC-3)
+  return new Date(d.getTime() - 3 * 3600 * 1000);
+};
+
+const formatDateBRL = (val: string | Date | null | undefined): string => {
+  if (!val) return '';
+  const d = getBRLDate(val);
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const year = d.getUTCFullYear();
+  return `${day}/${month}/${year}`;
+};
+
 const PieChartLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, value, index, name, percent }: any) => {
   const RADIAN = Math.PI / 180;
   const radius = outerRadius * 1.1;
@@ -401,10 +417,45 @@ export default function App() {
               .order('timestamp', { ascending: false });
             if (err4) throw err4;
 
-            // Deduplicate combo checkouts (same timestamp + user + value)
+            // Deduplicate exact purchases (same course, same user, same value)
+            // We keep the OLDEST occurrence (first purchase) and ignore subsequent ones (retries/webhooks)
+            const uniquePurchases: any[] = [];
+            // Sort ascending for deduplication to keep the original purchase
+            const chronologicalCheckouts = [...(checkoutsRaw || [])].sort((a, b) => 
+               getBRLDate(a.timestamp || a.created_at).getTime() - getBRLDate(b.timestamp || b.created_at).getTime()
+            );
+
+            chronologicalCheckouts.forEach(c => {
+               const dateVal = c.timestamp || c.created_at;
+               if (!dateVal || !c.id_usuario || !c.id_curso) {
+                 uniquePurchases.push(c);
+                 return;
+               }
+               const cTime = getBRLDate(dateVal).getTime();
+               
+               const isDuplicate = uniquePurchases.some(existing => {
+                 if (existing.id_usuario === c.id_usuario && existing.id_curso === c.id_curso && existing.valor === c.valor) {
+                    const eTime = getBRLDate(existing.timestamp || existing.created_at).getTime();
+                    const diffDays = Math.abs(cTime - eTime) / (1000 * 60 * 60 * 24);
+                    return diffDays <= 30; // Within 30 days we consider it the same transaction/retry
+                 }
+                 return false;
+               });
+
+               if (!isDuplicate) {
+                 uniquePurchases.push(c);
+               }
+            });
+
+            // Restore descending order for the rest of the app
+            uniquePurchases.sort((a, b) => 
+               getBRLDate(b.timestamp || b.created_at).getTime() - getBRLDate(a.timestamp || a.created_at).getTime()
+            );
+
+            // Deduplicate combo checkouts (same day + user + value for different courses)
             const deduplicatedCheckouts: any[] = [];
             const checkoutMap = new Map();
-            (checkoutsRaw || []).forEach((c: any) => {
+            uniquePurchases.forEach((c: any) => {
                const dateVal = c.timestamp || c.created_at;
                if (!dateVal || !c.id_usuario) {
                  deduplicatedCheckouts.push(c);
@@ -504,7 +555,10 @@ export default function App() {
               const dateVal = c.timestamp || c.created_at;
               if (!dateVal) return false;
               
-              const itemDate = parseSupabaseDate(dateVal);
+              // Filter by Status: Only "Pago" sales count for metrics
+              if (c.status !== 'Pago') return false;
+              
+              const itemDate = getBRLDate(dateVal);
               
               return itemDate >= startDate && itemDate <= endDate;
             });
@@ -514,7 +568,7 @@ export default function App() {
               const dateVal = c.data_cadastro;
               if (!dateVal) return false;
               
-              const itemDate = parseSupabaseDate(dateVal);
+              const itemDate = getBRLDate(dateVal);
               return itemDate >= startDate && itemDate <= endDate;
             });
 
@@ -694,7 +748,7 @@ export default function App() {
             // Adicionar custos (Meta Ads) ao trendMap
             metaCosts.forEach(c => {
               if (c.date >= startDate && c.date <= endDate) {
-                const dateStr = c.date.toLocaleDateString('pt-BR');
+                const dateStr = formatDateBRL(c.date);
                 if (!trendMap.has(dateStr)) {
                   trendMap.set(dateStr, { value: 0, salesCount: 0, leads: 0, cost: 0, products: new Map() });
                 }
@@ -704,7 +758,7 @@ export default function App() {
 
             // Inicializar com checkouts (vendas)
             filteredData.forEach(c => {
-              const dateStr = parseSupabaseDate(c.timestamp || c.created_at).toLocaleDateString('pt-BR');
+              const dateStr = formatDateBRL(c.timestamp || c.created_at);
               if (!trendMap.has(dateStr)) {
                 trendMap.set(dateStr, { value: 0, salesCount: 0, leads: 0, cost: 0, products: new Map() });
               }
@@ -719,7 +773,7 @@ export default function App() {
 
             // Mesclar com cadastros (leads)
             filteredCadastros.forEach(lead => {
-              const dateStr = parseSupabaseDate(lead.data_cadastro).toLocaleDateString('pt-BR');
+              const dateStr = formatDateBRL(lead.data_cadastro);
               if (!trendMap.has(dateStr)) {
                 trendMap.set(dateStr, { value: 0, salesCount: 0, leads: 0, cost: 0, products: new Map() });
               }
@@ -946,16 +1000,14 @@ export default function App() {
   ].filter(d => d.value > 0);
 
   const getTodayStats = () => {
-    const today = new Date();
+    const now = new Date();
+    const todayStr = formatDateBRL(now);
     
     // Checkouts Today
     const checkoutsToday = supabaseCheckouts.filter(c => {
       const dateVal = c.timestamp || c.created_at;
-      if (!dateVal) return false;
-      const d = parseSupabaseDate(dateVal);
-      return d.getFullYear() === today.getFullYear() && 
-             d.getMonth() === today.getMonth() && 
-             d.getDate() === today.getDate();
+      if (!dateVal || c.status !== 'Pago') return false;
+      return formatDateBRL(dateVal) === todayStr;
     });
 
     const productsCount = new Map<string, number>();
@@ -973,10 +1025,7 @@ export default function App() {
     const cadastrosToday = supabaseCadastros.filter(c => {
       const dateVal = c.data_cadastro;
       if (!dateVal) return false;
-      const d = parseSupabaseDate(dateVal);
-      return d.getFullYear() === today.getFullYear() && 
-             d.getMonth() === today.getMonth() && 
-             d.getDate() === today.getDate();
+      return formatDateBRL(dateVal) === todayStr;
     });
 
     return { 
@@ -1654,7 +1703,6 @@ export default function App() {
                    <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
                       <Award className="w-4 h-4 text-primary" /> Fontes de Aquisição
                    </h4>
-                   <span className="text-[10px] bg-primary/10 text-primary px-2 py-1 rounded border border-primary/20 font-bold">Top ROI</span>
                 </div>
                 <div className="w-full overflow-x-auto scrollbar-hide">
                    <table className="w-full text-left min-w-[600px]">
