@@ -31,8 +31,7 @@ const parseSupabaseDate = (dateVal: string | null | undefined): Date => {
 const getBRLDate = (val: string | Date | null | undefined): Date => {
   if (!val) return new Date();
   const d = (val instanceof Date) ? val : parseSupabaseDate(val);
-  // Shift to Brazil Time (UTC-3)
-  return new Date(d.getTime() - 3 * 3600 * 1000);
+  return d;
 };
 
 const formatDateBRL = (val: string | Date | null | undefined): string => {
@@ -184,6 +183,17 @@ export default function App() {
   const [sheetData, setSheetData] = useState<any[]>([]);
   const [metaCosts, setMetaCosts] = useState<any[]>([]);
   const [distStats, setDistStats] = useState<any>({ cost: 0, revenue: 0, sales: 0, leads: 0 });
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  useEffect(() => {
+    if (selectedCompanyId === 'cultura') {
+      const interval = setInterval(() => {
+        console.log("🔄 Auto-refreshing Supabase data...");
+        setRefreshTrigger(prev => prev + 1);
+      }, 30000); // 30 seconds
+      return () => clearInterval(interval);
+    }
+  }, [selectedCompanyId]);
 
   useEffect(() => {
     const fetchSheetData = async () => {
@@ -388,10 +398,10 @@ export default function App() {
           try {
             setDataStatus('loading');
             
-            // 1. Cadastros (Incluindo id_usuario)
+            // 1. Cadastros (Incluindo todos os campos para garantir que pegamos o 'id' se necessário)
             const { data: cadastros, error: err1 } = await supabase
               .from('cadastros')
-              .select('id_usuario, nome, email, telefone, data_cadastro, utm_source_cadastro, utm_medium_cadastro, utm_campaign_cadastro, utm_content_cadastro, utm_term_cadastro')
+              .select('*')
               .order('data_cadastro', { ascending: false });
             if (err1) throw err1;
             setSupabaseCadastros(cadastros || []);
@@ -667,7 +677,10 @@ export default function App() {
 
               // Fallback logic: Se não tem rastreio direto, busca no cadastro do usuário
               if (!source && checkout.id_usuario) {
-                const lead = cadastros.find((l: any) => l.id_usuario === checkout.id_usuario);
+                const lead = cadastros.find((l: any) => {
+                  const cId = String(checkout.id_usuario);
+                  return String(l.id_usuario) === cId || String(l.id) === cId;
+                });
                 if (lead && lead.utm_source_cadastro) {
                   source = lead.utm_source_cadastro;
                   medium = lead.utm_medium_cadastro || '';
@@ -836,7 +849,10 @@ export default function App() {
 
             const topCustomers = Array.from(customerMap.values())
                 .map(c => {
-                    const lead = cadastros.find((l: any) => l.id_usuario === c.id);
+                    const lead = cadastros.find((l: any) => {
+                      const cId = String(c.id);
+                      return String(l.id_usuario) === cId || String(l.id) === cId;
+                    });
                     return { ...c, name: lead ? (lead.nome || lead.email) : 'Cliente ' + c.id };
                 })
                 .sort((a, b) => b.rev - a.rev)
@@ -899,7 +915,10 @@ export default function App() {
             
             filteredData.forEach(c => {
                if (c.id_usuario) {
-                  const lead = cadastros.find(l => l.id_usuario === c.id_usuario);
+                   const lead = cadastros.find((l: any) => {
+                     const cId = String(c.id_usuario);
+                     return String(l.id_usuario) === cId || String(l.id) === cId;
+                   });
                   if (lead && lead.data_cadastro && (c.timestamp || c.created_at)) {
                      const cDate = parseSupabaseDate(c.timestamp || c.created_at);
                      const lDate = parseSupabaseDate(lead.data_cadastro);
@@ -965,7 +984,7 @@ export default function App() {
     };
 
     fetchAnalytics();
-  }, [tokens, propertyId, dateRange, appliedCustomDate.start, appliedCustomDate.end, metaCosts]);
+  }, [tokens, propertyId, dateRange, appliedCustomDate.start, appliedCustomDate.end, metaCosts, refreshTrigger]);
 
   const handleConnect = async () => {
     try {
@@ -1833,7 +1852,10 @@ export default function App() {
                  <div className="max-h-[500px] overflow-y-auto">
                    <div className="divide-y divide-white/5">
                      {supabaseCheckouts.slice(0, 30).map((checkout, i) => {
-                       const lead = supabaseCadastros.find(l => l.id_usuario === checkout.id_usuario);
+                        const lead = supabaseCadastros.find(l => {
+                          const cId = String(checkout.id_usuario);
+                          return String(l.id_usuario) === cId || String(l.id) === cId;
+                        });
                        const curso = supabaseCursos.find(c => c.id_curso === checkout.id_curso);
                        const checkoutId = checkout.id || checkout.timestamp || i.toString();
                        const isExpanded = expandedCheckoutId === checkoutId;
@@ -2010,9 +2032,10 @@ export default function App() {
                             <div className="flex items-center gap-2 md:gap-4 shrink-0">
                                <div className="text-right">
                                   <p className="text-[10px] text-text-secondary">
-                                    {parseSupabaseDate(lead.data_cadastro).toLocaleDateString('pt-BR')} 
-                                    {' '} 
-                                    {parseSupabaseDate(lead.data_cadastro).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                    {(() => {
+                                      const d = parseSupabaseDate(lead.data_cadastro);
+                                      return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+                                    })()}
                                   </p>
                                   <p className="text-[9px] text-[#525252] uppercase tracking-tighter truncate max-w-[60px] md:max-w-none">{lead.cidade || 'S/ Cidade'}</p>
                                </div>
