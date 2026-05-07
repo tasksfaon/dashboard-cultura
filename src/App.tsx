@@ -68,7 +68,7 @@ const PieChartLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, value, inde
   );
 };
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload, label, isCurrency = true }: any) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-bg-card border border-border p-3 rounded-[4px] shadow-xl outline-none">
@@ -79,7 +79,13 @@ const CustomTooltip = ({ active, payload, label }: any) => {
                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
                <span className="text-text-label">{entry.name}</span>
              </div>
-             <span className="font-mono text-text-primary">R$ {Number(entry.value).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+             <span className="font-mono text-text-primary">
+               {isCurrency ? "R$ " : ""}
+               {Number(entry.value).toLocaleString('pt-BR', {
+                 minimumFractionDigits: isCurrency ? 2 : 0, 
+                 maximumFractionDigits: isCurrency ? 2 : 0
+               })}
+             </span>
            </div>
         ))}
       </div>
@@ -2023,7 +2029,7 @@ export default function App() {
                           <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} stroke="none" />
                         ))}
                       </Pie>
-                      <RechartsTooltip content={<CustomTooltip />} />
+                      <RechartsTooltip content={<CustomTooltip isCurrency={false} />} />
                     </PieChart>
                   </ResponsiveContainer>
                 ) : (
@@ -2198,7 +2204,7 @@ export default function App() {
                            <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} stroke="none" />
                          ))}
                        </Pie>
-                       <RechartsTooltip content={<CustomTooltip />} />
+                       <RechartsTooltip content={<CustomTooltip isCurrency={false} />} />
                      </PieChart>
                    </ResponsiveContainer>
                  ) : (
