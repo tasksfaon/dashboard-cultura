@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   TrendingUp, Users, DollarSign, Activity, Focus,
   ArrowUpRight, ArrowDownRight, Filter, CalendarDays, Loader2, KeyRound, ChevronDown, ChevronRight, PieChart as PieChartIcon, BarChart2,
-  Zap, Target, ShoppingCart, Award, CreditCard, Clock
+  Zap, Target, ShoppingCart, Award, CreditCard, Clock, AlertCircle
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
@@ -31,7 +31,7 @@ const parseSupabaseDate = (dateVal: string | null | undefined): Date => {
 const getBRLDate = (val: string | Date | null | undefined): Date => {
   if (!val) return new Date();
   const d = (val instanceof Date) ? val : parseSupabaseDate(val);
-  return d;
+  return new Date(d.getTime() - 3 * 3600 * 1000);
 };
 
 const formatDateBRL = (val: string | Date | null | undefined): string => {
@@ -179,21 +179,13 @@ export default function App() {
   const [supabaseCategorias, setSupabaseCategorias] = useState<any[]>([]);
   const [supabaseCursos, setSupabaseCursos] = useState<any[]>([]);
   const [supabaseCheckouts, setSupabaseCheckouts] = useState<any[]>([]);
+  const [checkoutsAllStatus, setCheckoutsAllStatus] = useState<any[]>([]);
+  const [checkoutsCancelados, setCheckoutsCancelados] = useState<any[]>([]);
+  const [checkoutsRecusados, setCheckoutsRecusados] = useState<any[]>([]);
   const [filteredCheckouts, setFilteredCheckouts] = useState<any[]>([]);
   const [sheetData, setSheetData] = useState<any[]>([]);
   const [metaCosts, setMetaCosts] = useState<any[]>([]);
   const [distStats, setDistStats] = useState<any>({ cost: 0, revenue: 0, sales: 0, leads: 0 });
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-
-  useEffect(() => {
-    if (selectedCompanyId === 'cultura') {
-      const interval = setInterval(() => {
-        console.log("🔄 Auto-refreshing Supabase data...");
-        setRefreshTrigger(prev => prev + 1);
-      }, 30000); // 30 seconds
-      return () => clearInterval(interval);
-    }
-  }, [selectedCompanyId]);
 
   useEffect(() => {
     const fetchSheetData = async () => {
@@ -335,6 +327,10 @@ export default function App() {
     const camp = (campaign || '').toLowerCase();
     const cont = (content || '').toLowerCase();
 
+    if (src === 'ig' && med === 'paid') return 'Botão turbinar do Instagram';
+    if (src === 'fb' && med === 'paid') return 'Botão turbinar do Facebook';
+    if ((src === 'search_ads' || src === 'google') && camp.includes('brand')) return 'Google Ads (Campanha de Marca)';
+
     if (src === 'ig' && med === 'social' && cont === 'link_in_bio') return 'Link na bio do Instagram';
 
     if (src.includes('manychat')) return 'Manychat';
@@ -342,7 +338,7 @@ export default function App() {
     if (src.includes('email') || src.includes('e-mail') || src.includes('newsletter')) return 'E-Mail';
     if (src.includes('bio') || med.includes('bio') || camp.includes('bio') || cont.includes('bio')) return 'Bio do Instagram';
     if (src.includes('comercial') || src.includes('whatsapp') || src.includes('crm') || src.includes('comerc')) return 'Comercial';
-    if ((src.includes('google') || src.includes('gads')) && (med.includes('cpc') || med.includes('ads') || med.includes('search'))) return 'Search Ads';
+    if ((src.includes('google') || src.includes('gads')) && (med.includes('cpc') || med.includes('ads') || med.includes('search'))) return 'Google Ads (Search)';
     if (src.includes('fb') || src.includes('ig') || src.includes('meta') || src.includes('instagram') || src.includes('facebook')) return 'Meta Ads';
     
     return 'Busca Orgânica / Sem Rastreio';
@@ -561,18 +557,23 @@ export default function App() {
               startDate.setHours(0,0,0,0); 
             } // Default 1 ano
 
-            const filteredData = (checkouts || []).filter(c => {
+            const checkoutsNoPeriodo = (checkouts || []).filter((c: any) => {
               const dateVal = c.timestamp || c.created_at;
               if (!dateVal) return false;
-              
-              // Filter by Status: Only "Pago" sales count for metrics
-              if (c.status !== 'Pago') return false;
               
               const itemDate = getBRLDate(dateVal);
               
               return itemDate >= startDate && itemDate <= endDate;
             });
+            const filteredData = checkoutsNoPeriodo.filter((c: any) => c.status === 'Pago');
+            const canceladosData = checkoutsNoPeriodo.filter((c: any) => c.status === 'Cancelado');
+            const recusadosData = checkoutsNoPeriodo.filter((c: any) => c.status === 'Cartão recusado' || c?.status?.toLowerCase().includes('recusa'));
+            
             setFilteredCheckouts(filteredData);
+            setSupabaseCheckouts(filteredData);
+            setCheckoutsAllStatus(checkoutsNoPeriodo);
+            setCheckoutsCancelados(canceladosData);
+            setCheckoutsRecusados(recusadosData);
             
             const filteredCadastros = cadastros.filter(c => {
               const dateVal = c.data_cadastro;
@@ -593,7 +594,7 @@ export default function App() {
             // Atribuição por Canal (UTM Source)
             const channelDefinitions: Record<string, { name: string, color: string }> = {
               meta: { name: 'Meta Ads', color: 'bg-primary/10 text-primary border-primary/20' },
-              google: { name: 'Search Ads', color: 'bg-primary/10 text-primary border-primary/20' },
+              google: { name: 'Google Ads (Search)', color: 'bg-primary/10 text-primary border-primary/20' },
               comercial: { name: 'Comercial', color: 'bg-primary/10 text-primary border-primary/20' },
               rdstation: { name: 'RD Station', color: 'bg-primary/10 text-primary border-primary/20' },
               bio: { name: 'Bio do Instagram', color: 'bg-primary/10 text-primary border-primary/20' },
@@ -654,12 +655,15 @@ export default function App() {
               const camp = (campaign || '').toLowerCase();
               const cont = (content || '').toLowerCase();
 
+              if ((src === 'search_ads' || src === 'google') && camp.includes('brand')) return 'google';
+              if (src === 'ig' && med === 'social' && cont === 'link_in_bio') return 'bio';
+
               if (src.includes('manychat')) return 'manychat';
               if (src.includes('rdstation') || src.includes('rd_station')) return 'rdstation';
               if (src.includes('email') || src.includes('e-mail') || src.includes('newsletter')) return 'email';
               if (src.includes('bio') || med.includes('bio') || camp.includes('bio') || cont.includes('bio')) return 'bio';
               if (src.includes('comercial') || src.includes('whatsapp') || src.includes('crm') || src.includes('comerc')) return 'comercial';
-              if ((src.includes('google') || src.includes('gads')) && (med.includes('cpc') || med.includes('ads') || med.includes('search'))) return 'google';
+              if (src.includes('search_ads') || (src.includes('google') || src.includes('gads')) && (med.includes('cpc') || med.includes('ads') || med.includes('search'))) return 'google';
               if (src.includes('fb') || src.includes('ig') || src.includes('meta') || src.includes('instagram') || src.includes('facebook')) return 'meta';
               
               return 'organic';
@@ -756,24 +760,24 @@ export default function App() {
               .sort((a, b) => b.rev - a.rev);
 
             // --- TREND DATA (Receita, Leads e Produtos por Dia) ---
-            const trendMap = new Map<string, { value: number, salesCount: number, leads: number, cost: number, products: Map<string, number> }>();
+            const trendMap = new Map<string, { value: number, salesCount: number, leads: number, cost: number, cancelsCount: number, declinesCount: number, products: Map<string, number> }>();
             
             // Adicionar custos (Meta Ads) ao trendMap
             metaCosts.forEach(c => {
               if (c.date >= startDate && c.date <= endDate) {
                 const dateStr = formatDateBRL(c.date);
                 if (!trendMap.has(dateStr)) {
-                  trendMap.set(dateStr, { value: 0, salesCount: 0, leads: 0, cost: 0, products: new Map() });
+                  trendMap.set(dateStr, { value: 0, salesCount: 0, leads: 0, cost: 0, cancelsCount: 0, declinesCount: 0, products: new Map() });
                 }
                 trendMap.get(dateStr)!.cost += c.cost;
               }
             });
 
-            // Inicializar com checkouts (vendas)
+            // Inicializar com checkouts (vendas PAGAS)
             filteredData.forEach(c => {
               const dateStr = formatDateBRL(c.timestamp || c.created_at);
               if (!trendMap.has(dateStr)) {
-                trendMap.set(dateStr, { value: 0, salesCount: 0, leads: 0, cost: 0, products: new Map() });
+                trendMap.set(dateStr, { value: 0, salesCount: 0, leads: 0, cost: 0, cancelsCount: 0, declinesCount: 0, products: new Map() });
               }
               const dayData = trendMap.get(dateStr)!;
               dayData.value += (Number(c.valor) || 0);
@@ -782,6 +786,24 @@ export default function App() {
               const curso = cursosMap.get(c.id_curso);
               const cursoName = curso ? curso.nome : 'Curso #' + c.id_curso;
               dayData.products.set(cursoName, (dayData.products.get(cursoName) || 0) + 1);
+            });
+
+            // Incluir cancelamentos no trendMap
+            canceladosData.forEach(c => {
+              const dateStr = formatDateBRL(c.timestamp || c.created_at);
+              if (!trendMap.has(dateStr)) {
+                trendMap.set(dateStr, { value: 0, salesCount: 0, leads: 0, cost: 0, cancelsCount: 0, declinesCount: 0, products: new Map() });
+              }
+              trendMap.get(dateStr)!.cancelsCount += 1;
+            });
+
+            // Incluir recusados no trendMap
+            recusadosData.forEach(c => {
+              const dateStr = formatDateBRL(c.timestamp || c.created_at);
+              if (!trendMap.has(dateStr)) {
+                trendMap.set(dateStr, { value: 0, salesCount: 0, leads: 0, cost: 0, cancelsCount: 0, declinesCount: 0, products: new Map() });
+              }
+              trendMap.get(dateStr)!.declinesCount += 1;
             });
 
             // Mesclar com cadastros (leads)
@@ -800,6 +822,8 @@ export default function App() {
                 salesCount: data.salesCount,
                 leads: data.leads,
                 cost: data.cost,
+                cancelsCount: data.cancelsCount,
+                declinesCount: data.declinesCount,
                 products: Array.from(data.products.entries()).map(([name, qty]) => ({ name, qty }))
               }))
               .sort((a, b) => {
@@ -820,6 +844,8 @@ export default function App() {
                    camp = 'Orgânico/sem rastreio';
                } else if (camp === 'comercial') {
                    camp = 'Comercial';
+               } else if (camp === 'brand') {
+                   camp = 'Google Ads';
                }
                if (!campaignMap.has(camp)) campaignMap.set(camp, { name: camp, sales: 0, rev: 0, source: '' });
                const stats = campaignMap.get(camp);
@@ -887,6 +913,23 @@ export default function App() {
             .filter(c => c.value > 0)
             .sort((a, b) => b.value - a.value);
 
+            const leadsSourcePieData = [
+              { name: 'Meta Ads', value: channelMap.meta.leads },
+              { name: 'Google Ads (Search)', value: channelMap.google.leads },
+              { name: 'Orgânico/Busca', value: channelMap.organic.leads },
+              { name: 'Manychat', value: channelMap.manychat.leads },
+              { name: 'RD Station', value: channelMap.rdstation.leads },
+              { name: 'E-mail', value: channelMap.email.leads },
+              { name: 'Comercial/CRM', value: channelMap.comercial.leads },
+              { name: 'Link na Bio', value: channelMap.bio.leads },
+            ]
+            .map(c => ({
+              name: c.name,
+              value: c.value
+            }))
+            .filter(c => c.value > 0)
+            .sort((a, b) => b.value - a.value);
+
             setChannelData({
               meta: { ...channelMap.meta, products: formatProducts(channelMap.meta.products), campaigns: [] },
               google: { ...channelMap.google, products: formatProducts(channelMap.google.products), campaigns: [] },
@@ -904,6 +947,7 @@ export default function App() {
               paymentMethods: paymentMethodsData,
               productPieData,
               channelPieData,
+              leadsSourcePieData,
               hasFallback: fallbackCount > 0
             });
 
@@ -948,6 +992,9 @@ export default function App() {
                }
             }
 
+            const taxaCancelamento = checkoutsNoPeriodo.length > 0 ? ((canceladosData.length / checkoutsNoPeriodo.length) * 100).toFixed(1) + '%' : '0%';
+            const recusadosCount = recusadosData.length.toString();
+
             setKpis([
               { title: 'Receita Total', value: `R$ ${totalRevenue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, trend: 'Faturamento no Período', isUp: true, icon: DollarSign },
               { title: 'Investimento Total', value: `R$ ${periodMetaCost.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, trend: 'Valor Gasto no Período', isUp: true, icon: CreditCard },
@@ -955,7 +1002,9 @@ export default function App() {
               { title: 'CPA Geral', value: blendedCPA, trend: 'Custo por Venda', isUp: true, icon: Target },
               { title: 'Total Leads', value: leadsCount.toString(), trend: 'Novos Cadastros', isUp: true, icon: Users },
               { title: 'Vendas Totais', value: salesCount.toString(), trend: 'Checkouts realizados', isUp: true, icon: ShoppingCart },
-              { title: 'Tempo Médio de Conversão', value: avgConvTime, trend: 'Cadastro até a compra', isUp: true, icon: Clock },
+              { title: 'Tempo Médio', value: avgConvTime, trend: 'Cadastro até a compra', isUp: true, icon: Clock },
+              { title: 'Taxa de Cancelamento', value: taxaCancelamento, trend: 'Pedidos Cancelados', isUp: false, icon: ArrowDownRight },
+              { title: 'Cartão Recusado', value: recusadosCount, trend: 'Pagamentos Negados', isUp: false, icon: ArrowDownRight },
             ]);
 
             setDataStatus('success');
@@ -984,7 +1033,7 @@ export default function App() {
     };
 
     fetchAnalytics();
-  }, [tokens, propertyId, dateRange, appliedCustomDate.start, appliedCustomDate.end, metaCosts, refreshTrigger]);
+  }, [tokens, propertyId, dateRange, appliedCustomDate.start, appliedCustomDate.end, metaCosts]);
 
   const handleConnect = async () => {
     try {
@@ -1017,9 +1066,10 @@ export default function App() {
   };
 
   const statusPieData = [
-    { name: 'Pago', value: filteredCheckouts.filter(c => (c.status || '').toLowerCase().trim() === 'pago').length, color: '#DCA61F' },
-    { name: 'Aguardando', value: filteredCheckouts.filter(c => (c.status || '').toLowerCase().trim() === 'aguardando').length, color: '#f59e0b' },
-    { name: 'Cancelado', value: filteredCheckouts.filter(c => (c.status || '').toLowerCase().trim() === 'cancelado').length, color: '#DCA61F' }
+    { name: 'Pago', value: checkoutsAllStatus.filter(c => (c.status || '').toLowerCase().trim() === 'pago').length, color: '#DCA61F' },
+    { name: 'Aguardando', value: checkoutsAllStatus.filter(c => (c.status || '').toLowerCase().trim().includes('aguardando')).length, color: '#f59e0b' },
+    { name: 'Cancelado', value: checkoutsCancelados.length, color: '#ef4444' },
+    { name: 'Recusado/Negado', value: checkoutsRecusados.length, color: '#f97316' }
   ].filter(d => d.value > 0);
 
   const getTodayStats = () => {
@@ -1059,6 +1109,156 @@ export default function App() {
   };
 
   const { todayPieData, vendasHojeTotal, cadastrosHojeTotal } = getTodayStats();
+
+  const renderCheckoutCard = (checkoutsToRender: any[], title: string, limit: number, iconComp: React.ReactNode, type: 'sales' | 'cancels' | 'declines') => {
+    return (
+      <Card className="p-0 overflow-hidden border-primary/20">
+         <div className="p-5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between bg-white/5 gap-2">
+         <h4 className="text-[0.75rem] font-serif font-normal text-primary/80 uppercase tracking-[0.25em] flex items-center gap-2 shrink-0">
+               {iconComp} {title}
+            </h4>
+         </div>
+          <div className="max-h-[500px] overflow-y-auto">
+            <div className="divide-y divide-white/5">
+              {checkoutsToRender.slice(0, limit).map((checkout, i) => {
+                 const lead = supabaseCadastros.find(l => {
+                   const cId = String(checkout.id_usuario);
+                   return String(l.id_usuario) === cId || String(l.id) === cId;
+                 });
+                const curso = supabaseCursos.find(c => c.id_curso === checkout.id_curso);
+                const checkoutId = checkout.id || checkout.timestamp || i.toString() + type;
+                const isExpanded = expandedCheckoutId === checkoutId;
+                
+                const purchaseDate = parseSupabaseDate(checkout.timestamp || checkout.created_at);
+                const regDate = lead ? getBRLDate(lead.data_cadastro) : null;
+                const timeToConversion = lead ? formatTimeDiff(lead.data_cadastro, checkout.timestamp || checkout.created_at) : 'N/A';
+                
+                const origin = checkout.utm_source || lead?.utm_source_cadastro || 'Direto / S. Rastreio';
+                const paymentMethod = checkout.metodo_pagamento || checkout.payment_method || checkout.forma_pagamento || 'Indefinido';
+
+                let IconMain = DollarSign;
+                if (type === 'cancels') IconMain = Target;
+                if (type === 'declines') IconMain = AlertCircle;
+                let bgIconClass = 'bg-primary/10 text-primary';
+                if (type === 'cancels') bgIconClass = 'bg-red-500/10 text-red-500';
+                if (type === 'declines') bgIconClass = 'bg-orange-500/10 text-orange-500';
+
+                return (
+                  <div key={i} className="flex flex-col">
+                     <div 
+                       onClick={() => setExpandedCheckoutId(isExpanded ? null : checkoutId)}
+                       className={`p-4 flex items-center justify-between hover:bg-white/[0.04] cursor-pointer transition-colors ${isExpanded ? 'bg-white/[0.03]' : ''}`}
+                     >
+                       <div className="flex items-center gap-3 overflow-hidden">
+                         <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors ${isExpanded && type === 'sales' ? 'bg-primary text-[#0D0D0D]' : bgIconClass}`}>
+                             <IconMain className="w-4 h-4" />
+                         </div>
+                         <div className="overflow-hidden">
+                             <p className="text-[11px] md:text-xs font-medium text-text-primary truncate">{lead?.nome || 'Usuário #' + checkout.id_usuario}</p>
+                             <p className="text-[9px] md:text-[10px] text-text-secondary truncate">{curso?.nome || 'Curso #' + checkout.id_curso}</p>
+                         </div>
+                       </div>
+                       <div className="flex items-center gap-2 md:gap-4 shrink-0">
+                         <div className="text-right hidden md:block">
+                            <p className="text-[10px] text-text-secondary">
+                              {(() => {
+                                const d = getBRLDate(checkout.timestamp || checkout.created_at);
+                                return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+                              })()}
+                            </p>
+                            <p className="text-[9px] text-[#525252] uppercase font-bold">{paymentMethod} / {checkout.status}</p>
+                         </div>
+                         <div className="text-right">
+                            <p className={`text-sm font-bold ${type === 'cancels' ? 'text-red-500' : type === 'declines' ? 'text-orange-500' : 'text-primary'}`}>R$ {Number(checkout.valor).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                            <ChevronDown className={`w-3 h-3 text-[#525252] ml-auto transition-transform ${isExpanded ? 'rotate-180 text-[inherit]' : ''}`} />
+                         </div>
+                       </div>
+                     </div>
+
+                     {isExpanded && (
+                       <div className="px-6 pb-10 pt-6 bg-white/[0.03] border-b border-primary/20 animate-in fade-in slide-in-from-top-4 duration-300">
+                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-12 gap-x-16">
+                           
+                           {/* Seção: Identidade & Contato */}
+                           <div className="space-y-6">
+                             <div className="flex items-center gap-2 mb-4">
+                               <div className="w-1 h-3 bg-primary rounded-full" />
+                               <p className="text-[10px] text-text-secondary uppercase font-bold tracking-[0.2em]">Identidade e Contato</p>
+                             </div>
+                             <div className="space-y-4 pl-3">
+                               <div className="flex flex-col gap-1">
+                                 <span className="text-[9px] text-text-secondary uppercase font-medium">E-mail de Cadastro</span>
+                                 <span className="text-sm text-text-primary font-medium select-all break-all">{lead?.email || 'Não informado'}</span>
+                               </div>
+                               <div className="flex flex-col gap-1">
+                                 <span className="text-[9px] text-text-secondary uppercase font-medium">WhatsApp / Telefone</span>
+                                 <span className="text-sm text-text-primary font-mono">{lead?.telefone || 'Não informado'}</span>
+                               </div>
+                             </div>
+                           </div>
+
+                           {/* Seção: Ciclo de Venda */}
+                           <div className="space-y-6">
+                             <div className="flex items-center gap-2 mb-4">
+                               <div className="w-1 h-3 bg-primary rounded-full" />
+                               <p className="text-[10px] text-text-secondary uppercase font-bold tracking-[0.2em]">Ciclo de {type === 'sales' ? 'Venda' : 'Processamento'}</p>
+                             </div>
+                             <div className="space-y-4 pl-3">
+                               <div className="flex flex-col gap-1">
+                                 <span className="text-[9px] text-text-secondary uppercase font-medium text-primary">Data de Primeiro Contato</span>
+                                 <span className="text-sm text-text-primary">{regDate ? `${String(regDate.getUTCDate()).padStart(2, '0')}/${String(regDate.getUTCMonth() + 1).padStart(2, '0')}/${regDate.getUTCFullYear()} ${String(regDate.getUTCHours()).padStart(2, '0')}:${String(regDate.getUTCMinutes()).padStart(2, '0')}` : '---'}</span>
+                               </div>
+                               <div className="flex flex-col gap-1">
+                                 <span className="text-[9px] text-text-secondary uppercase font-medium text-primary">Janela de Decisão</span>
+                                 <span className={`text-sm font-bold ${timeToConversion === 'Instantâneo' ? 'text-primary' : 'text-primary'}`}>
+                                   {timeToConversion === 'Instantâneo' ? 'Compra Imediata' : `${timeToConversion} pós-cadastro`}
+                                 </span>
+                               </div>
+                             </div>
+                           </div>
+
+                           {/* Seção: Atribuição Detalhada */}
+                           <div className="space-y-6 lg:col-span-1 md:col-span-2">
+                             <div className="flex items-center gap-2 mb-4">
+                               <div className="w-1 h-3 bg-primary rounded-full" />
+                               <p className="text-[10px] text-text-secondary uppercase font-bold tracking-[0.2em]">Atribuição do Negócio</p>
+                             </div>
+                             <div className="space-y-5 pl-3">
+                               <div>
+                                 <span className="text-[9px] text-text-secondary uppercase font-medium block mb-2">Canal de Origem</span>
+                                 <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-[4px] bg-primary/10 border border-primary/20">
+                                   <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                                   <span className="text-xs text-primary font-bold">
+                                     {getFriendlyChannel(checkout.utm_source || lead?.utm_source_cadastro, checkout.utm_medium || lead?.utm_medium_cadastro, checkout.utm_campaign || lead?.utm_campaign_cadastro, checkout.utm_content || lead?.utm_content_cadastro)}
+                                   </span>
+                                 </div>
+                               </div>
+
+                               <div className="pt-2 border-t border-white/5 space-y-2">
+                                 <div className="flex items-center justify-between text-[10px]">
+                                   <span className="text-text-secondary">UTM Source:</span>
+                                   <span className="text-text-secondary font-mono">{checkout.utm_source || lead?.utm_source_cadastro || '(vazio)'}</span>
+                                 </div>
+                                 <div className="flex items-center justify-between text-[10px]">
+                                   <span className="text-text-secondary">UTM Campaign:</span>
+                                   <span className="text-text-secondary font-mono truncate max-w-[150px]" title={checkout.utm_campaign || lead?.utm_campaign_cadastro}>
+                                     {checkout.utm_campaign || lead?.utm_campaign_cadastro || '(vazio)'}
+                                   </span>
+                                 </div>
+                               </div>
+                             </div>
+                           </div>
+                         </div>
+                       </div>
+                     )}
+                  </div>
+                );
+              })}
+            </div>
+         </div>
+      </Card>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-bg-page text-text-main font-sans selection:bg-primary selection:text-text-primary pb-12">
@@ -1286,8 +1486,16 @@ export default function App() {
                                 <span className="text-emerald-400 font-bold ml-4">{(data.cost > 0 ? (data.value / data.cost).toFixed(2) : '0.00') + 'x'}</span>
                               </div>
                               <div className="flex justify-between items-center pt-1 border-t border-white/5">
-                                <span className="text-text-label">Vendas:</span>
+                                <span className="text-text-label">Vendas (Pagas):</span>
                                 <span className="text-primary font-bold ml-4">{data.salesCount}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-red-400">Cancelados:</span>
+                                <span className="text-red-400 font-bold ml-4">{data.cancelsCount || 0}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-orange-400">Recusados:</span>
+                                <span className="text-orange-400 font-bold ml-4">{data.declinesCount || 0}</span>
                               </div>
                               <div className="flex justify-between items-center">
                                 <span className="text-text-label">Novos Leads:</span>
@@ -1644,7 +1852,7 @@ export default function App() {
                      <BarChart
                        data={[
                          { name: 'Meta Ads', Receita: channelData.meta.revenue, Custo: channelData.meta.cost },
-                         { name: 'Search Ads', Receita: channelData.google.revenue, Custo: channelData.google.cost },
+                         { name: 'Google Ads (Search)', Receita: channelData.google.revenue, Custo: channelData.google.cost },
                          { name: 'Comercial', Receita: channelData.comercial?.revenue || 0 },
                          { name: 'RD Station', Receita: channelData.rdstation?.revenue || 0 },
                          { name: 'Bio do Instagram', Receita: channelData.bio?.revenue || 0 },
@@ -1842,149 +2050,9 @@ export default function App() {
 
         {/* LIVE ACTIVITY FEED - Somente para Cultura */}
         {selectedCompanyId === 'cultura' && dataStatus === 'success' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-             <Card className="p-0 overflow-hidden border-primary/20">
-                <div className="p-5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between bg-white/5 gap-2">
-                <h4 className="text-[0.75rem] font-serif font-normal text-primary/80 uppercase tracking-[0.25em] flex items-center gap-2 shrink-0">
-                      <CreditCard className="w-4 h-4" /> Vendas Recentes (Checkouts)
-                   </h4>
-                </div>
-                 <div className="max-h-[500px] overflow-y-auto">
-                   <div className="divide-y divide-white/5">
-                     {supabaseCheckouts.slice(0, 30).map((checkout, i) => {
-                        const lead = supabaseCadastros.find(l => {
-                          const cId = String(checkout.id_usuario);
-                          return String(l.id_usuario) === cId || String(l.id) === cId;
-                        });
-                       const curso = supabaseCursos.find(c => c.id_curso === checkout.id_curso);
-                       const checkoutId = checkout.id || checkout.timestamp || i.toString();
-                       const isExpanded = expandedCheckoutId === checkoutId;
-                       
-                       const purchaseDate = parseSupabaseDate(checkout.timestamp || checkout.created_at);
-                       const regDate = lead ? parseSupabaseDate(lead.data_cadastro) : null;
-                       const timeToConversion = lead ? formatTimeDiff(lead.data_cadastro, checkout.timestamp || checkout.created_at) : 'N/A';
-                       
-                       const origin = checkout.utm_source || lead?.utm_source_cadastro || 'Direto / S. Rastreio';
-                       const paymentMethod = checkout.metodo_pagamento || checkout.payment_method || checkout.forma_pagamento || 'Indefinido';
-
-                       return (
-                         <div key={i} className="flex flex-col">
-                            <div 
-                              onClick={() => setExpandedCheckoutId(isExpanded ? null : checkoutId)}
-                              className={`p-4 flex items-center justify-between hover:bg-white/[0.04] cursor-pointer transition-colors ${isExpanded ? 'bg-white/[0.03]' : ''}`}
-                            >
-                              <div className="flex items-center gap-3 overflow-hidden">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-colors ${isExpanded ? 'bg-primary text-[#0D0D0D]' : 'bg-primary/10 text-primary'}`}>
-                                    <DollarSign className="w-4 h-4" />
-                                </div>
-                                <div className="overflow-hidden">
-                                    <p className="text-[11px] md:text-xs font-medium text-text-primary truncate">{lead?.nome || 'Usuário #' + checkout.id_usuario}</p>
-                                    <p className="text-[9px] md:text-[10px] text-text-secondary truncate">{curso?.nome || 'Curso #' + checkout.id_curso}</p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 md:gap-4 shrink-0">
-                                <div className="text-right hidden md:block">
-                                   <p className="text-[10px] text-text-secondary">{purchaseDate.toLocaleDateString('pt-BR')}</p>
-                                   <p className="text-[9px] text-[#525252] uppercase font-bold">{paymentMethod} / {checkout.status}</p>
-                                </div>
-                                <div className="text-right">
-                                   <p className="text-sm font-bold text-primary">R$ {Number(checkout.valor).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
-                                   <ChevronDown className={`w-3 h-3 text-[#525252] ml-auto transition-transform ${isExpanded ? 'rotate-180 text-primary' : ''}`} />
-                                </div>
-                              </div>
-                            </div>
-
-                            {isExpanded && (
-                              <div className="px-6 pb-10 pt-6 bg-white/[0.03] border-b border-primary/20 animate-in fade-in slide-in-from-top-4 duration-300">
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-12 gap-x-16">
-                                  
-                                  {/* Seção: Identidade & Contato */}
-                                  <div className="space-y-6">
-                                    <div className="flex items-center gap-2 mb-4">
-                                      <div className="w-1 h-3 bg-primary rounded-full" />
-                                      <p className="text-[10px] text-text-secondary uppercase font-bold tracking-[0.2em]">Identidade e Contato</p>
-                                    </div>
-                                    <div className="space-y-4 pl-3">
-                                      <div className="flex flex-col gap-1">
-                                        <span className="text-[9px] text-text-secondary uppercase font-medium">E-mail de Cadastro</span>
-                                        <span className="text-sm text-text-primary font-medium select-all break-all">{lead?.email || 'Não informado'}</span>
-                                      </div>
-                                      <div className="flex flex-col gap-1">
-                                        <span className="text-[9px] text-text-secondary uppercase font-medium">WhatsApp / Telefone</span>
-                                        <span className="text-sm text-text-primary font-mono">{lead?.telefone || 'Não informado'}</span>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Seção: Ciclo de Venda */}
-                                  <div className="space-y-6">
-                                    <div className="flex items-center gap-2 mb-4">
-                                      <div className="w-1 h-3 bg-primary rounded-full" />
-                                      <p className="text-[10px] text-text-secondary uppercase font-bold tracking-[0.2em]">Ciclo de Venda</p>
-                                    </div>
-                                    <div className="space-y-4 pl-3">
-                                      <div className="flex flex-col gap-1">
-                                        <span className="text-[9px] text-text-secondary uppercase font-medium text-primary">Data de Primeiro Contato</span>
-                                        <span className="text-sm text-text-primary">{regDate ? regDate.toLocaleString('pt-BR') : '---'}</span>
-                                      </div>
-                                      <div className="flex flex-col gap-1">
-                                        <span className="text-[9px] text-text-secondary uppercase font-medium text-primary">Janela de Decisão</span>
-                                        <span className={`text-sm font-bold ${timeToConversion === 'Instantâneo' ? 'text-primary' : 'text-primary'}`}>
-                                          {timeToConversion === 'Instantâneo' ? 'Compra Imediata' : `${timeToConversion} pós-cadastro`}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Seção: Atribuição Detalhada */}
-                                  <div className="space-y-6 lg:col-span-1 md:col-span-2">
-                                    <div className="flex items-center gap-2 mb-4">
-                                      <div className="w-1 h-3 bg-primary rounded-full" />
-                                      <p className="text-[10px] text-text-secondary uppercase font-bold tracking-[0.2em]">Atribuição do Negócio</p>
-                                    </div>
-                                    <div className="space-y-5 pl-3">
-                                      <div>
-                                        <span className="text-[9px] text-text-secondary uppercase font-medium block mb-2">Canal de Origem</span>
-                                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-[4px] bg-primary/10 border border-primary/20">
-                                          <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                                          <span className="text-xs text-primary font-bold">
-                                            {getFriendlyChannel(checkout.utm_source || lead?.utm_source_cadastro, checkout.utm_medium || lead?.utm_medium_cadastro, checkout.utm_campaign || lead?.utm_campaign_cadastro, checkout.utm_content || lead?.utm_content_cadastro)}
-                                          </span>
-                                        </div>
-                                      </div>
-
-                                      <div className="pt-2 border-t border-white/5 space-y-2">
-                                        <div className="flex items-center justify-between text-[10px]">
-                                          <span className="text-text-secondary">UTM Source:</span>
-                                          <span className="text-text-secondary font-mono">{checkout.utm_source || lead?.utm_source_cadastro || '(vazio)'}</span>
-                                        </div>
-                                        <div className="flex items-center justify-between text-[10px]">
-                                          <span className="text-text-secondary">UTM Campaign:</span>
-                                          <span className="text-text-secondary font-mono truncate max-w-[150px]" title={checkout.utm_campaign || lead?.utm_campaign_cadastro}>
-                                            {checkout.utm_campaign || lead?.utm_campaign_cadastro || '(vazio)'}
-                                          </span>
-                                        </div>
-                                      </div>
-
-                                      {!checkout.utm_source && lead?.utm_source_cadastro && (
-                                        <div className="mt-4 p-3 rounded-[4px] bg-white/5 border border-primary/20 flex items-start gap-3">
-                                          <Activity className="w-4 h-4 text-primary shrink-0" />
-                                          <p className="text-[10px] text-primary leading-relaxed font-medium">
-                                            Venda sem rastreio direto. Atribuição recuperada através do <span className="underline decoration-primary/50">Primeiro Contato</span> do lead na base.
-                                          </p>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                         </div>
-                       );
-                     })}
-                   </div>
-                </div>
-             </Card>
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+               {renderCheckoutCard(supabaseCheckouts, "Vendas Recentes (Checkouts)", 30, <CreditCard className="w-4 h-4" />, 'sales')}
 
              <Card className="p-0 overflow-hidden border-primary/20">
                 <div className="p-5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between bg-white/5 gap-2">
@@ -2033,7 +2101,7 @@ export default function App() {
                                <div className="text-right">
                                   <p className="text-[10px] text-text-secondary">
                                     {(() => {
-                                      const d = parseSupabaseDate(lead.data_cadastro);
+                                      const d = getBRLDate(lead.data_cadastro);
                                       return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
                                     })()}
                                   </p>
@@ -2060,7 +2128,7 @@ export default function App() {
                                     <div className="p-3 rounded-[4px] bg-white/5 border border-primary/20">
                                       <p className="text-[9px] text-primary uppercase font-bold tracking-widest mb-2">Conversão Realizada</p>
                                       <p className="text-[10px] text-text-secondary leading-relaxed">
-                                        Comprou <span className="text-text-primary font-bold italic">"{supabaseCursos.find(c => c.id_curso === purchase.id_curso)?.nome || 'Produto'}"</span> em {parseSupabaseDate(purchase.timestamp || purchase.created_at).toLocaleDateString('pt-BR')}.
+                                        Comprou <span className="text-text-primary font-bold italic">"{supabaseCursos.find(c => c.id_curso === purchase.id_curso)?.nome || 'Produto'}"</span> em {formatDateBRL(purchase.timestamp || purchase.created_at)}.
                                       </p>
                                     </div>
                                   )}
@@ -2101,158 +2169,207 @@ export default function App() {
                 </div>
              </Card>
           </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+             {renderCheckoutCard(checkoutsCancelados, "Cancelamentos Recentes", 30, <Target className="w-4 h-4 text-red-500" />, 'cancels')}
+             {renderCheckoutCard(checkoutsRecusados, "Recusas Recentes", 30, <AlertCircle className="w-4 h-4 text-orange-500" />, 'declines')}
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 mt-8">
+             <Card className="p-5">
+               <h4 className="text-sm font-medium mb-6 text-[#A1A1AA] flex items-center gap-2">
+                 <Activity className="w-4 h-4" /> Fontes de Cadastro (Leads)
+               </h4>
+               <div className="h-[300px]">
+                 {channelData.leadsSourcePieData && channelData.leadsSourcePieData.length > 0 ? (
+                   <ResponsiveContainer width="100%" height="100%">
+                     <PieChart>
+                       <Pie
+                         data={channelData.leadsSourcePieData}
+                         cx="50%"
+                         cy="50%"
+                         innerRadius={60}
+                         outerRadius={100}
+                         paddingAngle={5}
+                         dataKey="value"
+                         label={PieChartLabel}
+                       >
+                         {channelData.leadsSourcePieData.map((entry: any, index: number) => (
+                           <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} stroke="none" />
+                         ))}
+                       </Pie>
+                       <RechartsTooltip content={<CustomTooltip />} />
+                     </PieChart>
+                   </ResponsiveContainer>
+                 ) : (
+                   <div className="w-full h-full flex items-center justify-center text-sm text-text-secondary italic">
+                     Não há dados de fonte de cadastro.
+                   </div>
+                 )}
+               </div>
+             </Card>
+          </div>
+          </>
         )}
 
         {/* Channels Breakdown */}
         {dataStatus === 'success' && (
-          <div className="space-y-6 mt-8">
-            <h2 className="text-2xl font-light tracking-tight mb-4 border-b border-border pb-2">
+          <div className="mt-8">
+            <h2 className="text-2xl font-light tracking-tight mb-6 border-b border-border pb-2">
               Detalhamento de Canais
             </h2>
             
-            {(selectedCompanyId === 'cultura' ? [
-              { id: 'meta', name: 'Meta Ads', color: 'bg-primary/10 text-primary border-primary/20' },
-              { id: 'google', name: 'Search Ads', color: 'bg-primary/10 text-primary border-primary/20' },
-              { id: 'comercial', name: 'Comercial', color: 'bg-primary/10 text-primary border-primary/20' },
-              { id: 'rdstation', name: 'RD Station', color: 'bg-primary/10 text-primary border-primary/20' },
-              { id: 'bio', name: 'Bio do Instagram', color: 'bg-primary/10 text-primary border-primary/20' },
-              { id: 'manychat', name: 'Manychat', color: 'bg-primary/10 text-primary border-primary/20' },
-              { id: 'email', name: 'E-Mail', color: 'bg-primary/10 text-primary border-primary/20' },
-              { id: 'organic', name: 'Busca Orgânica / Sem Rastreio', color: 'bg-primary/10 text-primary border-primary/20' }
-            ] : [
-              { id: 'meta', name: 'Meta Ads', color: 'bg-primary/10 text-primary border-primary/20' },
-              { id: 'google', name: 'Google Ads', color: 'bg-primary/10 text-primary border-primary/20' },
-              { id: 'organic', name: 'Tráfego Orgânico / Direto', color: 'bg-primary/10 text-primary border-primary/20' }
-            ]).map(channel => {
-              const data = channelData[channel.id];
-              if (!data || (selectedCompanyId === 'cultura' && data.revenue === 0 && data.leads === 0)) return null;
-              
-              const cr = data.sessions > 0 ? (data.sales) / data.sessions * 100 : 0;
-              const roas = data.cost > 0 ? data.revenue / data.cost : 0;
-              const cpa = data.sales > 0 ? data.cost / data.sales : 0;
-              const avgTicket = data.sales > 0 ? data.revenue / data.sales : 0;
-              const roasColor = roas > 3 ? 'text-primary' : roas >= 1.5 ? 'text-primary' : roas > 0 ? 'text-primary' : 'text-text-secondary';
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              {(selectedCompanyId === 'cultura' ? [
+                { id: 'meta', name: 'Meta Ads', color: 'bg-primary/10 text-primary border-primary/20' },
+                { id: 'google', name: 'Google Ads (Search)', color: 'bg-primary/10 text-primary border-primary/20' },
+                { id: 'comercial', name: 'Comercial', color: 'bg-primary/10 text-primary border-primary/20' },
+                { id: 'rdstation', name: 'RD Station', color: 'bg-primary/10 text-primary border-primary/20' },
+                { id: 'bio', name: 'Bio do Instagram', color: 'bg-primary/10 text-primary border-primary/20' },
+                { id: 'manychat', name: 'Manychat', color: 'bg-primary/10 text-primary border-primary/20' },
+                { id: 'email', name: 'E-Mail', color: 'bg-primary/10 text-primary border-primary/20' },
+                { id: 'organic', name: 'Busca Orgânica / Sem Rastreio', color: 'bg-primary/10 text-primary border-primary/20' }
+              ] : [
+                { id: 'meta', name: 'Meta Ads', color: 'bg-primary/10 text-primary border-primary/20' },
+                { id: 'google', name: 'Google Ads', color: 'bg-primary/10 text-primary border-primary/20' },
+                { id: 'organic', name: 'Tráfego Orgânico / Direto', color: 'bg-primary/10 text-primary border-primary/20' }
+              ]).map(channel => {
+                const data = channelData[channel.id];
+                if (!data || (selectedCompanyId === 'cultura' && data.revenue === 0 && data.leads === 0)) return null;
+                
+                const cr = data.sessions > 0 ? (data.sales) / data.sessions * 100 : 0;
+                const roas = data.cost > 0 ? data.revenue / data.cost : 0;
+                const cpa = data.sales > 0 ? data.cost / data.sales : 0;
+                const avgTicket = data.sales > 0 ? data.revenue / data.sales : 0;
+                const roasColor = roas > 3 ? 'text-primary' : roas >= 1.5 ? 'text-primary' : roas > 0 ? 'text-primary' : 'text-text-secondary';
 
-              return (
-                <Card key={channel.id} className="p-0 overflow-hidden border border-border">
-                  <div className="p-5 border-b border-border flex justify-between items-center bg-bg-sidebar">
-                    <div className="flex items-center gap-3">
-                      <span className={`px-3 py-1 text-xs font-medium rounded-full border ${channel.color}`}>
-                        {channel.name}
-                      </span>
-                    </div>
-                  </div>
-                  <div className={`grid grid-cols-2 md:grid-cols-5 divide-x divide-y md:divide-y-0 divide-[#222225] bg-bg-card`}>
-                    <div className="p-4 flex flex-col justify-center">
-                      <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Receita Gerada</span>
-                      <span className="text-[24px] font-bold">R$ {data.revenue.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
-                    </div>
-                    
-                    {channel.id === 'meta' && data.cost > 0 ? (
-                      <div className="p-4 flex flex-col justify-center">
-                        <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">Investimento Meta</span>
-                        <span className="text-[24px] font-bold text-red-500">R$ {data.cost.toLocaleString('pt-BR', {minimumFractionDigits:2})}</span>
+                return (
+                  <Card key={channel.id} className="p-0 overflow-hidden border border-border flex flex-col h-full">
+                    <div className="p-4 border-b border-border flex justify-between items-center bg-bg-sidebar">
+                      <div className="flex items-center gap-3">
+                        <span className={`px-3 py-1 text-[10px] font-bold rounded-full border ${channel.color}`}>
+                          {channel.name}
+                        </span>
                       </div>
-                    ) : (
-                      <div className="p-4 flex flex-col justify-center">
-                        <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">{selectedCompanyId === 'cultura' ? 'Total Leads' : 'Custo Total'}</span>
-                        <span className="text-[24px] font-bold text-primary">{selectedCompanyId === 'cultura' ? data.leads : `R$ ${data.cost.toLocaleString('pt-BR')}`}</span>
-                      </div>
-                    )}
-
-                    {channel.id === 'meta' && data.cost > 0 ? (
-                      <div className="p-4 flex flex-col justify-center">
-                        <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">ROAS Meta</span>
-                        <span className={`text-[24px] font-bold ${roasColor}`}>{roas.toFixed(2)}x</span>
-                      </div>
-                    ) : (
-                      <div className="p-4 flex flex-col justify-center">
-                        <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">{selectedCompanyId === 'cultura' ? 'Ticket Médio' : 'ROAS'}</span>
-                        <span className={`text-[24px] font-bold ${selectedCompanyId === 'cultura' ? '' : roasColor}`}>{selectedCompanyId === 'cultura' ? `R$ ${avgTicket.toFixed(2)}` : `${roas.toFixed(2)}x`}</span>
-                      </div>
-                    )}
-
-                    <div className="p-4 flex flex-col justify-center">
-                      <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">{channel.id === 'meta' && data.cost > 0 ? 'CPA Meta' : 'Vendas (Qtd)'}</span>
-                      <span className="text-[24px] font-bold">{channel.id === 'meta' && data.cost > 0 ? `R$ ${cpa.toFixed(2)}` : data.sales}</span>
                     </div>
-
-                    <div className="p-4 flex flex-col justify-center">
-                      <span className="text-[0.875rem] font-medium text-text-label font-medium mb-1">{selectedCompanyId === 'cultura' ? 'Conversão' : 'Taxa de Conversão'}</span>
-                      <span className="text-[24px] font-bold">{selectedCompanyId === 'cultura' ? (data.leads > 0 ? ((data.sales / data.leads) * 100).toFixed(1) : 0) + '%' : cr.toFixed(2) + '%'}</span>
-                    </div>
-                  </div>
-
-                  {(data.products?.length > 0 || data.campaigns?.length > 0) && (
-                    <div className="p-5 bg-bg-page border-t border-border grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      {data.products && data.products.length > 0 && (
-                        <div>
-                          <h4 className="text-sm font-medium mb-3 text-[#A1A1AA] flex items-center gap-2">
-                            <Focus className="w-4 h-4" /> Detalhamento de Cursos (Canais)
-                          </h4>
-                          <div className="overflow-x-auto rounded-[4px] border border-border">
-                            <table className="w-full text-left">
-                              <thead className="bg-bg-card">
-                                <tr>
-                                  <th className="text-[10px] font-medium text-text-label p-3 uppercase tracking-wider">Produto</th>
-                                  <th className="text-[10px] font-medium text-text-label p-3 uppercase tracking-wider text-right">Qtd</th>
-                                  <th className="text-[10px] font-medium text-text-label p-3 uppercase tracking-wider text-right">Receita</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-[#222225] bg-bg-sidebar">
-                                {data.products.map((p: any, i: number) => (
-                                  <ProductRow key={i} p={p} isSupabase={selectedCompanyId === 'cultura'} />
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
+                    <div className={`grid grid-cols-2 md:grid-cols-3 divide-x divide-y divide-[#222225] bg-bg-card border-b border-border`}>
+                      <div className="p-3 flex flex-col">
+                        <span className="text-[0.7rem] font-medium text-text-label uppercase tracking-wider mb-1">Receita</span>
+                        <span className="text-lg font-bold">R$ {data.revenue.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+                      </div>
+                      
+                      {channel.id === 'meta' && data.cost > 0 ? (
+                        <div className="p-3 flex flex-col">
+                          <span className="text-[0.7rem] font-medium text-text-label uppercase tracking-wider mb-1">Investimento</span>
+                          <span className="text-lg font-bold text-red-500">R$ {data.cost.toLocaleString('pt-BR', {minimumFractionDigits:2})}</span>
+                        </div>
+                      ) : (
+                        <div className="p-3 flex flex-col">
+                          <span className="text-[0.7rem] font-medium text-text-label uppercase tracking-wider mb-1">{selectedCompanyId === 'cultura' ? 'Leads' : 'Custo'}</span>
+                          <span className="text-lg font-bold text-primary">{selectedCompanyId === 'cultura' ? data.leads : `R$ ${data.cost.toLocaleString('pt-BR')}`}</span>
                         </div>
                       )}
 
-                      {data.campaigns && data.campaigns.length > 0 && (
-                        <div>
-                          <h4 className="text-sm font-medium mb-3 text-[#A1A1AA] flex items-center gap-2">
-                            <TrendingUp className="w-4 h-4" /> Top Campanhas / Origens
-                          </h4>
-                          <div className="overflow-x-auto rounded-[4px] border border-border">
-                            <table className="w-full text-left">
-                              <thead className="bg-bg-card">
-                                <tr>
-                                  <th className="text-[10px] font-medium text-text-label p-3 uppercase tracking-wider">Campanha</th>
-                                  <th className="text-[10px] font-medium text-text-label p-3 uppercase tracking-wider text-right w-24">Vendas</th>
-                                  <th className="text-[10px] font-medium text-text-label p-3 uppercase tracking-wider text-right w-24">Taxa %</th>
-                                  <th className="text-[10px] font-medium text-text-label p-3 uppercase tracking-wider text-right w-32">Receita</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-[#222225] bg-bg-sidebar">
-                                {data.campaigns.map((c: any, i: number) => {
-                                  const totalCampSales = data.sales || 1;
-                                  const pct = (c.sales / totalCampSales) * 100;
-                                  return (
-                                  <tr key={i} className="hover:bg-bg-card transition-colors">
-                                    <td className="p-3 text-[0.875rem] font-normal text-text-secondary max-w-[200px] truncate" title={c.name}>{c.name}</td>
-                                    <td className="p-3 text-[0.875rem] font-medium tabular-nums text-right text-text-primary text-text-label">{c.sales}</td>
-                                    <td className="p-3 text-[0.875rem] font-medium tabular-nums text-right text-text-primary text-text-label">
-                                      <div className="flex items-center justify-end gap-2">
-                                        <div className="w-12 h-1.5 bg-bg-sidebar rounded-full overflow-hidden">
-                                          <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }}></div>
-                                        </div>
-                                        <span className="w-8">{pct.toFixed(0)}%</span>
-                                      </div>
-                                    </td>
-                                    <td className="p-3 text-[0.875rem] font-medium tabular-nums text-right text-text-primary text-primary">R$ {c.rev.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+                      {channel.id === 'meta' && data.cost > 0 ? (
+                        <div className="p-3 flex flex-col">
+                          <span className="text-[0.7rem] font-medium text-text-label uppercase tracking-wider mb-1">ROAS</span>
+                          <span className={`text-lg font-bold ${roasColor}`}>{roas.toFixed(2)}x</span>
+                        </div>
+                      ) : (
+                        <div className="p-3 flex flex-col">
+                          <span className="text-[0.7rem] font-medium text-text-label uppercase tracking-wider mb-1">Ticket Médio</span>
+                          <span className={`text-lg font-bold`}>{`R$ ${avgTicket.toFixed(0)}`}</span>
+                        </div>
+                      )}
+
+                      <div className="p-3 flex flex-col">
+                        <span className="text-[0.7rem] font-medium text-text-label uppercase tracking-wider mb-1">Vendas</span>
+                        <span className="text-lg font-bold">{data.sales}</span>
+                      </div>
+
+                      <div className="p-3 flex flex-col">
+                        <span className="text-[0.7rem] font-medium text-text-label uppercase tracking-wider mb-1">Conversão</span>
+                        <span className="text-lg font-bold">{selectedCompanyId === 'cultura' ? (data.leads > 0 ? ((data.sales / data.leads) * 100).toFixed(1) : 0) + '%' : cr.toFixed(2) + '%'}</span>
+                      </div>
+                      
+                      {channel.id !== 'meta' && (
+                        <div className="p-3 flex flex-col">
+                          <span className="text-[0.7rem] font-medium text-text-label uppercase tracking-wider mb-1">ROAS</span>
+                          <span className={`text-lg font-bold ${roasColor}`}>{roas.toFixed(2)}x</span>
+                        </div>
+                      )}
+                      
+                      {channel.id === 'meta' && (
+                        <div className="p-3 flex flex-col">
+                           <span className="text-[0.7rem] font-medium text-text-label uppercase tracking-wider mb-1">CPA Meta</span>
+                           <span className="text-lg font-bold text-primary">R$ {cpa.toFixed(0)}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {(data.products?.length > 0 || data.campaigns?.length > 0) && (
+                      <div className="p-4 bg-bg-page/30 flex-1 space-y-4">
+                        {data.products && data.products.length > 0 && (
+                          <div>
+                            <h4 className="text-[10px] font-bold mb-2 text-[#A1A1AA] flex items-center gap-2 uppercase tracking-widest">
+                              <Focus className="w-3 h-3" /> Cursos (Canais)
+                            </h4>
+                            <div className="overflow-x-auto rounded-[4px] border border-border">
+                              <table className="w-full text-left">
+                                <thead className="bg-bg-card">
+                                  <tr>
+                                    <th className="text-[9px] font-bold text-text-label p-2 uppercase tracking-wider">Prod</th>
+                                    <th className="text-[9px] font-bold text-text-label p-2 uppercase tracking-wider text-right">Qtd</th>
+                                    <th className="text-[9px] font-bold text-text-label p-2 uppercase tracking-wider text-right">Receita</th>
                                   </tr>
-                                )})}
-                              </tbody>
-                            </table>
+                                </thead>
+                                <tbody className="divide-y divide-[#222225] bg-bg-sidebar/40">
+                                  {data.products.slice(0, 5).map((p: any, i: number) => (
+                                    <tr key={i} className="hover:bg-bg-card transition-colors">
+                                      <td className="p-2 text-[10px] font-normal text-text-secondary truncate max-w-[120px]" title={p.name}>{p.name}</td>
+                                      <td className="p-2 text-[10px] font-medium tabular-nums text-right text-text-label">{p.qty}</td>
+                                      <td className="p-2 text-[10px] font-bold tabular-nums text-right text-primary">R$ {p.rev.toLocaleString('pt-BR', {minimumFractionDigits:0})}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </Card>
-              );
-            })}
+                        )}
+
+                        {data.campaigns && data.campaigns.length > 0 && selectedCompanyId === 'cultura' && (
+                          <div>
+                            <h4 className="text-[10px] font-bold mb-2 text-[#A1A1AA] flex items-center gap-2 uppercase tracking-widest">
+                              <TrendingUp className="w-3 h-3" /> Top Campanhas
+                            </h4>
+                            <div className="overflow-x-auto rounded-[4px] border border-border">
+                              <table className="w-full text-left">
+                                <thead className="bg-bg-card">
+                                  <tr>
+                                    <th className="text-[9px] font-bold text-text-label p-2 uppercase tracking-wider">Camp</th>
+                                    <th className="text-[9px] font-bold text-text-label p-2 uppercase tracking-wider text-right">Vds</th>
+                                    <th className="text-[9px] font-bold text-text-label p-2 uppercase tracking-wider text-right">Receita</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-[#222225] bg-bg-sidebar/40">
+                                  {data.campaigns.slice(0, 5).map((c: any, i: number) => (
+                                    <tr key={i} className="hover:bg-bg-card transition-colors">
+                                      <td className="p-2 text-[10px] font-normal text-text-secondary truncate max-w-[120px]" title={c.name}>{c.name}</td>
+                                      <td className="p-2 text-[10px] font-medium tabular-nums text-right text-text-label">{c.sales}</td>
+                                      <td className="p-2 text-[10px] font-bold tabular-nums text-right text-primary">R$ {c.rev.toLocaleString('pt-BR', {minimumFractionDigits:0})}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
           </div>
         )}
       </main>
