@@ -571,9 +571,15 @@ export default function App() {
               
               return itemDate >= startDate && itemDate <= endDate;
             });
-            const filteredData = checkoutsNoPeriodo.filter((c: any) => c.status === 'Pago');
-            const canceladosData = checkoutsNoPeriodo.filter((c: any) => c.status === 'Cancelado');
-            const recusadosData = checkoutsNoPeriodo.filter((c: any) => c.status === 'Cartão recusado' || c?.status?.toLowerCase().includes('recusa'));
+            const filteredData = checkoutsNoPeriodo.filter((c: any) => (c.status || '').toLowerCase().trim() === 'pago');
+            const canceladosData = checkoutsNoPeriodo.filter((c: any) => {
+               const st = (c.status || '').toLowerCase().trim();
+               return st.includes('cancelad') || st.includes('estornad') || st.includes('refunded');
+            });
+            const recusadosData = checkoutsNoPeriodo.filter((c: any) => {
+               const st = (c.status || '').toLowerCase().trim();
+               return st.includes('recusa') || st.includes('negad');
+            });
             
             setFilteredCheckouts(filteredData);
             setSupabaseCheckouts(filteredData);
@@ -633,9 +639,16 @@ export default function App() {
             ).reduce((acc, curr) => acc + curr.cost, 0);
 
             // Filter checkouts that belong to distribution campaigns
-            const distributionCheckouts = filteredData.filter(c => 
-                distributionTags.some(tag => (c.utm_campaign || '').includes(tag))
-            );
+            const distributionCheckouts = filteredData.filter(c => {
+                let camp = c.utm_campaign || '';
+                if (!c.utm_source && !camp && c.id_usuario) {
+                   const lead = cadastros.find((l: any) => String(l.id_usuario) === String(c.id_usuario) || String(l.id) === String(c.id_usuario));
+                   if (lead && lead.utm_campaign_cadastro) {
+                      camp = lead.utm_campaign_cadastro;
+                   }
+                }
+                return distributionTags.some(tag => camp.includes(tag));
+            });
             const distributionRevenue = distributionCheckouts.reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
             
             // Filter leads belonging to distribution campaigns
@@ -816,7 +829,7 @@ export default function App() {
             filteredCadastros.forEach(lead => {
               const dateStr = formatDateBRL(lead.data_cadastro);
               if (!trendMap.has(dateStr)) {
-                trendMap.set(dateStr, { value: 0, salesCount: 0, leads: 0, cost: 0, products: new Map() });
+                trendMap.set(dateStr, { value: 0, salesCount: 0, leads: 0, cost: 0, cancelsCount: 0, declinesCount: 0, products: new Map() });
               }
               trendMap.get(dateStr)!.leads += 1;
             });
@@ -841,8 +854,17 @@ export default function App() {
             // Atribuição de "Campanhas" (Winning Ads)
             const campaignMap = new Map();
             filteredData.forEach(c => {
-               let camp = c.utm_campaign || c.utm_source || 'Desconhecido';
-               if ((c.utm_source || '').toLowerCase().includes('meta_ads')) {
+               let camp = c.utm_campaign || c.utm_source || '';
+               
+               if (!camp && c.id_usuario) {
+                 const lead = cadastros.find((l: any) => String(l.id_usuario) === String(c.id_usuario) || String(l.id) === String(c.id_usuario));
+                 if (lead && (lead.utm_campaign_cadastro || lead.utm_source_cadastro)) {
+                    camp = lead.utm_campaign_cadastro || lead.utm_source_cadastro || '';
+                 }
+               }
+               if (!camp) camp = 'Desconhecido';
+
+               if (camp.toLowerCase().includes('meta_ads')) {
                    camp = 'Meta Ads';
                } else if (camp === 'ig') {
                    camp = 'Link na bio do Instagram';
@@ -1085,7 +1107,7 @@ export default function App() {
     // Checkouts Today
     const checkoutsToday = supabaseCheckouts.filter(c => {
       const dateVal = c.timestamp || c.created_at;
-      if (!dateVal || c.status !== 'Pago') return false;
+      if (!dateVal || (c.status || '').toLowerCase().trim() !== 'pago') return false;
       return formatDateBRL(dateVal) === todayStr;
     });
 
