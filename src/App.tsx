@@ -17,6 +17,75 @@ const COLORS = {
 };
 
 const CHART_COLORS = ['#DCA61F', '#A3A3A3', '#737373', '#525252', '#404040', '#E5E5E5', '#FFFFFF', '#D4D4D4', '#262626', '#171717'];
+const PROJECT_LABELS: Record<string, string> = {
+  'ACA26': 'Academia',
+  'GAR26': 'Garantismo',
+  'PEN26': 'Clube dos Penalistas',
+  'CIV26': 'Clube dos Civilistas',
+  'CUL26': 'Cultura'
+};
+
+const OBJECTIVE_LABELS: Record<string, string> = {
+  'VENDA': 'Venda',
+  'VEN': 'Venda',
+  'CAP': 'Captação',
+  'CAPTACAO': 'Captação',
+  'DIST': 'Distribuição',
+  'ENG': 'Engajamento',
+  'ACE': 'Alcance'
+};
+
+const CampaignGroupTable: React.FC<{ title: string, data: any[], icon: React.ReactNode }> = ({ title, data, icon }) => (
+  <Card className="p-0 overflow-hidden">
+    <div className="p-5 border-b border-border flex items-center justify-between bg-gradient-to-r from-[#111113] to-transparent">
+      <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
+        {icon} {title}
+      </h4>
+    </div>
+    <div className="w-full overflow-x-auto scrollbar-hide">
+      <table className="w-full text-left min-w-[600px]">
+        <thead className="bg-bg-card/50 sticky top-0 z-10">
+          <tr>
+            <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold">Campanha / Projeto</th>
+            <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">Investimento</th>
+            <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">Leads</th>
+            <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">Vendas</th>
+            <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">Receita</th>
+            <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">ROAS</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-[#222225]/50">
+          {data.length > 0 ? data.map((item: any, i: number) => {
+             const roas = item.cost > 0 ? (item.revenue / item.cost) : 0;
+             return (
+              <tr key={i} className="hover:bg-white/5 transition-colors">
+                <td className="p-4 flex items-center gap-3">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                  <span className="text-xs text-text-primary truncate max-w-[240px]" title={item.name}>{item.name}</span>
+                </td>
+                <td className="p-4 text-[0.875rem] font-medium tabular-nums text-text-primary text-right">R$ {item.cost.toLocaleString('pt-BR')}</td>
+                <td className="p-4 text-[0.875rem] font-medium tabular-nums text-text-primary text-right">{item.leads}</td>
+                <td className="p-4 text-[0.875rem] font-medium tabular-nums text-text-primary text-right">{item.sales}</td>
+                <td className="p-4 text-[0.875rem] font-medium tabular-nums text-text-primary text-right text-primary">R$ {item.revenue.toLocaleString('pt-BR')}</td>
+                <td className="p-4 text-[0.875rem] font-medium tabular-nums text-right">
+                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${roas > 3 ? 'bg-primary/10 text-primary' : (roas > 1 ? 'bg-orange-500/10 text-orange-600' : 'bg-gray-500/10 text-text-secondary')}`}>
+                     {roas > 0 ? `${roas.toFixed(1)}x` : '0.0x'}
+                   </span>
+                </td>
+              </tr>
+             );
+          }) : (
+            <tr>
+              <td colSpan={6} className="p-8 text-center text-[#525252] italic text-xs">
+                Nenhum dado encontrado para este período.
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  </Card>
+);
 
 // Corrige conversão de timezone (UTC to Local) para dados vindos do Supabase
 const parseSupabaseDate = (dateVal: string | null | undefined): Date => {
@@ -885,7 +954,106 @@ export default function App() {
 
             const winners = Array.from(campaignMap.values())
               .sort((a, b) => b.rev - a.rev)
-              .slice(0, 10);
+               .slice(0, 10);
+
+             // --- NOVA LÓGICA DE CAMPANHAS (DISTRIBUIÇÃO, CAPTAÇÃO, VENDA) ---
+            const distCampaignMap = new Map();
+            const capCampaignMap = new Map();
+            const venCampaignMap = new Map();
+
+            const getFriendlyName = (name: string) => {
+               // Remove as tags entre colchetes [TAG] e espaços extras
+               return name.replace(/\[.*?\]/g, '').replace(/\s+/g, ' ').trim();
+            };
+
+            const getProjectInfo = (camp: string) => {
+               const foundProjects = Object.keys(PROJECT_LABELS).filter(p => camp.includes(p));
+               if (foundProjects.length === 0) return { id: 'CUL26', label: PROJECT_LABELS['CUL26'] };
+               return {
+                  id: foundProjects.join('+'),
+                  label: foundProjects.map(p => PROJECT_LABELS[p]).join(' + ')
+               };
+            };
+
+            // 1. Processar Custos (Google Sheets)
+            metaCosts.filter(c => c.date >= startDate && c.date <= endDate).forEach(c => {
+               const camp = c.campaign.toUpperCase();
+               
+               let objective = 'OUTROS';
+               if (camp.includes('DIST') || camp.includes('ACE') || camp.includes('ENG')) objective = 'DIST';
+               else if (camp.includes('CAP') || camp.includes('CAPTACAO')) objective = 'CAP';
+               else if (camp.includes('VEN') || camp.includes('VENDA')) objective = 'VEN';
+
+               const project = getProjectInfo(camp);
+               
+               if (objective === 'DIST') {
+                  const key = c.campaign; // Individual for dist as requested
+                  if (!distCampaignMap.has(key)) distCampaignMap.set(key, { name: getFriendlyName(c.campaign) || c.campaign, cost: 0, revenue: 0, sales: 0, leads: 0 });
+                  distCampaignMap.get(key).cost += c.cost;
+               } else if (objective === 'CAP') {
+                  const key = c.campaign;
+                  if (!capCampaignMap.has(key)) capCampaignMap.set(key, { name: getFriendlyName(c.campaign) || c.campaign, cost: 0, revenue: 0, sales: 0, leads: 0 });
+                  capCampaignMap.get(key).cost += c.cost;
+               } else if (objective === 'VEN') {
+                  const key = project.id; // Grouped by product for VEN
+                  if (!venCampaignMap.has(key)) venCampaignMap.set(key, { name: project.label, cost: 0, revenue: 0, sales: 0, leads: 0 });
+                  venCampaignMap.get(key).cost += c.cost;
+               }
+            });
+
+            // 2. Processar Vendas (Supabase)
+            filteredData.forEach(c => {
+               let camp = (c.utm_campaign || '').toUpperCase();
+               if (!camp && c.id_usuario) {
+                  const lead = cadastros.find((l: any) => String(l.id_usuario) === String(c.id_usuario) || String(l.id) === String(c.id_usuario));
+                  if (lead && lead.utm_campaign_cadastro) camp = lead.utm_campaign_cadastro.toUpperCase();
+               }
+               if (!camp) return;
+
+               let objective = 'OUTROS';
+               if (camp.includes('DIST') || camp.includes('ACE') || camp.includes('ENG')) objective = 'DIST';
+               else if (camp.includes('CAP') || camp.includes('CAPTACAO')) objective = 'CAP';
+               else if (camp.includes('VEN') || camp.includes('VENDA')) objective = 'VEN';
+
+               const utmCampaign = c.utm_campaign || camp;
+               const project = getProjectInfo(camp);
+               const rev = Number(c.valor) || 0;
+
+               if (objective === 'DIST') {
+                  if (!distCampaignMap.has(utmCampaign)) distCampaignMap.set(utmCampaign, { name: getFriendlyName(utmCampaign) || utmCampaign, cost: 0, revenue: 0, sales: 0, leads: 0 });
+                  const s = distCampaignMap.get(utmCampaign);
+                  s.revenue += rev; s.sales += 1;
+               } else if (objective === 'CAP') {
+                  if (!capCampaignMap.has(utmCampaign)) capCampaignMap.set(utmCampaign, { name: getFriendlyName(utmCampaign) || utmCampaign, cost: 0, revenue: 0, sales: 0, leads: 0 });
+                  const s = capCampaignMap.get(utmCampaign);
+                  s.revenue += rev; s.sales += 1;
+               } else if (objective === 'VEN') {
+                  if (!venCampaignMap.has(project.id)) venCampaignMap.set(project.id, { name: project.label, cost: 0, revenue: 0, sales: 0, leads: 0 });
+                  const s = venCampaignMap.get(project.id);
+                  s.revenue += rev; s.sales += 1;
+               }
+            });
+
+            // 3. Processar Leads (Supabase)
+            filteredCadastros.forEach(l => {
+                const rawCamp = (l.utm_campaign_cadastro || '').toUpperCase();
+                if (!rawCamp) return;
+                const utmCampaign = l.utm_campaign_cadastro || rawCamp;
+
+                let objective = 'OUTROS';
+                if (rawCamp.includes('DIST') || rawCamp.includes('ACE') || rawCamp.includes('ENG')) objective = 'DIST';
+                else if (rawCamp.includes('CAP') || rawCamp.includes('CAPTACAO')) objective = 'CAP';
+                else if (rawCamp.includes('VEN') || rawCamp.includes('VENDA')) objective = 'VEN';
+                
+                const project = getProjectInfo(rawCamp);
+
+                if (objective === 'DIST' && distCampaignMap.has(utmCampaign)) distCampaignMap.get(utmCampaign).leads += 1;
+                else if (objective === 'CAP') {
+                   if (!capCampaignMap.has(utmCampaign)) capCampaignMap.set(utmCampaign, { name: getFriendlyName(utmCampaign) || utmCampaign, cost: 0, revenue: 0, sales: 0, leads: 0 });
+                   capCampaignMap.get(utmCampaign).leads += 1;
+                }
+                else if (objective === 'VEN' && venCampaignMap.has(project.id)) venCampaignMap.get(project.id).leads += 1;
+            });
 
             // --- TOP 5 CLIENTES ---
             const customerMap = new Map();
@@ -931,7 +1099,7 @@ export default function App() {
               { name: 'Manychat', value: channelMap.manychat.revenue },
               { name: 'RD Station', value: channelMap.rdstation.revenue },
               { name: 'E-mail', value: channelMap.email.revenue },
-              { name: 'Comercial/CRM', value: channelMap.comercial.revenue },
+              { name: 'Comercial', value: channelMap.comercial.revenue },
               { name: 'Link na Bio', value: channelMap.bio.revenue },
             ]
             .map(c => ({
@@ -948,7 +1116,7 @@ export default function App() {
               { name: 'Manychat', value: channelMap.manychat.leads },
               { name: 'RD Station', value: channelMap.rdstation.leads },
               { name: 'E-mail', value: channelMap.email.leads },
-              { name: 'Comercial/CRM', value: channelMap.comercial.leads },
+              { name: 'Comercial', value: channelMap.comercial.leads },
               { name: 'Link na Bio', value: channelMap.bio.leads },
             ]
             .map(c => ({
@@ -971,6 +1139,9 @@ export default function App() {
               totalProducts: formatProducts(channelMap.total.products),
               trendData,
               winners,
+              distCampaigns: Array.from(distCampaignMap.values()).sort((a, b) => b.cost - a.cost),
+              capCampaigns: Array.from(capCampaignMap.values()).sort((a, b) => b.leads - a.leads),
+              venCampaigns: Array.from(venCampaignMap.values()).sort((a, b) => b.rev - a.rev),
               topCustomers,
               paymentMethods: paymentMethodsData,
               productPieData,
@@ -1955,71 +2126,122 @@ export default function App() {
 
         {/* Winning Ads and Products Matrix */}
         {dataStatus === 'success' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-             {/* ... col 1 ... */}
-             <Card className="p-0 overflow-hidden">
-                <div className="p-5 border-b border-border flex items-center justify-between bg-gradient-to-r from-[#111113] to-transparent">
-                   <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
-                      <Award className="w-4 h-4 text-primary" /> Fontes de Aquisição
-                   </h4>
-                </div>
-                <div className="w-full overflow-x-auto scrollbar-hide">
-                   <table className="w-full text-left min-w-[600px]">
-                      <thead className="bg-bg-card/50 sticky top-0 z-10">
-                        <tr>
-                          <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold">Campanha / Anúncio</th>
-                          <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">Vendas</th>
-                          <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">Receita</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#222225]/50">
-                        {channelData.winners?.length > 0 ? channelData.winners.map((win: any, i: number) => (
-                           <tr key={i} className="hover:bg-white/5 transition-colors">
-                              <td className="p-4 flex items-center gap-3">
-                                 <div className={`w-1.5 h-1.5 rounded-full ${win.source === 'meta' ? 'bg-primary' : 'bg-primary'}`} />
-                                 <span className="text-xs text-text-primary truncate max-w-[240px]" title={win.name}>{win.name}</span>
-                              </td>
-                              <td className="p-4 text-[0.875rem] font-medium tabular-nums text-text-primary text-center">{win.sales}</td>
-                              <td className="p-4 text-[0.875rem] font-medium tabular-nums text-text-primary text-right text-primary">R$ {win.rev.toLocaleString('pt-BR')}</td>
-                           </tr>
-                        )) : (
-                          <tr>
-                            <td colSpan={3} className="p-8 text-center text-[#525252] italic text-xs">
-                              {selectedCompanyId === 'cultura' ? 'Dados insuficientes de UTMs para classificar anúncios.' : 'Nenhum dado de campanha encontrado.'}
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                   </table>
-                </div>
-             </Card>
+          <div className="grid grid-cols-1 gap-6">
+             {selectedCompanyId === 'cultura' ? (
+                <>
+                  <CampaignGroupTable 
+                    title="Campanhas de Distribuição" 
+                    data={channelData.distCampaigns || []} 
+                    icon={<Zap className="w-4 h-4 text-primary" />} 
+                  />
+                  <CampaignGroupTable 
+                    title="Campanhas de Captação" 
+                    data={channelData.capCampaigns || []} 
+                    icon={<Target className="w-4 h-4 text-primary" />} 
+                  />
+                  <CampaignGroupTable 
+                    title="Campanhas de Venda" 
+                    data={channelData.venCampaigns || []} 
+                    icon={<Award className="w-4 h-4 text-primary" />} 
+                  />
+                </>
+             ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Winning Ads Table */}
+                  <Card className="p-0 overflow-hidden">
+                    <div className="p-5 border-b border-border flex items-center justify-between bg-gradient-to-r from-[#111113] to-transparent">
+                        <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
+                          <Award className="w-4 h-4 text-primary" /> Fontes de Aquisição
+                        </h4>
+                    </div>
+                    <div className="w-full overflow-x-auto scrollbar-hide">
+                        <table className="w-full text-left min-w-[600px]">
+                          <thead className="bg-bg-card/50 sticky top-0 z-10">
+                            <tr>
+                              <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold">Campanha / Anúncio</th>
+                              <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">Vendas</th>
+                              <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">Receita</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#222225]/50">
+                            {channelData.winners?.length > 0 ? channelData.winners.map((win: any, i: number) => (
+                              <tr key={i} className="hover:bg-white/5 transition-colors">
+                                  <td className="p-4 flex items-center gap-3">
+                                    <div className={`w-1.5 h-1.5 rounded-full ${win.source === 'meta' ? 'bg-primary' : 'bg-primary'}`} />
+                                    <span className="text-xs text-text-primary truncate max-w-[240px]" title={win.name}>{win.name}</span>
+                                  </td>
+                                  <td className="p-4 text-[0.875rem] font-medium tabular-nums text-text-primary text-center">{win.sales}</td>
+                                  <td className="p-4 text-[0.875rem] font-medium tabular-nums text-text-primary text-right text-primary">R$ {win.rev.toLocaleString('pt-BR')}</td>
+                              </tr>
+                            )) : (
+                              <tr>
+                                <td colSpan={3} className="p-8 text-center text-[#525252] italic text-xs">
+                                  {selectedCompanyId === 'cultura' ? 'Dados insuficientes de UTMs para classificar anúncios.' : 'Nenhum dado de campanha encontrado.'}
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                    </div>
+                  </Card>
 
-             <Card className="p-0 overflow-hidden">
-                <div className="p-5 border-b border-border flex items-center justify-between bg-gradient-to-r from-[#111113] to-transparent">
-                   <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
-                      <ShoppingCart className="w-4 h-4" /> Performance por Produto
-                   </h4>
-                   <span className="text-[10px] text-text-label">Ordenado por Receita</span>
+                  <Card className="p-0 overflow-hidden">
+                    <div className="p-5 border-b border-border flex items-center justify-between bg-gradient-to-r from-[#111113] to-transparent">
+                        <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
+                          <ShoppingCart className="w-4 h-4" /> Performance por Produto
+                        </h4>
+                        <span className="text-[10px] text-text-label">Ordenado por Receita</span>
+                    </div>
+                    <div className="w-full overflow-x-auto scrollbar-hide">
+                        <table className="w-full text-left border-collapse min-w-[600px]">
+                          <thead className="bg-bg-card/50 sticky top-0 z-10">
+                            <tr>
+                              <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold">Infoproduto</th>
+                              <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">Vendas</th>
+                              <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">ROAS</th>
+                              <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">Receita</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-bg-card/20">
+                            {(channelData.totalProducts || [])
+                              .map((p: any, i: number) => (
+                                <ProductRow key={i} p={p} isSupabase={selectedCompanyId === 'cultura'} />
+                              ))}
+                          </tbody>
+                        </table>
+                    </div>
+                  </Card>
                 </div>
-                <div className="w-full overflow-x-auto scrollbar-hide">
-                   <table className="w-full text-left border-collapse min-w-[600px]">
-                      <thead className="bg-bg-card/50 sticky top-0 z-10">
-                        <tr>
-                          <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold">Infoproduto</th>
-                          <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">Vendas</th>
-                          <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">ROAS</th>
-                          <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">Receita</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-bg-card/20">
-                        {(channelData.totalProducts || [])
-                          .map((p: any, i: number) => (
-                             <ProductRow key={i} p={p} isSupabase={selectedCompanyId === 'cultura'} />
-                          ))}
-                      </tbody>
-                   </table>
-                </div>
-             </Card>
+             )}
+
+             {selectedCompanyId === 'cultura' && (
+                <Card className="p-0 overflow-hidden">
+                   <div className="p-5 border-b border-border flex items-center justify-between bg-gradient-to-r from-[#111113] to-transparent">
+                       <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
+                         <ShoppingCart className="w-4 h-4" /> Performance por Produto
+                       </h4>
+                       <span className="text-[10px] text-text-label">Ordenado por Receita</span>
+                   </div>
+                   <div className="w-full overflow-x-auto scrollbar-hide">
+                       <table className="w-full text-left border-collapse min-w-[600px]">
+                         <thead className="bg-bg-card/50 sticky top-0 z-10">
+                           <tr>
+                             <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold">Infoproduto</th>
+                             <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">Vendas</th>
+                             <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">ROAS</th>
+                             <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">Receita</th>
+                           </tr>
+                         </thead>
+                         <tbody className="bg-bg-card/20">
+                           {(channelData.totalProducts || [])
+                             .map((p: any, i: number) => (
+                                <ProductRow key={i} p={p} isSupabase={selectedCompanyId === 'cultura'} />
+                             ))}
+                         </tbody>
+                       </table>
+                   </div>
+                </Card>
+             )}
           </div>
         )}
 
@@ -2206,7 +2428,7 @@ export default function App() {
           <div className="grid grid-cols-1 gap-6 mt-8">
              <Card className="p-5">
                <h4 className="text-sm font-medium mb-6 text-[#A1A1AA] flex items-center gap-2">
-                 <Activity className="w-4 h-4" /> Fontes de Cadastro (Leads)
+                 <Activity className="w-4 h-4" /> Fontes de cadastros
                </h4>
                <div className="h-[300px]">
                  {channelData.leadsSourcePieData && channelData.leadsSourcePieData.length > 0 ? (
@@ -2346,8 +2568,8 @@ export default function App() {
                               <table className="w-full text-left">
                                 <thead className="bg-bg-card">
                                   <tr>
-                                    <th className="text-[9px] font-bold text-text-label p-2 uppercase tracking-wider">Prod</th>
-                                    <th className="text-[9px] font-bold text-text-label p-2 uppercase tracking-wider text-right">Qtd</th>
+                                    <th className="text-[9px] font-bold text-text-label p-2 uppercase tracking-wider">Produto</th>
+                                    <th className="text-[9px] font-bold text-text-label p-2 uppercase tracking-wider text-right">Quantidade</th>
                                     <th className="text-[9px] font-bold text-text-label p-2 uppercase tracking-wider text-right">Receita</th>
                                   </tr>
                                 </thead>
