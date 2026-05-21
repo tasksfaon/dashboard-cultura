@@ -1024,7 +1024,11 @@ export default function App() {
               .from('trafego_meta_cultura')
               .select('*')
               .limit(5000);
+            
+            console.log('err5:', err5);
             if (err5) throw err5;
+            
+            console.log("Data provided by trafegoMeta (first 2 rows):", trafegoMeta?.slice(0, 2));
 
             // 6. Anúncios Ativos Cultura (TUDO) do Supabase
             let activeCampsRaw: any[] = [];
@@ -1045,13 +1049,22 @@ export default function App() {
             // - campaign_name -> campaign, campanha
             // - ad_name -> ad name, nome do anuncio
             const metaCosts = (trafegoMeta || []).map(row => {
-              const dateStr = String(row.date || '');
+              const rawDate = row.date || row.day || row.data || '';
+              const dateStr = String(rawDate);
+              
+              let rawSpend = row.spend;
+              if (rawSpend === undefined || rawSpend === null) rawSpend = row.spent;
+              if (rawSpend === undefined || rawSpend === null) rawSpend = row.gasto;
+              if (rawSpend === undefined || rawSpend === null) rawSpend = row.cost;
+              if (rawSpend === undefined || rawSpend === null) rawSpend = row.valor;
+              if (rawSpend === undefined || rawSpend === null) rawSpend = row.amount_spent;
+
               let cost = 0;
-              if (row.spend !== undefined && row.spend !== null) {
-                if (typeof row.spend === 'number') {
-                  cost = row.spend;
+              if (rawSpend !== undefined && rawSpend !== null) {
+                if (typeof rawSpend === 'number') {
+                  cost = rawSpend;
                 } else {
-                  const valStr = String(row.spend)
+                  const valStr = String(rawSpend)
                     .replace('R$', '')
                     .replace(/\./g, '')
                     .replace(',', '.')
@@ -1059,22 +1072,22 @@ export default function App() {
                   cost = parseFloat(valStr);
                 }
               }
-              const campaign = row.campaign_name || 'Desconhecido';
-              const adName = row.ad_name || 'Desconhecido';
+              
+              const campaign = row.campaign_name || row.campaign || row.campanha || 'Desconhecido';
+              const adName = row.ad_name || row['ad name'] || row.nome_do_anuncio || row['nome do anuncio'] || row.nome || 'Desconhecido';
 
               if (!dateStr || isNaN(cost)) return null;
 
               let dateObj: Date;
+              const cleanDateStr = dateStr.split('T')[0].split(' ')[0];
               if (dateStr.includes('-')) {
-                const cleanDateStr = dateStr.split(' ')[0];
                 const [y, m, d] = cleanDateStr.split('-');
                 dateObj = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d), 0, 0, 0, 0));
               } else if (dateStr.includes('/')) {
-                const cleanDateStr = dateStr.split(' ')[0];
                 const [d, m, y] = cleanDateStr.split('/');
                 dateObj = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d), 0, 0, 0, 0));
               } else {
-                dateObj = new Date(dateStr);
+                dateObj = new Date(cleanDateStr);
               }
 
               if (isNaN(dateObj.getTime())) return null;
@@ -1086,7 +1099,51 @@ export default function App() {
                 dateObj = shifted;
               }
 
-              return { date: dateObj, cost, campaign, adName };
+              return { 
+                date: dateObj, 
+                cost, 
+                campaign, 
+                adName,
+                impressions: Number(row.impressions) || 0,
+                reach: Number(row.reach) || 0,
+                frequency: Number(row.frequency) || 0,
+                clicks: Number(row.clicks) || 0,
+                unique_clicks: Number(row.unique_clicks) || 0,
+                outbound_clicks: Number(row.outbound_clicks) || 0,
+                ctr: Number(row.ctr) || 0,
+                unique_ctr: Number(row.unique_ctr) || 0,
+                website_ctr: Number(row.website_ctr) || 0,
+                social_spend: Number(row.social_spend) || 0,
+                cpc: Number(row.cpc) || 0,
+                cpm: Number(row.cpm) || 0,
+                cpp: Number(row.cpp) || 0,
+                link_clicks: Number(row.link_clicks) || 0,
+                leads: Number(row.leads) || 0,
+                purchases: Number(row.purchases) || 0,
+                omni_purchases: Number(row.omni_purchases) || 0,
+                complete_registrations: Number(row.complete_registrations) || 0,
+                initiate_checkouts: Number(row.initiate_checkouts) || 0,
+                add_to_carts: Number(row.add_to_carts) || 0,
+                add_payment_infos: Number(row.add_payment_infos) || 0,
+                searches: Number(row.searches) || 0,
+                view_contents: Number(row.view_contents) || 0,
+                contacts: Number(row.contacts) || 0,
+                schedules: Number(row.schedules) || 0,
+                subscribe: Number(row.subscribe) || 0,
+                start_trial: Number(row.start_trial) || 0,
+                cost_per_lead: Number(row.cost_per_lead) || 0,
+                cost_per_purchase: Number(row.cost_per_purchase) || 0,
+                cost_per_complete_registration: Number(row.cost_per_complete_registration) || 0,
+                cost_per_link_click: Number(row.cost_per_link_click) || 0,
+                video_plays: Number(row.video_plays) || 0,
+                video_avg_watch_time: Number(row.video_avg_watch_time) || 0,
+                video_p25: Number(row.video_p25) || 0,
+                video_p50: Number(row.video_p50) || 0,
+                video_p75: Number(row.video_p75) || 0,
+                video_p95: Number(row.video_p95) || 0,
+                video_p100: Number(row.video_p100) || 0,
+                video_thruplay: Number(row.video_thruplay) || 0
+              };
             }).filter(v => v !== null) as any[];
 
             setMetaCosts(metaCosts);
@@ -1476,12 +1533,14 @@ export default function App() {
                 if (c.date >= startDate && c.date <= endDate) {
                     channelMap.total.products.forEach((p: any, name: string) => {
                          const ad = c.adName.toUpperCase();
+                         const campName = c.campaign.toUpperCase();
+                         const searchStr = `${ad} ${campName}`;
                          const prod = name.toUpperCase();
                          
                          // More flexible matching
-                         const hasCIV = ad.includes('CIV') && ad.includes('26');
-                         const hasPEN = ad.includes('PEN') && ad.includes('26');
-                         const hasACA = ad.includes('ACA') && ad.includes('26');
+                         const hasCIV = searchStr.includes('CIV') && searchStr.includes('26');
+                         const hasPEN = searchStr.includes('PEN') && searchStr.includes('26');
+                         const hasACA = searchStr.includes('ACA') && searchStr.includes('26');
 
                          if (hasPEN && prod.includes('PENALIST')) {
                              p.cost = (p.cost || 0) + c.cost;
@@ -1683,7 +1742,7 @@ export default function App() {
                };
             };
 
-            // 1. Processar Custos (Google Sheets)
+            // 1. Processar Custos (Banco de Dados Meta)
             metaCosts.filter(c => c.date >= startDate && c.date <= endDate).forEach(c => {
                const camp = c.campaign.toUpperCase();
                
@@ -1761,6 +1820,32 @@ export default function App() {
                    capCampaignMap.get(utmCampaign).leads += 1;
                 }
                 else if (objective === 'VEN' && venCampaignMap.has(project.id)) venCampaignMap.get(project.id).leads += 1;
+            });
+
+            // 4. Métricas Gerais Meta (tabela trafego_meta_cultura completa)
+            const metaAdsMap = new Map();
+            metaCosts.filter(c => c.date >= startDate && c.date <= endDate).forEach(c => {
+               const key = c.campaign;
+               if (!metaAdsMap.has(key)) {
+                  metaAdsMap.set(key, {
+                      name: getFriendlyName(c.campaign) || c.campaign,
+                      cost: 0,
+                      impressions: 0,
+                      clicks: 0,
+                      link_clicks: 0,
+                      leads: 0,
+                      purchases: 0,
+                      reach: 0
+                  });
+               }
+               const s = metaAdsMap.get(key);
+               s.cost += c.cost;
+               s.impressions += c.impressions;
+               s.clicks += c.clicks;
+               s.link_clicks += c.link_clicks;
+               s.leads += c.leads;
+               s.purchases += c.purchases;
+               s.reach += c.reach;
             });
 
             // --- TOP 5 CLIENTES ---
@@ -1848,6 +1933,7 @@ export default function App() {
               trendData,
               monthlyTrendData,
               winners,
+              metaAdsCampaigns: Array.from(metaAdsMap.values()).sort((a, b) => b.cost - a.cost),
               distCampaigns: Array.from(distCampaignMap.values()).sort((a, b) => b.cost - a.cost),
               capCampaigns: Array.from(capCampaignMap.values()).sort((a, b) => b.leads - a.leads),
               venCampaigns: Array.from(venCampaignMap.values()).sort((a, b) => b.rev - a.rev),
@@ -3161,6 +3247,82 @@ export default function App() {
                 </Card>
              )}
           </div>
+        )}
+
+        {/* MÉTRICAS META ADS (Tabela trafego_meta_cultura) */}
+        {selectedCompanyId === 'cultura' && dataStatus === 'success' && (
+           <Card className="p-0 overflow-hidden mb-6">
+              <div className="p-5 border-b border-border flex items-center justify-between bg-gradient-to-r from-[#111113] to-transparent">
+                  <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-[#DCA61F]" /> Desempenho Meta Ads
+                  </h4>
+                  <span className="text-[10px] text-text-label uppercase tracking-widest text-primary">Trafego_Meta_Cultura</span>
+              </div>
+              <div className="w-full overflow-x-auto scrollbar-hide">
+                  <table className="w-full text-left border-collapse min-w-[1000px]">
+                    <thead className="bg-[#111113] sticky top-0 z-10 bottom-border">
+                      <tr>
+                        <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold border-b border-white/5">Campanha</th>
+                        <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right border-b border-white/5">Investimento</th>
+                        <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right border-b border-white/5">Impressões</th>
+                        <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right border-b border-white/5">Cliques</th>
+                        <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right border-b border-white/5">CTR</th>
+                        <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right border-b border-white/5">CPM</th>
+                        <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right border-b border-white/5">CPC</th>
+                        <th className="p-4 text-[0.75rem] text-[#6366f1] uppercase font-bold text-right border-b border-white/5">Leads</th>
+                        <th className="p-4 text-[0.75rem] text-[#10b981] uppercase font-bold text-right border-b border-white/5">Vendas</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#222225]/50 bg-bg-card/20">
+                      {(channelData.metaAdsCampaigns || []).map((camp: any, i: number) => {
+                         const ctr = camp.impressions > 0 ? (camp.clicks / camp.impressions) * 100 : 0;
+                         const cpm = camp.impressions > 0 ? (camp.cost / camp.impressions) * 1000 : 0;
+                         const cpc = camp.clicks > 0 ? camp.cost / camp.clicks : 0;
+                         
+                         return (
+                           <tr key={i} className="hover:bg-white/5 transition-colors group">
+                               <td className="p-4 text-[0.75rem] font-medium text-text-primary max-w-[280px] break-words whitespace-normal border-r border-[#222225]/30 group-hover:border-transparent">
+                                  {camp.name}
+                               </td>
+                               <td className="p-4 text-[0.75rem] text-right font-mono text-red-400">
+                                  R$ {camp.cost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                               </td>
+                               <td className="p-4 text-[0.75rem] text-right text-text-secondary tabular-nums">
+                                  {camp.impressions.toLocaleString('pt-BR')}
+                               </td>
+                               <td className="p-4 text-[0.75rem] text-right text-text-secondary tabular-nums">
+                                  {camp.clicks.toLocaleString('pt-BR')}
+                               </td>
+                               <td className="p-4 text-[0.75rem] text-right text-text-secondary tabular-nums">
+                                  {ctr.toFixed(2)}%
+                               </td>
+                               <td className="p-4 text-[0.75rem] text-right text-text-secondary tabular-nums">
+                                  R$ {cpm.toFixed(2)}
+                               </td>
+                               <td className="p-4 text-[0.75rem] text-right text-text-secondary tabular-nums border-r border-[#222225]/30 group-hover:border-transparent">
+                                  R$ {cpc.toFixed(2)}
+                               </td>
+                               <td className="p-4 text-[0.75rem] text-right font-bold text-[#818cf8] tabular-nums">
+                                  {camp.leads.toLocaleString('pt-BR')}
+                               </td>
+                               <td className="p-4 text-[0.75rem] text-right font-bold text-[#34d399] tabular-nums">
+                                  {camp.purchases.toLocaleString('pt-BR')}
+                               </td>
+                           </tr>
+                         );
+                      })}
+                      
+                      {(!channelData.metaAdsCampaigns || channelData.metaAdsCampaigns.length === 0) && (
+                         <tr>
+                           <td colSpan={9} className="p-8 text-center text-[#525252] italic text-xs">
+                             Nenhum dado do Meta encontrado para este período.
+                           </td>
+                         </tr>
+                      )}
+                    </tbody>
+                  </table>
+              </div>
+           </Card>
         )}
 
 
