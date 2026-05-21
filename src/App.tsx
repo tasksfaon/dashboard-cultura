@@ -1023,6 +1023,7 @@ export default function App() {
             const { data: trafegoMeta, error: err5 } = await supabase
               .from('trafego_meta_cultura')
               .select('*')
+              .order('date', { ascending: false })
               .limit(5000);
             
             console.log('err5:', err5);
@@ -1387,6 +1388,16 @@ export default function App() {
             const totalRevenue = filteredData.reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
             const salesCount = filteredData.length;
             
+            console.log("DEBUG CALCS:", {
+               startDate, endDate,
+               allCheckouts: (checkouts || []).length,
+               filteredData: filteredData.length,
+               totalRevenue,
+               salesCount,
+               activeCampsCount: activeCampsRaw.length,
+               metaCostsCount: metaCosts.length
+            });
+            
             const paymentMap = new Map<string, number>();
             let fallbackCount = 0;
             
@@ -1453,7 +1464,7 @@ export default function App() {
 
 
             // Map para fácil acesso aos cursos
-            const cursosMap = new Map<string, any>(cursos.map((c: any) => [c.id_curso, c]));
+            const cursosMap = new Map<string, any>(cursos.map((c: any) => [String(c.id_curso), c]));
 
             const getCategory = (source: any, medium: any, campaign: any = '', content: any = '') => {
               const src = (source || '').toLowerCase();
@@ -1482,7 +1493,7 @@ export default function App() {
               let content = checkout.utm_content || '';
               const rev = Number(checkout.valor) || 0;
               const cursoId = checkout.id_curso;
-              const curso = cursosMap.get(cursoId);
+              const curso = cursosMap.get(String(cursoId));
               const cursoName = curso ? curso.nome : 'Curso Indefinido';
 
               // Fallback logic: Se não tem rastreio direto, busca no cadastro do usuário
@@ -1592,7 +1603,7 @@ export default function App() {
               dayData.value += (Number(c.valor) || 0);
               dayData.salesCount += 1;
               
-              const curso = cursosMap.get(c.id_curso);
+              const curso = cursosMap.get(String(c.id_curso));
               const cursoName = curso ? curso.nome : 'Curso #' + c.id_curso;
               dayData.products.set(cursoName, (dayData.products.get(cursoName) || 0) + 1);
             });
