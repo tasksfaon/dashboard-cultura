@@ -1155,10 +1155,10 @@ CREATE POLICY "Permitir tudo para todos" ON public.metas_vendas FOR ALL USING (t
               <tr>
                 <th className="px-6 py-3 text-[10px] text-text-muted uppercase font-bold">Produto</th>
                 <th className="px-6 py-3 text-[10px] text-text-muted uppercase font-bold text-center">Meta de Vendas (Mês)</th>
-                <th className="px-6 py-3 text-[10px] text-text-muted uppercase font-bold text-right">Quantidade</th>
-                <th className="px-6 py-3 text-[10px] text-text-muted uppercase font-bold text-right">Comparativo Qtd</th>
-                <th className="px-6 py-3 text-[10px] text-text-muted uppercase font-bold text-right">Faturamento</th>
-                <th className="px-6 py-3 text-[10px] text-text-muted uppercase font-bold text-right">Comparativo R$</th>
+                <th className="px-6 py-3 text-[10px] text-text-muted uppercase font-bold text-center">Quantidade</th>
+                <th className="px-6 py-3 text-[10px] text-text-muted uppercase font-bold text-center">Comparativo Qtd</th>
+                <th className="px-6 py-3 text-[10px] text-text-muted uppercase font-bold text-center">Faturamento</th>
+                <th className="px-6 py-3 text-[10px] text-text-muted uppercase font-bold text-center">Comparativo R$</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -1249,7 +1249,7 @@ CREATE POLICY "Permitir tudo para todos" ON public.metas_vendas FOR ALL USING (t
                                 />
                               </div>
                               {goalRevenue > 0 && (
-                                <div className="text-[9px] font-mono text-zinc-500 text-left -mt-0.5 leading-none mb-0.5">
+                                <div className="text-[9px] font-mono text-zinc-500 text-center -mt-0.5 leading-none mb-0.5">
                                   Equivale a: <span className="text-zinc-300">R$ {goalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                 </div>
                               )}
@@ -1319,12 +1319,12 @@ CREATE POLICY "Permitir tudo para todos" ON public.metas_vendas FOR ALL USING (t
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-xs font-mono text-right text-text-primary">{p.qty}</td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-xs font-mono text-center text-text-primary">{p.qty}</td>
+                    <td className="px-6 py-4 text-center">
                        {formatDiff(qDiff)}
                     </td>
-                    <td className="px-6 py-4 text-xs font-mono text-right text-primary">R$ {p.rev.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-xs font-mono text-center text-primary">R$ {p.rev.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <td className="px-6 py-4 text-center">
                        {formatDiff(rDiff, true)}
                     </td>
                   </tr>
@@ -1343,50 +1343,24 @@ CREATE POLICY "Permitir tudo para todos" ON public.metas_vendas FOR ALL USING (t
 };
 
 const ProductRow: React.FC<{ p: any, isSupabase?: boolean }> = ({ p, isSupabase }) => {
-  const [expanded, setExpanded] = useState(false);
   const roas = p.cost > 0 ? p.rev / p.cost : 0;
   console.log(`Debug ProductRow: Name: ${p.name}, Cost: ${p.cost}, Rev: ${p.rev}, ROAS: ${roas}`);
   return (
-    <React.Fragment>
-      <tr onClick={() => setExpanded(!expanded)} className="hover:bg-bg-card transition-colors cursor-pointer group border-b border-border/50">
-        <td className="p-4 text-[0.875rem] font-normal text-text-secondary max-w-[200px] truncate" title={p.name}>
-          <div className="flex items-center gap-2">
-            <ChevronRight className={`w-3 h-3 shrink-0 text-text-secondary transition-transform ${expanded ? 'rotate-90' : ''}`} />
-            <div className="flex flex-col">
-              <span className="truncate font-medium">{p.name}</span>
-              {!isSupabase && <span className="text-[0.75rem] text-text-muted">Sessões: {p.sessions || 0}</span>}
-            </div>
-          </div>
-        </td>
-        <td className="p-4 text-[0.875rem] font-medium tabular-nums text-right text-text-primary text-text-label">{p.qty}</td>
-        <td className="p-4 text-[0.875rem] font-medium tabular-nums text-right text-text-primary">
-             <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${roas > 3 ? 'bg-primary/10 text-primary' : (roas > 0 ? 'bg-orange-500/10 text-orange-600' : 'bg-gray-500/10 text-text-secondary')}`}>
-               {roas > 0 ? `${roas.toFixed(1)}x` : '0.0x'}
-             </span>
-        </td>
-        <td className="p-4 text-[0.875rem] font-medium tabular-nums text-right text-text-primary text-primary font-semibold">R$ {p.rev.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
-      </tr>
-      {expanded && p.campaigns && p.campaigns.length > 0 && (
-        <tr className="bg-bg-section">
-          <td colSpan={4} className="p-0">
-            <div className="px-4 py-3 border-l-2 border-border ml-4 bg-bg-sidebar">
-              <div className="text-[0.75rem] font-semibold uppercase tracking-[0.05em] text-text-label mb-2 font-medium">Vendas por Campanha/Origem</div>
-              <div className="space-y-2">
-                {p.campaigns.map((c: any, idx: number) => (
-                  <div key={idx} className="flex justify-between items-center text-xs">
-                    <span className="text-text-secondary truncate pr-2 max-w-[180px]" title={c.name}>{c.name}</span>
-                    <div className="flex space-x-4 shrink-0 text-right">
-                      <span className="font-mono text-text-secondary w-8">{c.qty} un</span>
-                      <span className="font-mono text-primary w-20">R$ {c.rev.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </td>
-        </tr>
-      )}
-    </React.Fragment>
+    <tr className="hover:bg-bg-card transition-colors border-b border-border/50">
+      <td className="p-4 text-[0.875rem] font-normal text-text-secondary max-w-[200px] truncate" title={p.name}>
+        <div className="flex flex-col">
+          <span className="truncate font-medium">{p.name}</span>
+          {!isSupabase && <span className="text-[0.75rem] text-text-muted">Sessões: {p.sessions || 0}</span>}
+        </div>
+      </td>
+      <td className="p-4 text-[0.875rem] font-medium tabular-nums text-right text-text-primary text-text-label">{p.qty}</td>
+      <td className="p-4 text-[0.875rem] font-medium tabular-nums text-right text-text-primary">
+           <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${roas > 3 ? 'bg-primary/10 text-primary' : (roas > 0 ? 'bg-orange-500/10 text-orange-600' : 'bg-gray-500/10 text-text-secondary')}`}>
+             {roas > 0 ? `${roas.toFixed(1)}x` : '0.0x'}
+           </span>
+      </td>
+      <td className="p-4 text-[0.875rem] font-medium tabular-nums text-right text-text-primary text-primary font-semibold">R$ {p.rev.toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+    </tr>
   );
 };
 
@@ -1514,10 +1488,23 @@ export default function App() {
   const formatTimeDiff = (startStr: string, endStr: string) => {
     const start = new Date(startStr);
     const end = new Date(endStr);
-    const diffMs = end.getTime() - start.getTime();
+    let diffMs = end.getTime() - start.getTime();
     
-    // Se a data de cadastro é posterior à compra (erro de log), tratamos como instantâneo
-    if (diffMs <= 0) return 'Instantâneo';
+    // Compensação inteligente de fuso horário / dessincronização sistemática de servidores (comumente 1h ou 2h)
+    // que faz com que o webhook de cadastro pareça gravado após a compra (diffMs < 0)
+    if (diffMs < 0) {
+      const test1h = diffMs + (1000 * 60 * 60); // tenta compensar 1 hora
+      const test2h = diffMs + (2 * 1000 * 60 * 60); // tenta compensar 2 horas
+      
+      if (test1h >= -60000) { // Tolerância de até 1 minuto de drift
+        diffMs = Math.max(0, test1h);
+      } else if (test2h >= -60000) {
+        diffMs = Math.max(0, test2h);
+      }
+    }
+    
+    // Considera como instantâneo se a diferença restante for de menos de 2 minutos
+    if (diffMs < 120000) return 'Instantâneo';
     
     const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
     
@@ -1526,11 +1513,17 @@ export default function App() {
         const mins = Math.floor(diffMs / (1000 * 60));
         return `${mins}min`;
       }
-      return `${diffHrs}h`;
+      const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      if (mins === 0) return `${diffHrs}h`;
+      return `${diffHrs}h ${mins}min`;
     } else {
       const days = Math.floor(diffHrs / 24);
       const hrs = diffHrs % 24;
-      return `${days}d ${hrs}h`;
+      const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      let res = `${days}d`;
+      if (hrs > 0) res += ` ${hrs}h`;
+      if (mins > 0 && days < 3) res += ` ${mins}min`; // Evita excesso de texto para datas muito antigas
+      return res;
     }
   };
 
@@ -3915,82 +3908,6 @@ export default function App() {
                 </Card>
              )}
           </div>
-        )}
-
-        {/* MÉTRICAS META ADS (Tabela trafego_meta_cultura) */}
-        {selectedCompanyId === 'cultura' && dataStatus === 'success' && (
-           <Card className="p-0 overflow-hidden mb-6">
-              <div className="p-5 border-b border-border flex items-center justify-between bg-gradient-to-r from-[#111113] to-transparent">
-                  <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-[#DCA61F]" /> Desempenho Meta Ads
-                  </h4>
-                  <span className="text-[10px] text-text-label uppercase tracking-widest text-primary">Trafego_Meta_Cultura</span>
-              </div>
-              <div className="w-full overflow-x-auto scrollbar-hide">
-                  <table className="w-full text-left border-collapse min-w-[1000px]">
-                    <thead className="bg-[#111113] sticky top-0 z-10 bottom-border">
-                      <tr>
-                        <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold border-b border-white/5">Campanha</th>
-                        <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right border-b border-white/5">Investimento</th>
-                        <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right border-b border-white/5">Impressões</th>
-                        <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right border-b border-white/5">Cliques</th>
-                        <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right border-b border-white/5">CTR</th>
-                        <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right border-b border-white/5">CPM</th>
-                        <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right border-b border-white/5">CPC</th>
-                        <th className="p-4 text-[0.75rem] text-[#6366f1] uppercase font-bold text-right border-b border-white/5">Leads</th>
-                        <th className="p-4 text-[0.75rem] text-[#10b981] uppercase font-bold text-right border-b border-white/5">Vendas</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#222225]/50 bg-bg-card/20">
-                      {(channelData.metaAdsCampaigns || []).map((camp: any, i: number) => {
-                         const ctr = camp.impressions > 0 ? (camp.clicks / camp.impressions) * 100 : 0;
-                         const cpm = camp.impressions > 0 ? (camp.cost / camp.impressions) * 1000 : 0;
-                         const cpc = camp.clicks > 0 ? camp.cost / camp.clicks : 0;
-                         
-                         return (
-                           <tr key={i} className="hover:bg-white/5 transition-colors group">
-                               <td className="p-4 text-[0.75rem] font-medium text-text-primary max-w-[280px] break-words whitespace-normal border-r border-[#222225]/30 group-hover:border-transparent">
-                                  {camp.name}
-                               </td>
-                               <td className="p-4 text-[0.75rem] text-right font-mono text-red-400">
-                                  R$ {camp.cost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                               </td>
-                               <td className="p-4 text-[0.75rem] text-right text-text-secondary tabular-nums">
-                                  {camp.impressions.toLocaleString('pt-BR')}
-                               </td>
-                               <td className="p-4 text-[0.75rem] text-right text-text-secondary tabular-nums">
-                                  {camp.clicks.toLocaleString('pt-BR')}
-                               </td>
-                               <td className="p-4 text-[0.75rem] text-right text-text-secondary tabular-nums">
-                                  {ctr.toFixed(2)}%
-                               </td>
-                               <td className="p-4 text-[0.75rem] text-right text-text-secondary tabular-nums">
-                                  R$ {cpm.toFixed(2)}
-                               </td>
-                               <td className="p-4 text-[0.75rem] text-right text-text-secondary tabular-nums border-r border-[#222225]/30 group-hover:border-transparent">
-                                  R$ {cpc.toFixed(2)}
-                               </td>
-                               <td className="p-4 text-[0.75rem] text-right font-bold text-[#818cf8] tabular-nums">
-                                  {camp.leads.toLocaleString('pt-BR')}
-                               </td>
-                               <td className="p-4 text-[0.75rem] text-right font-bold text-[#34d399] tabular-nums">
-                                  {camp.purchases.toLocaleString('pt-BR')}
-                               </td>
-                           </tr>
-                         );
-                      })}
-                      
-                      {(!channelData.metaAdsCampaigns || channelData.metaAdsCampaigns.length === 0) && (
-                         <tr>
-                           <td colSpan={9} className="p-8 text-center text-[#525252] italic text-xs">
-                             Nenhum dado do Meta encontrado para este período.
-                           </td>
-                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-              </div>
-           </Card>
         )}
 
 
