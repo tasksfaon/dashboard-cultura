@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   TrendingUp, Users, DollarSign, Activity, Focus,
   ArrowUpRight, ArrowDownRight, Filter, CalendarDays, Loader2, KeyRound, ChevronDown, ChevronRight, PieChart as PieChartIcon, BarChart2,
-  Zap, Target, ShoppingCart, Award, CreditCard, Clock, AlertCircle, Database, Check, Copy
+  Zap, Target, ShoppingCart, Award, CreditCard, Clock, AlertCircle, Database, Check, Copy, Trash2
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
@@ -852,6 +852,20 @@ const MonthlyClosingSection: React.FC<{ checkouts: any[], costs: any[], cursos: 
 
   const currentStats = calculateStats(selectedMonth.month, selectedMonth.year);
   
+  const totalGoalRevenue = currentStats.products.reduce((acc, p) => {
+    const goalKey = `${monthKey}::${p.name}`;
+    const currentGoal = productGoals[goalKey] || 0;
+    const curso = cursos.find(c => c.nome === p.name);
+    const price = curso ? (Number(curso.preco) || 0) : 0;
+    return acc + (currentGoal * price);
+  }, 0);
+
+  const totalGoalSales = currentStats.products.reduce((acc, p) => {
+    const goalKey = `${monthKey}::${p.name}`;
+    const currentGoal = productGoals[goalKey] || 0;
+    return acc + currentGoal;
+  }, 0);
+  
   // Previous Month for comparison
   const prevDate = new Date(selectedMonth.year, selectedMonth.month - 1, 1);
   const prevStats = calculateStats(prevDate.getMonth(), prevDate.getFullYear());
@@ -1023,27 +1037,91 @@ CREATE POLICY "Permitir tudo para todos" ON public.metas_vendas FOR ALL USING (t
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-border">
         {/* Faturamento */}
-        <div className="p-6 flex flex-col items-center text-center">
-          <p className="text-[10px] text-text-secondary uppercase font-bold tracking-wider mb-2">Faturamento Mensal</p>
-          <div className="flex items-baseline justify-center gap-3 mb-1">
-            <h4 className="text-3xl font-bold text-white">R$ {currentStats.revenue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</h4>
+        <div className="p-6 flex flex-col items-center text-center justify-between min-h-[140px]">
+          <div className="w-full">
+            <p className="text-[10px] text-text-secondary uppercase font-bold tracking-wider mb-2">Faturamento Mensal</p>
+            {totalGoalRevenue > 0 ? (
+              <div className="flex items-center justify-center gap-3 mb-2">
+                <div className="text-right">
+                  <span className="text-[8px] text-text-secondary uppercase block leading-none mb-0.5">Realizado</span>
+                  <span className="text-xl lg:text-2xl font-bold text-white leading-none block">R$ {currentStats.revenue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                </div>
+                <div className="h-7 w-px bg-white/10" />
+                <div className="text-left">
+                  <span className="text-[8px] text-text-secondary uppercase block leading-none mb-0.5">Meta ({Math.min(999, (currentStats.revenue / totalGoalRevenue) * 100).toFixed(0)}%)</span>
+                  <span className="text-sm lg:text-base font-bold text-primary leading-none block">R$ {totalGoalRevenue.toLocaleString('pt-BR', {maximumFractionDigits: 0})}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-baseline justify-center gap-3 mb-1">
+                <h4 className="text-3xl font-bold text-white">R$ {currentStats.revenue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</h4>
+              </div>
+            )}
+            <div className="flex items-center justify-center gap-2">
+              {formatDiff(revDiff, true)}
+              <span className="text-[10px] text-[#52525B]">vs mês anterior</span>
+            </div>
           </div>
-          <div className="flex items-center justify-center gap-2">
-            {formatDiff(revDiff, true)}
-            <span className="text-[10px] text-[#52525B]">vs mês anterior</span>
-          </div>
+          {totalGoalRevenue > 0 && (
+            <div className="mt-3 pt-2 w-full max-w-[200px] flex flex-col gap-1 items-center">
+              <div className="flex items-center justify-between text-[9px] font-mono w-full text-zinc-550">
+                <span className="text-zinc-500 font-medium">Meta R$: R$ {totalGoalRevenue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
+                <span className="text-primary font-bold">
+                  {Math.min(100, (currentStats.revenue / totalGoalRevenue) * 100).toFixed(0)}%
+                </span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-zinc-950 overflow-hidden relative border border-zinc-900 shadow-inner">
+                <div 
+                  style={{ width: `${Math.min(100, (currentStats.revenue / totalGoalRevenue) * 100)}%` }}
+                  className="h-full bg-gradient-to-r from-[#DCA61F] to-[#E9C364] rounded-full transition-all duration-500 shadow-[0_0_4px_rgba(220,166,31,0.2)]"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Vendas */}
-        <div className="p-6 flex flex-col items-center text-center">
-          <p className="text-[10px] text-text-secondary uppercase font-bold tracking-wider mb-2">Quantidade de Vendas</p>
-          <div className="flex items-baseline justify-center gap-3 mb-1">
-            <h4 className="text-3xl font-bold text-white">{currentStats.sales} <span className="text-sm font-normal text-text-muted">transações</span></h4>
+        <div className="p-6 flex flex-col items-center text-center justify-between min-h-[140px]">
+          <div className="w-full">
+            <p className="text-[10px] text-text-secondary uppercase font-bold tracking-wider mb-2">Quantidade de Vendas</p>
+            {totalGoalSales > 0 ? (
+              <div className="flex items-center justify-center gap-3 mb-2">
+                <div className="text-right">
+                  <span className="text-[8px] text-text-secondary uppercase block leading-none mb-0.5">Realizado</span>
+                  <span className="text-xl lg:text-2xl font-bold text-white leading-none block">{currentStats.sales} <span className="text-xs font-normal text-text-muted">vnds</span></span>
+                </div>
+                <div className="h-7 w-px bg-white/10" />
+                <div className="text-left">
+                  <span className="text-[8px] text-text-secondary uppercase block leading-none mb-0.5">Meta ({Math.min(999, (currentStats.sales / totalGoalSales) * 100).toFixed(0)}%)</span>
+                  <span className="text-sm lg:text-base font-bold text-primary leading-none block">{totalGoalSales} <span className="text-[10px] font-normal text-primary/70">vnds</span></span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-baseline justify-center gap-3 mb-1">
+                <h4 className="text-3xl font-bold text-white">{currentStats.sales} <span className="text-sm font-normal text-text-muted">transações</span></h4>
+              </div>
+            )}
+            <div className="flex items-center justify-center gap-2">
+              {formatDiff(salesDiff)}
+              <span className="text-[10px] text-[#52525B]">vs mês anterior</span>
+            </div>
           </div>
-          <div className="flex items-center justify-center gap-2">
-            {formatDiff(salesDiff)}
-            <span className="text-[10px] text-[#52525B]">vs mês anterior</span>
-          </div>
+          {totalGoalSales > 0 && (
+            <div className="mt-3 pt-2 w-full max-w-[200px] flex flex-col gap-1 items-center">
+              <div className="flex items-center justify-between text-[9px] font-mono w-full text-zinc-550">
+                <span className="text-zinc-500 font-medium">Meta Qtd: {totalGoalSales} vendas</span>
+                <span className="text-primary font-bold">
+                  {Math.min(100, (currentStats.sales / totalGoalSales) * 100).toFixed(0)}%
+                </span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-zinc-950 overflow-hidden relative border border-zinc-900 shadow-inner">
+                <div 
+                  style={{ width: `${Math.min(100, (currentStats.sales / totalGoalSales) * 100)}%` }}
+                  className="h-full bg-gradient-to-r from-[#DCA61F] to-[#E9C364] rounded-full transition-all duration-500 shadow-[0_0_4px_rgba(220,166,31,0.2)]"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Investimento */}
@@ -1157,6 +1235,9 @@ CREATE POLICY "Permitir tudo para todos" ON public.metas_vendas FOR ALL USING (t
                         (() => {
                           const pct = Math.min(100, (p.qty / currentGoal) * 100);
                           const isFinished = p.qty >= currentGoal;
+                          const curso = cursos.find(c => c.nome === p.name);
+                          const unitPrice = curso ? (Number(curso.preco) || 0) : 0;
+                          const goalRevenue = currentGoal * unitPrice;
                           return (
                             <div className="flex flex-col gap-1 mx-auto max-w-[170px]">
                               <div className="flex items-center justify-between text-[10px] font-mono">
@@ -1175,6 +1256,11 @@ CREATE POLICY "Permitir tudo para todos" ON public.metas_vendas FOR ALL USING (t
                                   }`}
                                 />
                               </div>
+                              {goalRevenue > 0 && (
+                                <div className="text-[9px] font-mono text-zinc-500 text-left -mt-0.5 leading-none mb-0.5">
+                                  Equivale a: <span className="text-zinc-300">R$ {goalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                </div>
+                              )}
                               <div className="flex items-center justify-between text-[9px] text-[#A1A1AA] mt-0.5 select-none leading-none">
                                 <span className={isFinished ? "text-emerald-400 font-semibold" : "text-zinc-500"}>
                                   {isFinished ? 'Meta batida! 🎉' : `Falta ${currentGoal - p.qty}`}
@@ -1196,9 +1282,11 @@ CREATE POLICY "Permitir tudo para todos" ON public.metas_vendas FOR ALL USING (t
                                         deleteGoal(p.name);
                                       }
                                     }}
-                                    className="text-[#71717A] hover:text-red-450 transition-colors"
+                                    className="text-[#71717A] hover:text-red-400 transition-colors flex items-center gap-1"
+                                    title="Excluir Meta"
                                   >
-                                    Limpar
+                                    <Trash2 className="w-3 h-3" />
+                                    Excluir
                                   </button>
                                 </div>
                               </div>
