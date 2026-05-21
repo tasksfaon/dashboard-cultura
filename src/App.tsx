@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   TrendingUp, Users, DollarSign, Activity, Focus,
   ArrowUpRight, ArrowDownRight, Filter, CalendarDays, Loader2, KeyRound, ChevronDown, ChevronRight, PieChart as PieChartIcon, BarChart2,
-  Zap, Target, ShoppingCart, Award, CreditCard, Clock, AlertCircle
+  Zap, Target, ShoppingCart, Award, CreditCard, Clock, AlertCircle, Database, Check, Copy
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
@@ -664,6 +664,13 @@ const Card = ({ children, className = '', ...props }: React.HTMLAttributes<HTMLD
 
 const MonthlyClosingSection: React.FC<{ checkouts: any[], costs: any[], cursos: any[] }> = ({ checkouts, costs, cursos }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [productGoals, setProductGoals] = useState<Record<string, number>>({});
+  const [dbStatus, setDbStatus] = useState<'loading' | 'synced' | 'local_fallback' | 'error'>('loading');
+  const [showSqlInfo, setShowSqlInfo] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const [editingProduct, setEditingProduct] = useState<string | null>(null);
+  const [editingValue, setEditingValue] = useState<number | string>('');
   
   const getMonths = () => {
     const months = [];
@@ -681,6 +688,124 @@ const MonthlyClosingSection: React.FC<{ checkouts: any[], costs: any[], cursos: 
 
   const monthsList = getMonths();
   const selectedMonth = monthsList[currentIndex];
+  const monthKey = `${selectedMonth.year}-${String(selectedMonth.month + 1).padStart(2, '0')}`;
+
+  const loadLocalFallback = () => {
+    const saved = localStorage.getItem('cultura-monthly-product-goals');
+    if (saved) {
+      try {
+        setProductGoals(JSON.parse(saved));
+        return;
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    // Default goals for May 2026 as starting placeholders
+    setProductGoals({
+      '2026-05::Academia Jurídica': 30,
+      '2026-05::Clube do Advogado': 15,
+    });
+  };
+
+  useEffect(() => {
+    const fetchDbGoals = async () => {
+      try {
+        if (!supabase) {
+          setDbStatus('local_fallback');
+          loadLocalFallback();
+          return;
+        }
+
+        setDbStatus('loading');
+        const { data, error } = await supabase
+          .from('metas_vendas')
+          .select('month_key, product_name, goal_value');
+
+        if (error) {
+          console.warn('Tabela metas_vendas não encontrada. Usando modo local.', error);
+          setDbStatus('local_fallback');
+          loadLocalFallback();
+          return;
+        }
+
+        if (data) {
+          const goalsObj: Record<string, number> = {};
+          data.forEach((row: any) => {
+            goalsObj[`${row.month_key}::${row.product_name}`] = row.goal_value;
+          });
+          setProductGoals(goalsObj);
+          setDbStatus('synced');
+        } else {
+          loadLocalFallback();
+          setDbStatus('synced');
+        }
+      } catch (err) {
+        console.error('Erro de conexão ao carregar metas:', err);
+        setDbStatus('local_fallback');
+        loadLocalFallback();
+      }
+    };
+
+    fetchDbGoals();
+  }, []);
+
+  const updateGoal = async (productName: string, value: number) => {
+    const key = `${monthKey}::${productName}`;
+    const updated = { ...productGoals, [key]: value };
+    setProductGoals(updated);
+    localStorage.setItem('cultura-monthly-product-goals', JSON.stringify(updated));
+
+    if (supabase && dbStatus !== 'local_fallback') {
+      try {
+        const { error } = await supabase
+          .from('metas_vendas')
+          .upsert({
+            month_key: monthKey,
+            product_name: productName,
+            goal_value: value
+          }, {
+            onConflict: 'month_key,product_name'
+          });
+
+        if (error) {
+          console.error('Erro ao salvar meta no banco:', error);
+          setDbStatus('local_fallback'); // Show integration help
+        } else {
+          setDbStatus('synced');
+        }
+      } catch (e) {
+        console.error('Falha de conexão com o banco:', e);
+        setDbStatus('local_fallback');
+      }
+    }
+  };
+
+  const deleteGoal = async (productName: string) => {
+    const key = `${monthKey}::${productName}`;
+    const updated = { ...productGoals };
+    delete updated[key];
+    setProductGoals(updated);
+    localStorage.setItem('cultura-monthly-product-goals', JSON.stringify(updated));
+
+    if (supabase && dbStatus !== 'local_fallback') {
+      try {
+        const { error } = await supabase
+          .from('metas_vendas')
+          .delete()
+          .match({ month_key: monthKey, product_name: productName });
+
+        if (error) {
+          console.error('Erro ao deletar meta no banco:', error);
+          setDbStatus('local_fallback');
+        } else {
+          setDbStatus('synced');
+        }
+      } catch (e) {
+        console.error('Falha de rede para deletar:', e);
+        setDbStatus('local_fallback');
+      }
+    }
+  };
 
   const calculateStats = (month: number, year: number) => {
     // Definimos início e fim do mês em BRT (UTC-3)
@@ -702,6 +827,14 @@ const MonthlyClosingSection: React.FC<{ checkouts: any[], costs: any[], cursos: 
     const cost = filteredCosts.reduce((acc, curr) => acc + curr.cost, 0);
 
     const productMap = new Map();
+    
+    // Seed all database courses with 0 default sales to allow goal tracking for any of them
+    if (cursos && cursos.length > 0) {
+      cursos.forEach(cur => {
+        productMap.set(cur.nome, { name: cur.nome, qty: 0, rev: 0 });
+      });
+    }
+
     filteredCheckouts.forEach(c => {
       const curso = cursos.find(cur => cur.id_curso === c.id_curso);
       const name = curso ? curso.nome : 'Produto #' + c.id_curso;
@@ -754,17 +887,40 @@ const MonthlyClosingSection: React.FC<{ checkouts: any[], costs: any[], cursos: 
   
   return (
     <Card className="p-0 border-primary/30 bg-black/40 backdrop-blur-sm overflow-hidden">
-      <div className="p-6 border-b border-border flex items-center justify-between">
+      <div className="p-6 border-b border-border flex flex-col md:flex-row gap-4 md:items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded bg-primary/10 text-primary">
+          <div className="p-2 rounded bg-primary/10 text-primary self-start">
             <CalendarDays className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-xl font-serif font-bold italic text-white capitalize">{selectedMonth.label}</h3>
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <h3 className="text-xl font-serif font-bold italic text-white capitalize">{selectedMonth.label}</h3>
+              {dbStatus === 'synced' && (
+                <span className="inline-flex items-center gap-1 text-[9px] bg-emerald-500/10 text-emerald-400 font-mono px-1.5 py-0.5 rounded border border-emerald-500/20" title="Metas salvas em tempo real no Supabase">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <Database className="w-2.5 h-2.5" /> Nuvem Ativa
+                </span>
+              )}
+              {dbStatus === 'loading' && (
+                <span className="inline-flex items-center gap-1 text-[9px] bg-zinc-500/10 text-zinc-400 font-mono px-1.5 py-0.5 rounded border border-zinc-500/15">
+                  <Loader2 className="w-2.5 h-2.5 animate-spin" /> Conectando...
+                </span>
+              )}
+              {dbStatus === 'local_fallback' && (
+                <button 
+                  onClick={() => setShowSqlInfo(!showSqlInfo)}
+                  className="inline-flex items-center gap-1 text-[9px] bg-amber-500/10 text-amber-450 hover:bg-amber-500/20 font-mono px-1.5 py-0.5 rounded border border-amber-500/25 transition-all text-left" 
+                  title="Metas salvas apenas localmente no navegador. Clique para ver instruções do banco de dados."
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                  <Database className="w-2.5 h-2.5" /> Modo Local (Ativar Banco ⚡)
+                </button>
+              )}
+            </div>
             <p className="text-[10px] text-text-secondary uppercase tracking-widest mt-1">Fechamento do Mês</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 self-end md:self-auto">
           <button 
             disabled={currentIndex === monthsList.length - 1}
             onClick={() => setCurrentIndex(prev => prev + 1)}
@@ -786,6 +942,84 @@ const MonthlyClosingSection: React.FC<{ checkouts: any[], costs: any[], cursos: 
           </button>
         </div>
       </div>
+
+      {/* Alerta de Persistência em Banco Supabase */}
+      {dbStatus === 'local_fallback' && (
+        <div className="mx-6 mt-4 p-4 rounded bg-amber-500/5 border border-amber-500/15 flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+            <div className="flex gap-2.5">
+              <Database className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+              <div>
+                <h4 className="text-xs font-bold text-amber-400 font-sans">Persistência em Nuvem Desativada (Salvo no Navegador)</h4>
+                <p className="text-[11px] text-zinc-400 leading-relaxed mt-0.5">
+                  As metas atuais estão salvas localmente no seu dispositivo. Para gravá-las no banco de dados do <strong>Supabase</strong> para que todos os membros da sua equipe vejam as mesmas metas, execute o seguinte comando no SQL Editor do seu Supabase.
+                </p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setShowSqlInfo(!showSqlInfo)}
+              className="text-xs font-semibold text-primary hover:text-amber-300 transition-colors shrink-0 whitespace-nowrap self-end sm:self-auto"
+            >
+              {showSqlInfo ? "Ocultar Código" : "Ver Código SQL ↓"}
+            </button>
+          </div>
+
+          {(showSqlInfo || !localStorage.getItem('cultura-monthly-product-goals-setup-dismissed')) && (
+            <div className="mt-1 text-left bg-zinc-950 border border-zinc-900 rounded p-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">Passo Único: SQL Editor do Supabase</span>
+                <button
+                  onClick={() => {
+                    const sql = `CREATE TABLE public.metas_vendas (
+  month_key TEXT NOT NULL,
+  product_name TEXT NOT NULL,
+  goal_value INTEGER NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  PRIMARY KEY (month_key, product_name)
+);
+
+-- Configura permissões simples para gravação imediata
+ALTER TABLE public.metas_vendas ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Permitir tudo para todos" ON public.metas_vendas FOR ALL USING (true) WITH CHECK (true);`;
+                    navigator.clipboard.writeText(sql);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  className="inline-flex items-center gap-1.5 text-[10px] bg-primary/10 hover:bg-primary/20 text-primary font-mono px-2 py-1 rounded transition-colors self-start sm:self-auto"
+                >
+                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-400 animate-bounce" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? "Copiado!" : "Copiar Script SQL"}
+                </button>
+              </div>
+              <pre className="text-[10px] font-mono text-zinc-300 p-2 bg-black/60 rounded border border-zinc-900 overflow-x-auto select-all leading-relaxed whitespace-pre font-normal scrollbar-hide">
+{`CREATE TABLE public.metas_vendas (
+  month_key TEXT NOT NULL,
+  product_name TEXT NOT NULL,
+  goal_value INTEGER NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  PRIMARY KEY (month_key, product_name)
+);
+
+-- Permissões básicas para gravação
+ALTER TABLE public.metas_vendas ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Permitir tudo para todos" ON public.metas_vendas FOR ALL USING (true) WITH CHECK (true);`}
+              </pre>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-3 text-[10px] text-zinc-500 leading-normal">
+                <span>Após rodar o script SQL no painel Supabase, basta atualizar esta página para sincronizar de forma nativa.</span>
+                <button 
+                  onClick={() => {
+                    localStorage.setItem('cultura-monthly-product-goals-setup-dismissed', 'true');
+                    setShowSqlInfo(false);
+                  }} 
+                  className="hover:text-white underline text-zinc-400 font-medium self-end sm:self-auto"
+                >
+                  Dispensar este aviso
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-border">
         {/* Faturamento */}
@@ -850,6 +1084,7 @@ const MonthlyClosingSection: React.FC<{ checkouts: any[], costs: any[], cursos: 
             <thead className="bg-white/5">
               <tr>
                 <th className="px-6 py-3 text-[10px] text-text-muted uppercase font-bold">Produto</th>
+                <th className="px-6 py-3 text-[10px] text-text-muted uppercase font-bold text-center">Meta de Vendas (Mês)</th>
                 <th className="px-6 py-3 text-[10px] text-text-muted uppercase font-bold text-right">Quantidade</th>
                 <th className="px-6 py-3 text-[10px] text-text-muted uppercase font-bold text-right">Comparativo Qtd</th>
                 <th className="px-6 py-3 text-[10px] text-text-muted uppercase font-bold text-right">Faturamento</th>
@@ -862,10 +1097,127 @@ const MonthlyClosingSection: React.FC<{ checkouts: any[], costs: any[], cursos: 
                 const qDiff = getDiff(p.qty, prevP.qty);
                 const rDiff = getDiff(p.rev, prevP.rev);
                 
+                const goalKey = `${monthKey}::${p.name}`;
+                const currentGoal = productGoals[goalKey] || 0;
+                const isEditing = editingProduct === p.name;
+
                 return (
                   <tr key={i} className="hover:bg-white/5 transition-colors">
                     <td className="px-6 py-4">
                       <span className="text-sm font-serif font-normal italic text-white truncate max-w-[250px] tracking-wide" title={p.name}>{p.name}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      {isEditing ? (
+                        <div className="flex items-center gap-1.5 justify-center">
+                          <input
+                            type="number"
+                            min={1}
+                            autoFocus
+                            value={editingValue}
+                            onChange={e => setEditingValue(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                const val = Number(editingValue);
+                                if (val > 0) {
+                                  updateGoal(p.name, val);
+                                } else {
+                                  deleteGoal(p.name);
+                                }
+                                setEditingProduct(null);
+                              } else if (e.key === 'Escape') {
+                                setEditingProduct(null);
+                              }
+                            }}
+                            className="w-14 bg-zinc-900 border border-primary/55 rounded px-2 py-1 text-xs text-zinc-100 font-mono text-center focus:outline-none focus:border-primary shadow-inner"
+                          />
+                          <button
+                            onClick={() => {
+                              const val = Number(editingValue);
+                              if (val > 0) {
+                                updateGoal(p.name, val);
+                              } else {
+                                deleteGoal(p.name);
+                              }
+                              setEditingProduct(null);
+                            }}
+                            className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20 transition-all font-mono"
+                            title="Salvar"
+                          >
+                            ✓
+                          </button>
+                          <button
+                            onClick={() => setEditingProduct(null)}
+                            className="text-[10px] font-bold text-red-400 hover:text-red-300 bg-red-500/10 px-2 py-1 rounded border border-red-500/20 transition-all font-mono"
+                            title="Cancelar"
+                          >
+                            ✗
+                          </button>
+                        </div>
+                      ) : currentGoal > 0 ? (
+                        (() => {
+                          const pct = Math.min(100, (p.qty / currentGoal) * 100);
+                          const isFinished = p.qty >= currentGoal;
+                          return (
+                            <div className="flex flex-col gap-1 mx-auto max-w-[170px]">
+                              <div className="flex items-center justify-between text-[10px] font-mono">
+                                <span className="text-zinc-400 text-xs font-semibold">{p.qty} / {currentGoal} vendas</span>
+                                <span className={isFinished ? "text-emerald-400 font-bold" : "text-primary font-bold"}>
+                                  {pct.toFixed(0)}%
+                                </span>
+                              </div>
+                              <div className="w-full h-1.5 rounded-full bg-zinc-950/80 border border-zinc-900 overflow-hidden relative shadow-inner">
+                                <div
+                                  style={{ width: `${pct}%` }}
+                                  className={`h-full rounded-full transition-all duration-500 ${
+                                    isFinished 
+                                      ? 'bg-gradient-to-r from-emerald-500 to-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.3)]' 
+                                      : 'bg-gradient-to-r from-[#DCA61F] to-[#E9C364] shadow-[0_0_6px_rgba(220,166,31,0.2)]'
+                                  }`}
+                                />
+                              </div>
+                              <div className="flex items-center justify-between text-[9px] text-[#A1A1AA] mt-0.5 select-none leading-none">
+                                <span className={isFinished ? "text-emerald-400 font-semibold" : "text-zinc-500"}>
+                                  {isFinished ? 'Meta batida! 🎉' : `Falta ${currentGoal - p.qty}`}
+                                </span>
+                                <div className="flex items-center gap-1.5 ml-2">
+                                  <button
+                                    onClick={() => {
+                                      setEditingProduct(p.name);
+                                      setEditingValue(currentGoal);
+                                    }}
+                                    className="text-[#71717A] hover:text-white transition-colors underline font-medium"
+                                  >
+                                    Editar
+                                  </button>
+                                  <span>•</span>
+                                  <button
+                                    onClick={() => {
+                                      if (confirm(`Tem certeza que deseja remover a meta para o produto "${p.name}" neste mês?`)) {
+                                        deleteGoal(p.name);
+                                      }
+                                    }}
+                                    className="text-[#71717A] hover:text-red-450 transition-colors"
+                                  >
+                                    Limpar
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <div className="text-center">
+                          <button
+                            onClick={() => {
+                              setEditingProduct(p.name);
+                              setEditingValue(10);
+                            }}
+                            className="inline-flex items-center gap-1.5 text-[10px] font-bold text-primary bg-primary/5 hover:bg-primary/20 border border-primary/20 px-2 py-1 rounded transition-all tracking-wider uppercase"
+                          >
+                            <Target className="w-3 h-3 text-primary animate-pulse" /> Definir Meta
+                          </button>
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-xs font-mono text-right text-text-primary">{p.qty}</td>
                     <td className="px-6 py-4 text-right">
@@ -879,7 +1231,7 @@ const MonthlyClosingSection: React.FC<{ checkouts: any[], costs: any[], cursos: 
                 );
               }) : (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-[#525252] italic text-xs">Sem dados para este período.</td>
+                  <td colSpan={6} className="px-6 py-8 text-center text-[#525252] italic text-xs">Sem dados para este período.</td>
                 </tr>
               )}
             </tbody>
@@ -2604,6 +2956,8 @@ export default function App() {
             </div>
           </div>
         )}
+
+
 
         {dataStatus === 'success' && channelData.trendData && channelData.trendData.length > 0 && (
           <Card className="mb-8 p-6 bg-gradient-to-br from-[#111113] to-[#0A0A0A]">
