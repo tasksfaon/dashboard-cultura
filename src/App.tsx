@@ -348,7 +348,7 @@ const ActiveCampaignsTree: React.FC<{ data: any[], metaCosts?: any[], checkouts?
     <div className="space-y-6">
       {categories.map((cat, catIdx) => {
         const catKey = `cat-${cat.id}`;
-        const isCatExpanded = expandedKeys[catKey] !== false;
+        const isCatExpanded = !!expandedKeys[catKey];
 
         return (
           <Card key={catIdx} className="overflow-hidden border border-zinc-800 bg-zinc-950/60 p-0 shadow-xl animate-fade-in">
@@ -477,16 +477,7 @@ const ActiveCampaignsTree: React.FC<{ data: any[], metaCosts?: any[], checkouts?
                                             </span>
                                             {renderMetricsBlock(cat.id, ad.stats)}
                                             
-                                            {ad.creativeUrl && (
-                                              <a 
-                                                href={ad.creativeUrl} 
-                                                target="_blank" 
-                                                rel="noopener noreferrer" 
-                                                className="text-[10px] text-primary hover:text-primary-light hover:underline mt-2.5 inline-flex items-center gap-1.5 font-mono border border-primary/20 hover:border-primary/40 bg-primary/5 px-2.5 py-1 rounded transition-all"
-                                              >
-                                                <Zap className="w-3.5 h-3.5" /> Ver criativo completo
-                                              </a>
-                                            )}
+
                                           </div>
                                         </div>
                                       ))}
@@ -671,6 +662,7 @@ const MonthlyClosingSection: React.FC<{ checkouts: any[], costs: any[], cursos: 
 
   const [editingProduct, setEditingProduct] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState<number | string>('');
+  const [deletingProduct, setDeletingProduct] = useState<string | null>(null);
   
   const getMonths = () => {
     const months = [];
@@ -1037,39 +1029,39 @@ CREATE POLICY "Permitir tudo para todos" ON public.metas_vendas FOR ALL USING (t
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-border">
         {/* Faturamento */}
-        <div className="p-6 flex flex-col items-center text-center justify-between min-h-[140px]">
+        <div className="p-6 flex flex-col items-center text-center justify-between min-h-[145px] hover:bg-white/[0.01] transition-colors duration-200">
           <div className="w-full">
-            <p className="text-[10px] text-text-secondary uppercase font-bold tracking-wider mb-2">Faturamento Mensal</p>
-            {totalGoalRevenue > 0 ? (
-              <div className="flex items-center justify-center gap-3 mb-2">
-                <div className="text-right">
-                  <span className="text-[8px] text-text-secondary uppercase block leading-none mb-0.5">Realizado</span>
-                  <span className="text-xl lg:text-2xl font-bold text-white leading-none block">R$ {currentStats.revenue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                </div>
-                <div className="h-7 w-px bg-white/10" />
-                <div className="text-left">
-                  <span className="text-[8px] text-text-secondary uppercase block leading-none mb-0.5">Meta ({Math.min(999, (currentStats.revenue / totalGoalRevenue) * 100).toFixed(0)}%)</span>
-                  <span className="text-sm lg:text-base font-bold text-primary leading-none block">R$ {totalGoalRevenue.toLocaleString('pt-BR', {maximumFractionDigits: 0})}</span>
-                </div>
+            <p className="text-[10px] text-text-secondary uppercase font-bold tracking-wider mb-3">Faturamento Mensal</p>
+            
+            <div className="flex flex-col items-center gap-2 mb-2">
+              {/* Realizado Header & Value */}
+              <div className="text-center">
+                <span className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold block mb-0.5">Realizado</span>
+                <span className="text-3xl font-extrabold text-white tracking-tight leading-none block">
+                  R$ {currentStats.revenue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                </span>
               </div>
-            ) : (
-              <div className="flex items-baseline justify-center gap-3 mb-1">
-                <h4 className="text-3xl font-bold text-white">R$ {currentStats.revenue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</h4>
-              </div>
-            )}
+
+              {/* Meta & Percentage Row */}
+              {totalGoalRevenue > 0 && (
+                <div className="inline-flex items-center gap-2 bg-white/[0.04] border border-white/[0.08] rounded-full px-3 py-1 mt-1 text-[11px] text-zinc-300">
+                  <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wide">Meta:</span>
+                  <span className="font-bold text-primary">R$ {totalGoalRevenue.toLocaleString('pt-BR', {maximumFractionDigits: 0})}</span>
+                  <span className="text-zinc-600">•</span>
+                  <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-400 text-[10px] font-mono font-bold rounded">
+                    {((currentStats.revenue / totalGoalRevenue) * 100).toFixed(0)}% atingido
+                  </span>
+                </div>
+              )}
+            </div>
+
             <div className="flex items-center justify-center gap-2">
               {formatDiff(revDiff, true)}
               <span className="text-[10px] text-[#52525B]">vs mês anterior</span>
             </div>
           </div>
           {totalGoalRevenue > 0 && (
-            <div className="mt-3 pt-2 w-full max-w-[200px] flex flex-col gap-1 items-center">
-              <div className="flex items-center justify-between text-[9px] font-mono w-full text-zinc-550">
-                <span className="text-zinc-500 font-medium">Meta R$: R$ {totalGoalRevenue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
-                <span className="text-primary font-bold">
-                  {Math.min(100, (currentStats.revenue / totalGoalRevenue) * 100).toFixed(0)}%
-                </span>
-              </div>
+            <div className="mt-4 w-full max-w-[220px] flex flex-col gap-1 items-center">
               <div className="w-full h-1.5 rounded-full bg-zinc-950 overflow-hidden relative border border-zinc-900 shadow-inner">
                 <div 
                   style={{ width: `${Math.min(100, (currentStats.revenue / totalGoalRevenue) * 100)}%` }}
@@ -1081,39 +1073,39 @@ CREATE POLICY "Permitir tudo para todos" ON public.metas_vendas FOR ALL USING (t
         </div>
 
         {/* Vendas */}
-        <div className="p-6 flex flex-col items-center text-center justify-between min-h-[140px]">
+        <div className="p-6 flex flex-col items-center text-center justify-between min-h-[145px] hover:bg-white/[0.01] transition-colors duration-200">
           <div className="w-full">
-            <p className="text-[10px] text-text-secondary uppercase font-bold tracking-wider mb-2">Quantidade de Vendas</p>
-            {totalGoalSales > 0 ? (
-              <div className="flex items-center justify-center gap-3 mb-2">
-                <div className="text-right">
-                  <span className="text-[8px] text-text-secondary uppercase block leading-none mb-0.5">Realizado</span>
-                  <span className="text-xl lg:text-2xl font-bold text-white leading-none block">{currentStats.sales} <span className="text-xs font-normal text-text-muted">vnds</span></span>
-                </div>
-                <div className="h-7 w-px bg-white/10" />
-                <div className="text-left">
-                  <span className="text-[8px] text-text-secondary uppercase block leading-none mb-0.5">Meta ({Math.min(999, (currentStats.sales / totalGoalSales) * 100).toFixed(0)}%)</span>
-                  <span className="text-sm lg:text-base font-bold text-primary leading-none block">{totalGoalSales} <span className="text-[10px] font-normal text-primary/70">vnds</span></span>
-                </div>
+            <p className="text-[10px] text-text-secondary uppercase font-bold tracking-wider mb-3">Quantidade de Vendas</p>
+            
+            <div className="flex flex-col items-center gap-2 mb-2">
+              {/* Realizado Header & Value */}
+              <div className="text-center">
+                <span className="text-[9px] text-zinc-500 uppercase tracking-wider font-semibold block mb-0.5">Realizado</span>
+                <span className="text-3xl font-extrabold text-white tracking-tight leading-none block">
+                  {currentStats.sales} <span className="text-sm font-normal text-zinc-400 font-sans">vendas</span>
+                </span>
               </div>
-            ) : (
-              <div className="flex items-baseline justify-center gap-3 mb-1">
-                <h4 className="text-3xl font-bold text-white">{currentStats.sales} <span className="text-sm font-normal text-text-muted">transações</span></h4>
-              </div>
-            )}
+
+              {/* Meta & Percentage Row */}
+              {totalGoalSales > 0 && (
+                <div className="inline-flex items-center gap-2 bg-white/[0.04] border border-white/[0.08] rounded-full px-3 py-1 mt-1 text-[11px] text-zinc-300">
+                  <span className="text-[10px] text-zinc-500 uppercase font-bold tracking-wide">Meta:</span>
+                  <span className="font-bold text-primary">{totalGoalSales} <span className="text-[11px] font-normal text-primary/80">vendas</span></span>
+                  <span className="text-zinc-600">•</span>
+                  <span className="px-1.5 py-0.5 bg-emerald-500/10 text-emerald-400 text-[10px] font-mono font-bold rounded">
+                    {((currentStats.sales / totalGoalSales) * 100).toFixed(0)}% atingido
+                  </span>
+                </div>
+              )}
+            </div>
+
             <div className="flex items-center justify-center gap-2">
               {formatDiff(salesDiff)}
               <span className="text-[10px] text-[#52525B]">vs mês anterior</span>
             </div>
           </div>
           {totalGoalSales > 0 && (
-            <div className="mt-3 pt-2 w-full max-w-[200px] flex flex-col gap-1 items-center">
-              <div className="flex items-center justify-between text-[9px] font-mono w-full text-zinc-550">
-                <span className="text-zinc-500 font-medium">Meta Qtd: {totalGoalSales} vendas</span>
-                <span className="text-primary font-bold">
-                  {Math.min(100, (currentStats.sales / totalGoalSales) * 100).toFixed(0)}%
-                </span>
-              </div>
+            <div className="mt-4 w-full max-w-[220px] flex flex-col gap-1 items-center">
               <div className="w-full h-1.5 rounded-full bg-zinc-950 overflow-hidden relative border border-zinc-900 shadow-inner">
                 <div 
                   style={{ width: `${Math.min(100, (currentStats.sales / totalGoalSales) * 100)}%` }}
@@ -1276,18 +1268,38 @@ CREATE POLICY "Permitir tudo para todos" ON public.metas_vendas FOR ALL USING (t
                                     Editar
                                   </button>
                                   <span>•</span>
-                                  <button
-                                    onClick={() => {
-                                      if (confirm(`Tem certeza que deseja remover a meta para o produto "${p.name}" neste mês?`)) {
-                                        deleteGoal(p.name);
-                                      }
-                                    }}
-                                    className="text-[#71717A] hover:text-red-400 transition-colors flex items-center gap-1"
-                                    title="Excluir Meta"
-                                  >
-                                    <Trash2 className="w-3 h-3" />
-                                    Excluir
-                                  </button>
+                                  {deletingProduct === p.name ? (
+                                    <span className="flex items-center gap-1.5 bg-red-950/40 border border-red-500/20 px-1.5 py-0.5 rounded leading-none transition-all">
+                                      <span className="text-red-400 font-semibold text-[8px] tracking-wide uppercase">Apagar?</span>
+                                      <button
+                                        onClick={() => {
+                                          deleteGoal(p.name);
+                                          setDeletingProduct(null);
+                                        }}
+                                        className="text-[9px] font-bold text-red-500 hover:text-red-400 transition-colors cursor-pointer"
+                                      >
+                                        Sim
+                                      </button>
+                                      <span className="text-[#52525B] text-[8px]">/</span>
+                                      <button
+                                        onClick={() => setDeletingProduct(null)}
+                                        className="text-[9px] font-medium text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                                      >
+                                        Não
+                                      </button>
+                                    </span>
+                                  ) : (
+                                    <button
+                                      onClick={() => {
+                                        setDeletingProduct(p.name);
+                                      }}
+                                      className="text-[#71717A] hover:text-red-400 transition-colors flex items-center gap-1"
+                                      title="Excluir Meta"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                      Excluir
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -1648,6 +1660,30 @@ export default function App() {
               activeCampsRaw = activeCamps || [];
             } catch (e) {
               console.warn("Aviso: Falha ao carregar anuncios_ativos_cultura", e);
+            }
+
+            // Fallback robusto se a tabela estiver vazia
+            if (activeCampsRaw.length === 0 && trafegoMeta && trafegoMeta.length > 0) {
+              console.log("ℹ️ Tabela de anuncios_ativos_cultura está vazia. Gerando campanhas ativas a partir de trafego_meta_cultura...");
+              const seen = new Set();
+              trafegoMeta.forEach(row => {
+                const campaign = row.campaign_name || row.campaign || row.campanha || '';
+                const adset = row.adset_name || row.ad_set_name || row.adset || row.conjunto_anuncio || row.conjunto || '';
+                const ad = row.ad_name || row['ad name'] || row.nome_do_anuncio || row.nome || row.ad || '';
+                if (campaign && adset && ad) {
+                  const key = `${campaign}||${adset}||${ad}`;
+                  if (!seen.has(key)) {
+                    seen.add(key);
+                    activeCampsRaw.push({
+                      campaign_name: campaign,
+                      adset_name: adset,
+                      ad_name: ad,
+                      ad_id: row.ad_id || '',
+                      creative_url: row.creative_url || row.creativeUrl || row.url_criativo || ''
+                    });
+                  }
+                }
+              });
             }
             setSupabaseCampanhasAtivas(activeCampsRaw);
 
