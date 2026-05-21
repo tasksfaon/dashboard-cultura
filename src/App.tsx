@@ -88,7 +88,7 @@ const CampaignGroupTable: React.FC<{ title: string, data: any[], icon: React.Rea
   </Card>
 );
 
-const ActiveCampaignsTree: React.FC<{ data: any[] }> = ({ data }) => {
+const ActiveCampaignsTree: React.FC<{ data: any[], metaCosts?: any[], checkouts?: any[], cursos?: any[] }> = ({ data, metaCosts = [], checkouts = [], cursos = [] }) => {
   const [expandedKeys, setExpandedKeys] = useState<Record<string, boolean>>({});
 
   const toggleKey = (key: string) => {
@@ -99,10 +99,11 @@ const ActiveCampaignsTree: React.FC<{ data: any[] }> = ({ data }) => {
   };
 
   const getGroupedData = (rawRows: any[]) => {
-    const categoriesMap: Record<string, { id: string; title: string; campaigns: Record<string, { name: string; adsets: Record<string, { name: string; ads: { name: string; creativeUrl?: string }[] }> }> }> = {
+    const categoriesMap: Record<string, any> = {
       venda: { id: 'venda', title: 'Campanhas de Venda Ativas', campaigns: {} },
       captacao: { id: 'captacao', title: 'Campanhas de Captação Ativas', campaigns: {} },
-      distribuicao: { id: 'distribuicao', title: 'Campanhas de Distribuição Ativas', campaigns: {} }
+      distribuicao: { id: 'distribuicao', title: 'Campanhas de Distribuição Ativas', campaigns: {} },
+      alcance: { id: 'alcance', title: 'Campanhas de Alcance Ativas', campaigns: {} }
     };
 
     rawRows.forEach(row => {
@@ -110,43 +111,132 @@ const ActiveCampaignsTree: React.FC<{ data: any[] }> = ({ data }) => {
       if (!rawCampName) return;
 
       const campNameUpper = rawCampName.toUpperCase();
-      let categoryKey = '';
+      let categoryKey = 'venda';
 
-      if (campNameUpper.includes('DIST') || campNameUpper.includes('ACE') || campNameUpper.includes('ENG') || campNameUpper.includes('DISTRIBUICAO') || campNameUpper.includes('ALCANCE') || campNameUpper.includes('ENGAJAMENTO')) {
+      if (campNameUpper.includes('DIST') || campNameUpper.includes('DISTRIBUICAO') || campNameUpper.includes('ENG') || campNameUpper.includes('ENGAJAMENTO')) {
         categoryKey = 'distribuicao';
+      } else if (campNameUpper.includes('ACE') || campNameUpper.includes('ALCANCE')) {
+        categoryKey = 'alcance';
       } else if (campNameUpper.includes('CAP') || campNameUpper.includes('CAPTACAO') || campNameUpper.includes('LEAD')) {
         categoryKey = 'captacao';
       } else if (campNameUpper.includes('VEN') || campNameUpper.includes('VENDA') || campNameUpper.includes('PURCHASE') || campNameUpper.includes('CONV')) {
-        categoryKey = 'venda';
-      } else {
         categoryKey = 'venda';
       }
 
       const adsetName = row.adset_name || row.ad_set_name || row.adset || row.conjunto_anuncio || row.conjunto_anuncios || row.conjunto || 'Sem Conjunto de Anúncios';
       const adName = row.ad_name || row.adname || row.ad || row.anuncio || 'Sem Anúncio';
+      const adId = row.ad_id ? String(row.ad_id) : '';
       const creativeUrl = row.creative_url || row.creativeUrl || row.url_criativo || '';
 
       const cat = categoriesMap[categoryKey];
       if (!cat.campaigns[rawCampName]) {
-        cat.campaigns[rawCampName] = {
-          name: rawCampName,
-          adsets: {}
-        };
+        cat.campaigns[rawCampName] = { name: rawCampName, adsets: {}, stats: { spend: 0, purchases: 0, revenue: 0, leads: 0, engagements: 0, impressions: 0, reach: 0, cpmSum: 0, cpmCount: 0 } };
       }
 
       const campaignObj = cat.campaigns[rawCampName];
       if (!campaignObj.adsets[adsetName]) {
-        campaignObj.adsets[adsetName] = {
-          name: adsetName,
-          ads: []
-        };
+        campaignObj.adsets[adsetName] = { name: adsetName, ads: [], stats: { spend: 0, purchases: 0, revenue: 0, leads: 0, engagements: 0, impressions: 0, reach: 0, cpmSum: 0, cpmCount: 0 } };
       }
 
-      // Avoid duplicates with the exact same name and creative_url
       const adsetObj = campaignObj.adsets[adsetName];
-      const exists = adsetObj.ads.some((item: any) => item.name === adName && item.creativeUrl === creativeUrl);
-      if (!exists) {
-        adsetObj.ads.push({ name: adName, creativeUrl });
+      const exists = adsetObj.ads.find((item: any) => item.name === adName && item.creativeUrl === creativeUrl);
+      
+      let adItem = exists;
+      if (!adItem) {
+        adItem = { name: adName, creativeUrl, stats: { spend: 0, purchases: 0, revenue: 0, leads: 0, engagements: 0, impressions: 0, reach: 0, cpmSum: 0, cpmCount: 0 } };
+        adsetObj.ads.push(adItem);
+        
+        // Calculate metrics for this Ad
+        const matchingCosts = metaCosts.filter(m => {
+          if (adId && m.ad_id) {
+            return String(m.ad_id) === adId;
+          }
+          return m.adName === adName || m.ad_name === adName;
+        });
+        matchingCosts.forEach(m => {
+            adItem.stats.spend += m.cost || 0;
+            adItem.stats.purchases += Number(m.purchases) || 0;
+            adItem.stats.leads += Number(m.leads) || 0;
+            adItem.stats.engagements += (Number(m.post_engagement) || 0) + (Number(m.page_engagement) || 0);
+            adItem.stats.impressions += Number(m.impressions) || 0;
+            adItem.stats.reach += Number(m.reach) || 0;
+            if (m.cpm > 0) {
+               adItem.stats.cpmSum += m.cpm;
+               adItem.stats.cpmCount += 1;
+            }
+        });
+        
+        // Match revenue using UTMs
+        const matchingCheckouts = checkouts.filter(c => {
+           const utmCamp = (c.utm_campaign || '').toLowerCase();
+           const utmContent = (c.utm_content || '').toLowerCase();
+           return utmCamp === rawCampName.toLowerCase() && utmContent === adName.toLowerCase();
+        });
+
+        // Determine product price to calculate real revenue and ROAS based on campaign / course name
+        let productPrice = 948; // default fallback (civilistas or penalistas)
+        const combinedText = `${rawCampName} ${adsetName} ${adName}`.toLowerCase();
+        
+        const isCiv = combinedText.includes('civ') || combinedText.includes('civilista');
+        const isPen = combinedText.includes('pen') || combinedText.includes('penalista');
+        const isAca = combinedText.includes('aca') || combinedText.includes('academia');
+        const isAgora = combinedText.includes('agora') || combinedText.includes('ágora');
+        
+        if (cursos && cursos.length > 0) {
+          if (isCiv && isPen) {
+            const match = cursos.find(c => c.id_curso === 10 || (c.nome.toLowerCase().includes('penalistas') && c.nome.toLowerCase().includes('civilistas')));
+            if (match) productPrice = match.preco;
+          } else if (isCiv) {
+            const match = cursos.find(c => c.id_curso === 11 || c.nome.toLowerCase().includes('civilistas'));
+            if (match) productPrice = match.preco;
+          } else if (isPen) {
+            const match = cursos.find(c => c.id_curso === 12 || c.nome.toLowerCase().includes('penalistas'));
+            if (match) productPrice = match.preco;
+          } else if (isAca) {
+            const match = cursos.find(c => c.id_curso === 9 || c.nome.toLowerCase().includes('academia'));
+            if (match) productPrice = match.preco;
+          } else if (isAgora) {
+            const match = cursos.find(c => c.id_curso === 8 || c.nome.toLowerCase().includes('ágora') || c.nome.toLowerCase().includes('agora'));
+            if (match) productPrice = match.preco;
+          }
+        } else {
+          // Hardcoded fallback static values matching Supabase
+          if (isCiv && isPen) productPrice = 1656;
+          else if (isCiv) productPrice = 948;
+          else if (isPen) productPrice = 948;
+          else if (isAca) productPrice = 348;
+          else if (isAgora) productPrice = 900.6;
+        }
+
+        // Calculate revenue dynamically
+        if (adItem.stats.purchases > 0) {
+          adItem.stats.revenue = adItem.stats.purchases * productPrice;
+        } else {
+          const utmRevenue = matchingCheckouts.reduce((acc: number, curr: any) => acc + (Number(curr.valor) || 0), 0);
+          adItem.stats.revenue = utmRevenue;
+        }
+
+        // Rollup to Adset
+        adsetObj.stats.spend += adItem.stats.spend;
+        adsetObj.stats.purchases += adItem.stats.purchases;
+        adsetObj.stats.revenue += adItem.stats.revenue;
+        adsetObj.stats.leads += adItem.stats.leads;
+        adsetObj.stats.engagements += adItem.stats.engagements;
+        adsetObj.stats.impressions += adItem.stats.impressions;
+        adsetObj.stats.reach += adItem.stats.reach;
+        adsetObj.stats.cpmSum += adItem.stats.cpmSum;
+        adsetObj.stats.cpmCount += adItem.stats.cpmCount;
+
+        // Rollup to Campaign
+        campaignObj.stats.spend += adItem.stats.spend;
+        campaignObj.stats.purchases += adItem.stats.purchases;
+        campaignObj.stats.revenue += adItem.stats.revenue;
+        campaignObj.stats.leads += adItem.stats.leads;
+        campaignObj.stats.engagements += adItem.stats.engagements;
+        campaignObj.stats.impressions += adItem.stats.impressions;
+        campaignObj.stats.reach += adItem.stats.reach;
+        campaignObj.stats.cpmSum += adItem.stats.cpmSum;
+        campaignObj.stats.cpmCount += adItem.stats.cpmCount;
       }
     });
 
@@ -155,16 +245,17 @@ const ActiveCampaignsTree: React.FC<{ data: any[] }> = ({ data }) => {
         const campaignsArray = Object.values(cat.campaigns).map((camp: any) => {
           const adsetsArray = Object.values(camp.adsets).map((adset: any) => ({
             name: adset.name,
+            stats: adset.stats,
             ads: adset.ads
           }));
           return {
             name: camp.name,
+            stats: camp.stats,
             adsets: adsetsArray
           };
         });
         return {
-          id: cat.id,
-          title: cat.title,
+          ...cat,
           campaigns: campaignsArray
         };
       })
@@ -184,152 +275,227 @@ const ActiveCampaignsTree: React.FC<{ data: any[] }> = ({ data }) => {
 
   const getCategoryIcon = (id: string) => {
     switch (id) {
-      case 'distribuicao':
-        return <Zap className="w-4 h-4 text-primary" />;
-      case 'captacao':
-        return <Target className="w-4 h-4 text-primary" />;
-      case 'venda':
-        return <Award className="w-4 h-4 text-primary" />;
-      default:
-        return <Activity className="w-4 h-4 text-primary" />;
+      case 'distribuicao': return <Zap className="w-4 h-4 text-primary" />;
+      case 'captacao': return <Target className="w-4 h-4 text-primary" />;
+      case 'venda': return <Award className="w-4 h-4 text-primary" />;
+      case 'alcance': return <Focus className="w-4 h-4 text-primary" />;
+      default: return <Activity className="w-4 h-4 text-primary" />;
+    }
+  };
+
+  const renderMetricsBlock = (catId: string, stats: any) => {
+    const s = stats || {};
+    const money = (val: number) => "R$ " + (val || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    const num = (val: number) => (val || 0).toLocaleString('pt-BR');
+
+    // Estiliza de forma compacta e chamativa cada item de métrica em pílulas com borda e fundo levemente opaco
+    const MetricItem = ({ label, value, colorClass = "text-white", bgClass = "bg-[#161618] border-white/10" }: { label: string, value: string, colorClass?: string, bgClass?: string }) => {
+      return (
+        <div className={`flex items-center gap-1.5 px-3 py-1 rounded-md border text-[10px] font-medium tracking-wide ${bgClass} transition-shadow duration-300 hover:shadow-md`}>
+          <span className="text-[#A1A1AA] uppercase text-[9px] font-semibold">{label}:</span>
+          <span className={`font-mono font-bold ${colorClass}`}>{value}</span>
+        </div>
+      );
+    };
+
+    // Mapeamento de métricas conforme a categoria:
+    if (catId === 'venda') {
+      const cpa = s.purchases > 0 ? s.spend / s.purchases : 0;
+      const roas = s.spend > 0 ? s.revenue / s.spend : 0;
+      return (
+        <div className="flex flex-wrap items-center gap-2 mt-2.5">
+          <MetricItem label="Inv" value={money(s.spend)} colorClass="text-zinc-100" bgClass="bg-zinc-900/70 border-zinc-700/30" />
+          <MetricItem label="Vnd" value={num(s.purchases)} colorClass="text-zinc-100" bgClass="bg-zinc-900/70 border-zinc-700/30" />
+          <MetricItem label="CPA" value={cpa > 0 ? money(cpa) : "R$ 0,00"} colorClass="text-primary-light" bgClass="bg-primary/10 border-primary/20" />
+          <MetricItem label="Fat" value={money(s.revenue)} colorClass="text-emerald-400" bgClass="bg-emerald-950/20 border-emerald-500/20" />
+          <MetricItem label="ROAS" value={roas > 0 ? `${roas.toFixed(2)}x` : "0.00x"} colorClass="text-emerald-400 font-extrabold" bgClass="bg-emerald-950/20 border-emerald-500/20" />
+        </div>
+      );
+    } else if (catId === 'captacao') {
+      const cpl = s.leads > 0 ? s.spend / s.leads : 0;
+      return (
+        <div className="flex flex-wrap items-center gap-2 mt-2.5">
+          <MetricItem label="Inv" value={money(s.spend)} colorClass="text-zinc-100" bgClass="bg-zinc-900/70 border-zinc-700/30" />
+          <MetricItem label="Cadastros" value={num(s.leads)} colorClass="text-zinc-100" bgClass="bg-zinc-900/70 border-zinc-700/30" />
+          <MetricItem label="CPL" value={cpl > 0 ? money(cpl) : "R$ 0,00"} colorClass="text-primary-light" bgClass="bg-primary/10 border-primary/20" />
+        </div>
+      );
+    } else if (catId === 'distribuicao') {
+      const cpe = s.engagements > 0 ? s.spend / s.engagements : 0;
+      return (
+        <div className="flex flex-wrap items-center gap-2 mt-2.5">
+          <MetricItem label="Inv" value={money(s.spend)} colorClass="text-zinc-100" bgClass="bg-zinc-900/70 border-zinc-700/30" />
+          <MetricItem label="Clicks/Engaj" value={num(s.engagements)} colorClass="text-zinc-100" bgClass="bg-zinc-900/70 border-zinc-700/30" />
+          <MetricItem label="CPE" value={cpe > 0 ? money(cpe) : "R$ 0,00"} colorClass="text-primary-light" bgClass="bg-primary/10 border-primary/20" />
+        </div>
+      );
+    } else if (catId === 'alcance') {
+      const cpm = s.cpmCount > 0 ? (s.cpmSum / s.cpmCount) : 0;
+      const freq = s.reach > 0 ? s.impressions / s.reach : 0;
+      return (
+        <div className="flex flex-wrap items-center gap-2 mt-2.5">
+          <MetricItem label="Inv" value={money(s.spend)} colorClass="text-zinc-100" bgClass="bg-zinc-900/70 border-zinc-700/30" />
+          <MetricItem label="Impr" value={num(s.impressions)} colorClass="text-zinc-100" bgClass="bg-zinc-900/70 border-zinc-700/30" />
+          <MetricItem label="Alcance" value={num(s.reach)} colorClass="text-zinc-100" bgClass="bg-zinc-900/70 border-zinc-700/30" />
+          <MetricItem label="Freq" value={freq.toFixed(2)} colorClass="text-primary-light" bgClass="bg-primary/10 border-primary/20" />
+          <MetricItem label="CPM" value={cpm > 0 ? money(cpm) : "R$ 0,00"} colorClass="text-orange-400" bgClass="bg-orange-950/20 border-orange-500/20" />
+        </div>
+      );
     }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {categories.map((cat, catIdx) => {
         const catKey = `cat-${cat.id}`;
-        const isCatExpanded = expandedKeys[catKey] !== false; // default expanded
+        const isCatExpanded = expandedKeys[catKey] !== false;
 
         return (
-          <Card key={catIdx} className="overflow-hidden border border-border/80 p-0 animate-fade-in">
+          <Card key={catIdx} className="overflow-hidden border border-zinc-800 bg-zinc-950/60 p-0 shadow-xl animate-fade-in">
             {/* Category Header */}
             <div 
               onClick={() => toggleKey(catKey)}
-              className="flex items-center justify-between p-4 cursor-pointer select-none bg-gradient-to-r from-black/20 to-transparent hover:bg-white/5 transition-colors border-b border-border/50"
+              className="flex items-center justify-between p-5 cursor-pointer select-none bg-gradient-to-r from-zinc-900 to-transparent hover:bg-zinc-900/80 transition-all border-b border-zinc-800/80"
             >
-              <div className="flex items-center gap-3">
-                <div className="p-1.5 rounded bg-primary/10 text-primary">
+              <div className="flex items-center gap-4">
+                <div className="p-2.5 rounded-lg bg-primary/10 text-primary border border-primary/20 shadow-inner">
                   {getCategoryIcon(cat.id)}
                 </div>
                 <div>
-                  <h4 className="text-sm font-semibold text-text-primary uppercase tracking-wider">{cat.title}</h4>
-                  <p className="text-[10px] text-text-secondary mt-0.5">
-                    {cat.campaigns.length} {cat.campaigns.length === 1 ? 'campanha' : 'campanhas'}
-                  </p>
+                  <h4 className="text-sm font-bold text-zinc-100 uppercase tracking-widest">{cat.title}</h4>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-zinc-900 text-zinc-400 border border-zinc-850 font-mono">
+                      {cat.campaigns.length} {cat.campaigns.length === 1 ? 'campanha ativa' : 'campanhas ativas'}
+                    </span>
+                  </div>
                 </div>
               </div>
-              <div>
-                {isCatExpanded ? (
-                  <ChevronDown className="w-4 h-4 text-[#A1A1AA]" />
-                ) : (
-                  <ChevronRight className="w-4 h-4 text-[#A1A1AA]" />
-                )}
+              <div className="p-1 rounded-full hover:bg-zinc-800 transition-colors">
+                {isCatExpanded ? <ChevronDown className="w-4 h-4 text-zinc-400" /> : <ChevronRight className="w-4 h-4 text-zinc-400" />}
               </div>
             </div>
 
-            {/* Category Campaigns Content */}
+            {/* Campaigns list */}
             {isCatExpanded && (
-              <div className="divide-y divide-border/40 bg-black/10 select-none">
+              <div className="divide-y divide-zinc-800/50 bg-zinc-950/20 p-2 space-y-3 select-none">
                 {cat.campaigns.map((camp, campIdx) => {
                   const campKey = `camp-${cat.id}-${campIdx}`;
                   const isCampExpanded = !!expandedKeys[campKey];
 
-                  // Count totals in camp
                   const adsetCount = camp.adsets.length;
-                  const adCount = camp.adsets.reduce((acc, curr) => acc + curr.ads.length, 0);
+                  const adCount = camp.adsets.reduce((acc: number, curr: any) => acc + curr.ads.length, 0);
 
                   return (
-                    <div key={campIdx} className="p-1">
-                      {/* Campaign Header */}
+                    <div 
+                      key={campIdx} 
+                      className="group border border-zinc-900 hover:border-zinc-800 bg-zinc-900/30 hover:bg-zinc-900/40 rounded-xl transition-all duration-300 overflow-hidden"
+                    >
+                      {/* Campaign Header Row */}
                       <div 
                         onClick={() => toggleKey(campKey)}
-                        className="flex items-center justify-between p-3 rounded hover:bg-white/5 cursor-pointer transition-colors"
+                        className="flex flex-col md:flex-row md:items-center justify-between p-4 cursor-pointer transition-colors"
                       >
-                        <div className="flex items-center gap-3 pl-3">
-                          {isCampExpanded ? (
-                            <ChevronDown className="w-3.5 h-3.5 text-[#737373]" />
-                          ) : (
-                            <ChevronRight className="w-3.5 h-3.5 text-[#737373]" />
-                          )}
-                          <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Ativa" />
-                            <span className="text-xs font-semibold text-text-primary tracking-wide text-left">{camp.name}</span>
+                        <div className="flex items-start gap-3.5 w-full">
+                          <div className="mt-1 p-0.5 rounded bg-zinc-800 text-zinc-400 group-hover:text-zinc-200 transition-colors shrink-0">
+                            {isCampExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                          </div>
+                          <div className="flex-1 w-full min-w-0">
+                            <div className="flex items-center gap-2.5 flex-wrap">
+                              <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0" title="Campanha Ativa" />
+                              <span className="text-xs md:text-sm font-bold text-zinc-100 group-hover:text-primary transition-colors text-left break-all">{camp.name}</span>
+                            </div>
+                            {renderMetricsBlock(cat.id, camp.stats)}
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 text-[10px] text-text-secondary pr-3 font-mono">
-                          <span className="bg-white/5 px-1.5 py-0.5 rounded border border-border/40">{adsetCount} cjs</span>
-                          <span className="bg-white/5 px-1.5 py-0.5 rounded border border-border/40">{adCount} anúncios</span>
+                        
+                        <div className="flex items-center gap-2 text-[10px] text-zinc-400 mt-3 md:mt-0 ml-8 md:ml-0 font-mono shrink-0">
+                          <span className="bg-zinc-900/80 px-2 py-1 rounded-md border border-zinc-800/80">{adsetCount} {adsetCount === 1 ? 'conjunto' : 'conjuntos'}</span>
+                          <span className="bg-zinc-900/80 px-2 py-1 rounded-md border border-zinc-800/80">{adCount} {adCount === 1 ? 'anúncio' : 'anúncios'}</span>
                         </div>
                       </div>
 
-                      {/* Campaign Adsets Content */}
+                      {/* Expanded Section (Adsets & Ads) */}
                       {isCampExpanded && (
-                        <div className="pl-6 md:pl-10 pr-4 py-2 space-y-3 bg-black/20 rounded border-l-2 border-primary/20 ml-6 mr-2 mb-2">
-                          {camp.adsets.map((adset, adsetIdx) => {
-                            const adsetKey = `adset-${cat.id}-${campIdx}-${adsetIdx}`;
-                            const isAdsetExpanded = !!expandedKeys[adsetKey];
+                        <div className="px-4 pb-4 pt-1 space-y-4 bg-zinc-950/40 border-t border-zinc-800/40">
+                          <div className="pl-2 md:pl-5 border-l border-zinc-800 space-y-4">
+                            {camp.adsets.map((adset: any, adsetIdx: number) => {
+                              const adsetKey = `adset-${cat.id}-${campIdx}-${adsetIdx}`;
+                              const isAdsetExpanded = !!expandedKeys[adsetKey];
 
-                            return (
-                              <div key={adsetIdx} className="space-y-2">
-                                <div 
-                                  onClick={() => toggleKey(adsetKey)}
-                                  className="flex items-center justify-between py-1.5 px-2.5 rounded hover:bg-white/5 cursor-pointer transition-colors"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    {isAdsetExpanded ? (
-                                      <ChevronDown className="w-3 h-3 text-[#A1A1AA]" />
-                                    ) : (
-                                      <ChevronRight className="w-3 h-3 text-[#A1A1AA]" />
-                                    )}
-                                    <span className="text-[11px] font-medium text-text-secondary hover:text-text-primary text-left">{adset.name}</span>
-                                  </div>
-                                  <span className="text-[9px] text-text-muted bg-neutral-900 border border-neutral-800 px-1.5 rounded font-mono">
-                                    {adset.ads.length} {adset.ads.length === 1 ? 'anúncio' : 'anúncios'}
-                                  </span>
-                                </div>
-
-                                {isAdsetExpanded && (
-                                  <div className="pl-6 space-y-3 py-2 border-l border-neutral-800">
-                                    {adset.ads.map((ad, adIdx) => (
-                                      <div key={adIdx} className="flex items-start gap-3 py-2 px-3 hover:bg-white/5 rounded-lg border border-border/10 transition-all">
-                                        {ad.creativeUrl ? (
-                                          <div className="relative group/thumb w-14 h-14 shrink-0 rounded overflow-hidden border border-border/30 bg-neutral-900">
-                                            <img 
-                                              src={ad.creativeUrl} 
-                                              alt={ad.name} 
-                                              className="w-full h-full object-cover group-hover/thumb:scale-110 transition-transform duration-300" 
-                                              referrerPolicy="no-referrer"
-                                              onError={(e) => {
-                                                (e.currentTarget as HTMLImageElement).style.display = 'none';
-                                              }}
-                                            />
-                                          </div>
-                                        ) : (
-                                          <div className="w-1.5 h-1.5 rounded-full bg-primary/60 mt-1.5 shrink-0" />
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                          <span className="text-[11px] font-medium text-text-secondary group-hover:text-text-primary line-clamp-2 text-left" title={ad.name}>
-                                            {ad.name}
-                                          </span>
-                                          {ad.creativeUrl && (
-                                            <a 
-                                              href={ad.creativeUrl} 
-                                              target="_blank" 
-                                              rel="noopener noreferrer" 
-                                              className="text-[9px] text-primary hover:underline mt-1 inline-flex items-center gap-1 font-mono hover:text-primary-light"
-                                            >
-                                              <Zap className="w-2.5 h-2.5" /> Ver criativo completo
-                                            </a>
-                                          )}
-                                        </div>
+                              return (
+                                <div key={adsetIdx} className="space-y-3">
+                                  {/* Adset Header */}
+                                  <div 
+                                    onClick={() => toggleKey(adsetKey)}
+                                    className="flex items-start justify-between p-3.5 rounded-lg bg-zinc-900/45 hover:bg-zinc-900/80 cursor-pointer border border-zinc-850/60 transition-all duration-200"
+                                  >
+                                    <div className="flex items-start gap-3 min-w-0">
+                                      <div className="mt-1 p-0.5 rounded bg-zinc-800/70 text-zinc-400 shrink-0">
+                                        {isAdsetExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                                       </div>
-                                    ))}
+                                      <div className="flex flex-col min-w-0">
+                                         <span className="text-xs font-semibold text-zinc-300 hover:text-zinc-100 text-left truncate" title={adset.name}>
+                                           {adset.name}
+                                         </span>
+                                         {renderMetricsBlock(cat.id, adset.stats)}
+                                      </div>
+                                    </div>
+                                    <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 border border-zinc-850 px-2 py-0.5 rounded shrink-0 self-start mt-0.5 shadow-sm">
+                                      {adset.ads.length} {adset.ads.length === 1 ? 'anúncio' : 'anúncios'}
+                                    </span>
                                   </div>
-                                )}
-                              </div>
-                            );
-                          })}
+
+                                  {/* List of Ads under Adset */}
+                                  {isAdsetExpanded && (
+                                    <div className="pl-4 space-y-3.5 py-1.5 border-l border-zinc-850 transition-all duration-300">
+                                      {adset.ads.map((ad: any, adIdx: number) => (
+                                        <div 
+                                          key={adIdx} 
+                                          className="flex flex-col sm:flex-row items-center sm:items-start gap-4 p-4 hover:bg-zinc-900/60 rounded-xl border border-zinc-850/50 bg-zinc-950/40 transition-all shadow-sm"
+                                        >
+                                          {/* Ad Creative Image */}
+                                          {ad.creativeUrl ? (
+                                            <div className="relative group/thumb w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-lg overflow-hidden border border-zinc-800 bg-zinc-900 shadow-md">
+                                              <img 
+                                                src={ad.creativeUrl} 
+                                                alt={ad.name} 
+                                                className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300" 
+                                                referrerPolicy="no-referrer"
+                                                onError={(e) => {
+                                                  (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                                }}
+                                              />
+                                            </div>
+                                          ) : (
+                                            <div className="w-2.5 h-2.5 rounded-full bg-primary/40 mt-2 shrink-0 animate-pulse" />
+                                          )}
+
+                                          {/* Ad metrics & link */}
+                                          <div className="flex-1 min-w-0 w-full">
+                                            <span className="text-xs font-bold text-zinc-200 block text-left mb-1 hover:text-primary transition-colors line-clamp-2" title={ad.name}>
+                                              {ad.name}
+                                            </span>
+                                            {renderMetricsBlock(cat.id, ad.stats)}
+                                            
+                                            {ad.creativeUrl && (
+                                              <a 
+                                                href={ad.creativeUrl} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer" 
+                                                className="text-[10px] text-primary hover:text-primary-light hover:underline mt-2.5 inline-flex items-center gap-1.5 font-mono border border-primary/20 hover:border-primary/40 bg-primary/5 px-2.5 py-1 rounded transition-all"
+                                              >
+                                                <Zap className="w-3.5 h-3.5" /> Ver criativo completo
+                                              </a>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -623,36 +789,36 @@ const MonthlyClosingSection: React.FC<{ checkouts: any[], costs: any[], cursos: 
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-border">
         {/* Faturamento */}
-        <div className="p-6">
+        <div className="p-6 flex flex-col items-center text-center">
           <p className="text-[10px] text-text-secondary uppercase font-bold tracking-wider mb-2">Faturamento Mensal</p>
-          <div className="flex items-baseline gap-3 mb-1">
+          <div className="flex items-baseline justify-center gap-3 mb-1">
             <h4 className="text-3xl font-bold text-white">R$ {currentStats.revenue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</h4>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center gap-2">
             {formatDiff(revDiff, true)}
             <span className="text-[10px] text-[#52525B]">vs mês anterior</span>
           </div>
         </div>
 
         {/* Vendas */}
-        <div className="p-6">
+        <div className="p-6 flex flex-col items-center text-center">
           <p className="text-[10px] text-text-secondary uppercase font-bold tracking-wider mb-2">Quantidade de Vendas</p>
-          <div className="flex items-baseline gap-3 mb-1">
+          <div className="flex items-baseline justify-center gap-3 mb-1">
             <h4 className="text-3xl font-bold text-white">{currentStats.sales} <span className="text-sm font-normal text-text-muted">transações</span></h4>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center gap-2">
             {formatDiff(salesDiff)}
             <span className="text-[10px] text-[#52525B]">vs mês anterior</span>
           </div>
         </div>
 
         {/* Investimento */}
-        <div className="p-6">
+        <div className="p-6 flex flex-col items-center text-center">
           <p className="text-[10px] text-text-secondary uppercase font-bold tracking-wider mb-2">Investimento em Anúncios</p>
-          <div className="flex items-baseline gap-3 mb-1">
+          <div className="flex items-baseline justify-center gap-3 mb-1">
             <h4 className="text-3xl font-bold text-white">R$ {currentStats.cost.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</h4>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center gap-2">
             <span className={`text-[10px] font-bold ${costDiff.isUp ? 'text-red-500' : 'text-emerald-500'}`}>
               {costDiff.isUp ? '+' : ''}{Math.abs(costDiff.diff).toLocaleString('pt-BR')} ({costDiff.isUp ? '+' : ''}{costDiff.percent.toFixed(1)}%)
             </span>
@@ -661,12 +827,12 @@ const MonthlyClosingSection: React.FC<{ checkouts: any[], costs: any[], cursos: 
         </div>
 
         {/* ROAS */}
-        <div className="p-6">
+        <div className="p-6 flex flex-col items-center text-center">
           <p className="text-[10px] text-text-secondary uppercase font-bold tracking-wider mb-2">ROAS do Mês</p>
-          <div className="flex items-baseline gap-3 mb-1">
+          <div className="flex items-baseline justify-center gap-3 mb-1">
             <h4 className="text-3xl font-bold text-white">{currentRoas.toFixed(2)}x</h4>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center gap-2">
             <span className={`text-[10px] font-bold ${roasDiff.isUp ? 'text-emerald-500' : 'text-red-500'}`}>
               {roasDiff.isUp ? '+' : ''}{roasDiff.diff.toFixed(2)} ({roasDiff.isUp ? '+' : ''}{roasDiff.percent.toFixed(1)}%)
             </span>
@@ -875,6 +1041,7 @@ export default function App() {
   const [filteredCheckouts, setFilteredCheckouts] = useState<any[]>([]);
   const [sheetData, setSheetData] = useState<any[]>([]);
   const [metaCosts, setMetaCosts] = useState<any[]>([]);
+  const [filteredMetaCosts, setFilteredMetaCosts] = useState<any[]>([]);
   const [metaCostsFull, setMetaCostsFull] = useState<any[]>([]);
   const [supabaseCheckoutsFull, setSupabaseCheckoutsFull] = useState<any[]>([]);
   const [supabaseCampanhasAtivas, setSupabaseCampanhasAtivas] = useState<any[]>([]);
@@ -1104,7 +1271,11 @@ export default function App() {
                 date: dateObj, 
                 cost, 
                 campaign, 
+                adsetName: row.adset_name || row.ad_set_name || row.adset || row.conjunto_anuncio || 'Sem Conjunto de Anúncios',
                 adName,
+                ad_id: row.ad_id ? String(row.ad_id) : '',
+                campaign_id: row.campaign_id ? String(row.campaign_id) : '',
+                adset_id: row.adset_id ? String(row.adset_id) : '',
                 impressions: Number(row.impressions) || 0,
                 reach: Number(row.reach) || 0,
                 frequency: Number(row.frequency) || 0,
@@ -1119,6 +1290,8 @@ export default function App() {
                 cpm: Number(row.cpm) || 0,
                 cpp: Number(row.cpp) || 0,
                 link_clicks: Number(row.link_clicks) || 0,
+                post_engagement: Number(row.post_engagement) || 0,
+                page_engagement: Number(row.page_engagement) || 0,
                 leads: Number(row.leads) || 0,
                 purchases: Number(row.purchases) || 0,
                 omni_purchases: Number(row.omni_purchases) || 0,
@@ -1370,6 +1543,7 @@ export default function App() {
             });
             
             setFilteredCheckouts(filteredData);
+            setFilteredMetaCosts(metaCosts.filter((m: any) => m.date >= startDate && m.date <= endDate));
             setSupabaseCheckouts(filteredData);
             setCheckoutsAllStatus(checkoutsNoPeriodo);
             setCheckoutsCancelados(canceladosData);
@@ -3158,7 +3332,12 @@ export default function App() {
                       <p className="text-[11px] text-text-secondary mt-1">Status atual das campanhas em veiculação (dados em tempo real não afetados pelo seletor de data).</p>
                     </div>
                   </div>
-                  <ActiveCampaignsTree data={supabaseCampanhasAtivas} />
+                  <ActiveCampaignsTree 
+                    data={supabaseCampanhasAtivas} 
+                    metaCosts={filteredMetaCosts} 
+                    checkouts={filteredCheckouts} 
+                    cursos={supabaseCursos}
+                  />
                 </div>
              ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
