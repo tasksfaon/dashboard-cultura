@@ -48,7 +48,7 @@ const CampaignGroupTable: React.FC<{ title: string, data: any[], icon: React.Rea
           <tr>
             <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold">Campanha / Projeto</th>
             <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">Investimento</th>
-            <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">Leads</th>
+            <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">Cadastros</th>
             <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">Vendas</th>
             <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">Receita</th>
             <th className="p-4 text-[0.75rem] text-text-muted uppercase font-bold text-right">ROAS</th>
@@ -86,6 +86,262 @@ const CampaignGroupTable: React.FC<{ title: string, data: any[], icon: React.Rea
     </div>
   </Card>
 );
+
+const ActiveCampaignsTree: React.FC<{ data: any[] }> = ({ data }) => {
+  const [expandedKeys, setExpandedKeys] = useState<Record<string, boolean>>({});
+
+  const toggleKey = (key: string) => {
+    setExpandedKeys(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
+
+  const getGroupedData = (rawRows: any[]) => {
+    const categoriesMap: Record<string, { id: string; title: string; campaigns: Record<string, { name: string; adsets: Record<string, { name: string; ads: { name: string; creativeUrl?: string }[] }> }> }> = {
+      venda: { id: 'venda', title: 'Campanhas de Venda Ativas', campaigns: {} },
+      captacao: { id: 'captacao', title: 'Campanhas de Captação Ativas', campaigns: {} },
+      distribuicao: { id: 'distribuicao', title: 'Campanhas de Distribuição Ativas', campaigns: {} }
+    };
+
+    rawRows.forEach(row => {
+      const rawCampName = row.campaign_name || row.campaign || row.campanha || '';
+      if (!rawCampName) return;
+
+      const campNameUpper = rawCampName.toUpperCase();
+      let categoryKey = '';
+
+      if (campNameUpper.includes('DIST') || campNameUpper.includes('ACE') || campNameUpper.includes('ENG') || campNameUpper.includes('DISTRIBUICAO') || campNameUpper.includes('ALCANCE') || campNameUpper.includes('ENGAJAMENTO')) {
+        categoryKey = 'distribuicao';
+      } else if (campNameUpper.includes('CAP') || campNameUpper.includes('CAPTACAO') || campNameUpper.includes('LEAD')) {
+        categoryKey = 'captacao';
+      } else if (campNameUpper.includes('VEN') || campNameUpper.includes('VENDA') || campNameUpper.includes('PURCHASE') || campNameUpper.includes('CONV')) {
+        categoryKey = 'venda';
+      } else {
+        categoryKey = 'venda';
+      }
+
+      const adsetName = row.adset_name || row.ad_set_name || row.adset || row.conjunto_anuncio || row.conjunto_anuncios || row.conjunto || 'Sem Conjunto de Anúncios';
+      const adName = row.ad_name || row.adname || row.ad || row.anuncio || 'Sem Anúncio';
+      const creativeUrl = row.creative_url || row.creativeUrl || row.url_criativo || '';
+
+      const cat = categoriesMap[categoryKey];
+      if (!cat.campaigns[rawCampName]) {
+        cat.campaigns[rawCampName] = {
+          name: rawCampName,
+          adsets: {}
+        };
+      }
+
+      const campaignObj = cat.campaigns[rawCampName];
+      if (!campaignObj.adsets[adsetName]) {
+        campaignObj.adsets[adsetName] = {
+          name: adsetName,
+          ads: []
+        };
+      }
+
+      // Avoid duplicates with the exact same name and creative_url
+      const adsetObj = campaignObj.adsets[adsetName];
+      const exists = adsetObj.ads.some((item: any) => item.name === adName && item.creativeUrl === creativeUrl);
+      if (!exists) {
+        adsetObj.ads.push({ name: adName, creativeUrl });
+      }
+    });
+
+    return Object.values(categoriesMap)
+      .map((cat: any) => {
+        const campaignsArray = Object.values(cat.campaigns).map((camp: any) => {
+          const adsetsArray = Object.values(camp.adsets).map((adset: any) => ({
+            name: adset.name,
+            ads: adset.ads
+          }));
+          return {
+            name: camp.name,
+            adsets: adsetsArray
+          };
+        });
+        return {
+          id: cat.id,
+          title: cat.title,
+          campaigns: campaignsArray
+        };
+      })
+      .filter(cat => cat.campaigns.length > 0);
+  };
+
+  const categories = getGroupedData(data);
+
+  if (data.length === 0) {
+    return (
+      <Card className="p-8 text-center text-[#525252] italic text-xs">
+        <Loader2 className="w-4 h-4 animate-spin mx-auto mb-2 text-primary" />
+        Nenhum anúncio ativo encontrado na tabela `anuncios_ativos_cultura`.
+      </Card>
+    );
+  }
+
+  const getCategoryIcon = (id: string) => {
+    switch (id) {
+      case 'distribuicao':
+        return <Zap className="w-4 h-4 text-primary" />;
+      case 'captacao':
+        return <Target className="w-4 h-4 text-primary" />;
+      case 'venda':
+        return <Award className="w-4 h-4 text-primary" />;
+      default:
+        return <Activity className="w-4 h-4 text-primary" />;
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {categories.map((cat, catIdx) => {
+        const catKey = `cat-${cat.id}`;
+        const isCatExpanded = expandedKeys[catKey] !== false; // default expanded
+
+        return (
+          <Card key={catIdx} className="overflow-hidden border border-border/80 p-0 animate-fade-in">
+            {/* Category Header */}
+            <div 
+              onClick={() => toggleKey(catKey)}
+              className="flex items-center justify-between p-4 cursor-pointer select-none bg-gradient-to-r from-black/20 to-transparent hover:bg-white/5 transition-colors border-b border-border/50"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-1.5 rounded bg-primary/10 text-primary">
+                  {getCategoryIcon(cat.id)}
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-text-primary uppercase tracking-wider">{cat.title}</h4>
+                  <p className="text-[10px] text-text-secondary mt-0.5">
+                    {cat.campaigns.length} {cat.campaigns.length === 1 ? 'campanha' : 'campanhas'}
+                  </p>
+                </div>
+              </div>
+              <div>
+                {isCatExpanded ? (
+                  <ChevronDown className="w-4 h-4 text-[#A1A1AA]" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-[#A1A1AA]" />
+                )}
+              </div>
+            </div>
+
+            {/* Category Campaigns Content */}
+            {isCatExpanded && (
+              <div className="divide-y divide-border/40 bg-black/10 select-none">
+                {cat.campaigns.map((camp, campIdx) => {
+                  const campKey = `camp-${cat.id}-${campIdx}`;
+                  const isCampExpanded = !!expandedKeys[campKey];
+
+                  // Count totals in camp
+                  const adsetCount = camp.adsets.length;
+                  const adCount = camp.adsets.reduce((acc, curr) => acc + curr.ads.length, 0);
+
+                  return (
+                    <div key={campIdx} className="p-1">
+                      {/* Campaign Header */}
+                      <div 
+                        onClick={() => toggleKey(campKey)}
+                        className="flex items-center justify-between p-3 rounded hover:bg-white/5 cursor-pointer transition-colors"
+                      >
+                        <div className="flex items-center gap-3 pl-3">
+                          {isCampExpanded ? (
+                            <ChevronDown className="w-3.5 h-3.5 text-[#737373]" />
+                          ) : (
+                            <ChevronRight className="w-3.5 h-3.5 text-[#737373]" />
+                          )}
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Ativa" />
+                            <span className="text-xs font-semibold text-text-primary tracking-wide text-left">{camp.name}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] text-text-secondary pr-3 font-mono">
+                          <span className="bg-white/5 px-1.5 py-0.5 rounded border border-border/40">{adsetCount} cjs</span>
+                          <span className="bg-white/5 px-1.5 py-0.5 rounded border border-border/40">{adCount} anúncios</span>
+                        </div>
+                      </div>
+
+                      {/* Campaign Adsets Content */}
+                      {isCampExpanded && (
+                        <div className="pl-6 md:pl-10 pr-4 py-2 space-y-3 bg-black/20 rounded border-l-2 border-primary/20 ml-6 mr-2 mb-2">
+                          {camp.adsets.map((adset, adsetIdx) => {
+                            const adsetKey = `adset-${cat.id}-${campIdx}-${adsetIdx}`;
+                            const isAdsetExpanded = !!expandedKeys[adsetKey];
+
+                            return (
+                              <div key={adsetIdx} className="space-y-2">
+                                <div 
+                                  onClick={() => toggleKey(adsetKey)}
+                                  className="flex items-center justify-between py-1.5 px-2.5 rounded hover:bg-white/5 cursor-pointer transition-colors"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    {isAdsetExpanded ? (
+                                      <ChevronDown className="w-3 h-3 text-[#A1A1AA]" />
+                                    ) : (
+                                      <ChevronRight className="w-3 h-3 text-[#A1A1AA]" />
+                                    )}
+                                    <span className="text-[11px] font-medium text-text-secondary hover:text-text-primary text-left">{adset.name}</span>
+                                  </div>
+                                  <span className="text-[9px] text-text-muted bg-neutral-900 border border-neutral-800 px-1.5 rounded font-mono">
+                                    {adset.ads.length} {adset.ads.length === 1 ? 'anúncio' : 'anúncios'}
+                                  </span>
+                                </div>
+
+                                {isAdsetExpanded && (
+                                  <div className="pl-6 space-y-3 py-2 border-l border-neutral-800">
+                                    {adset.ads.map((ad, adIdx) => (
+                                      <div key={adIdx} className="flex items-start gap-3 py-2 px-3 hover:bg-white/5 rounded-lg border border-border/10 transition-all">
+                                        {ad.creativeUrl ? (
+                                          <div className="relative group/thumb w-14 h-14 shrink-0 rounded overflow-hidden border border-border/30 bg-neutral-900">
+                                            <img 
+                                              src={ad.creativeUrl} 
+                                              alt={ad.name} 
+                                              className="w-full h-full object-cover group-hover/thumb:scale-110 transition-transform duration-300" 
+                                              referrerPolicy="no-referrer"
+                                              onError={(e) => {
+                                                (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                              }}
+                                            />
+                                          </div>
+                                        ) : (
+                                          <div className="w-1.5 h-1.5 rounded-full bg-primary/60 mt-1.5 shrink-0" />
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                          <span className="text-[11px] font-medium text-text-secondary group-hover:text-text-primary line-clamp-2 text-left" title={ad.name}>
+                                            {ad.name}
+                                          </span>
+                                          {ad.creativeUrl && (
+                                            <a 
+                                              href={ad.creativeUrl} 
+                                              target="_blank" 
+                                              rel="noopener noreferrer" 
+                                              className="text-[9px] text-primary hover:underline mt-1 inline-flex items-center gap-1 font-mono hover:text-primary-light"
+                                            >
+                                              <Zap className="w-2.5 h-2.5" /> Ver criativo completo
+                                            </a>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        );
+      })}
+    </div>
+  );
+};
 
 // Corrige conversão de timezone (UTC to Local) para dados vindos do Supabase
 const parseSupabaseDate = (dateVal: string | null | undefined): Date => {
@@ -321,6 +577,7 @@ export default function App() {
   const [filteredCheckouts, setFilteredCheckouts] = useState<any[]>([]);
   const [sheetData, setSheetData] = useState<any[]>([]);
   const [metaCosts, setMetaCosts] = useState<any[]>([]);
+  const [supabaseCampanhasAtivas, setSupabaseCampanhasAtivas] = useState<any[]>([]);
   const [distStats, setDistStats] = useState<any>({ cost: 0, revenue: 0, sales: 0, leads: 0 });
 
   const selectedCompany = companies.find(c => c.id === selectedCompanyId) || companies[0];
@@ -465,6 +722,19 @@ export default function App() {
               .from('trafego_meta_cultura')
               .select('*');
             if (err5) throw err5;
+
+            // 6. Anúncios Ativos Cultura (TUDO) do Supabase
+            let activeCampsRaw: any[] = [];
+            try {
+              const { data: activeCamps, error: err6 } = await supabase
+                .from('anuncios_ativos_cultura')
+                .select('*');
+              if (err6) throw err6;
+              activeCampsRaw = activeCamps || [];
+            } catch (e) {
+              console.warn("Aviso: Falha ao carregar anuncios_ativos_cultura", e);
+            }
+            setSupabaseCampanhasAtivas(activeCampsRaw);
 
             // Formata custo do Meta do Supabase conforme correspondências especificadas pelo usuário:
             // - date -> day, data
@@ -1282,12 +1552,12 @@ export default function App() {
               { title: 'Investimento Total', value: `R$ ${periodMetaCost.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, trend: 'Valor Gasto no Período', isUp: true, icon: CreditCard },
               { title: 'ROAS Geral', value: blendedROAS, trend: 'Retorno do investimento', isUp: true, icon: Activity },
               { title: 'CPA Geral', value: blendedCPA, trend: 'Custo por Venda', isUp: true, icon: Target },
-              { title: 'Vendas hoje', value: vendasHojeCount, trend: 'Checkouts hoje', isUp: true, icon: ShoppingCart },
+              { title: 'Vendas hoje', value: vendasHojeCount, trend: 'Checkouts hoje', isUp: true, icon: ShoppingCart, isToday: true },
               { title: 'Total de cadastros', value: leadsCount.toString(), trend: 'Novos Cadastros', isUp: true, icon: Users },
               { title: 'Vendas Totais', value: salesCount.toString(), trend: 'Checkouts realizados', isUp: true, icon: ShoppingCart },
               { title: 'Taxa de Cancelamento', value: taxaCancelamento, trend: 'Pedidos Cancelados', isUp: false, icon: ArrowDownRight },
               { title: 'Cartão Recusado', value: recusadosCount, trend: 'Pagamentos Negados', isUp: false, icon: ArrowDownRight },
-              { title: 'Cadastros hoje', value: cadastrosHojeCount, trend: 'Contatos hoje', isUp: true, icon: Users },
+              { title: 'Cadastros hoje', value: cadastrosHojeCount, trend: 'Contatos hoje', isUp: true, icon: Users, isToday: true },
             ]);
 
             setDataStatus('success');
@@ -1746,7 +2016,7 @@ export default function App() {
                     stroke="#6366f1"
                     strokeWidth={2}
                     fill="transparent"
-                    name="Leads"
+                    name="Cadastros"
                     dot={{ r: 2, strokeWidth: 1 }}
                     activeDot={{ r: 4 }}
                   />
@@ -1794,7 +2064,7 @@ export default function App() {
                                 <span className="text-orange-400 font-bold ml-4">{data.declinesCount || 0}</span>
                               </div>
                               <div className="flex justify-between items-center">
-                                <span className="text-text-label">Novos Leads:</span>
+                                <span className="text-text-label">Novos Cadastros:</span>
                                 <span className="text-primary font-bold ml-4">{data.leads}</span>
                               </div>
                             </div>
@@ -1824,23 +2094,45 @@ export default function App() {
 
         {/* KPIs Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 md:gap-4">
-          {kpis.map((kpi, idx) => (
-            <Card key={idx} className="relative overflow-hidden group hover:border-primary/50 transition-colors p-4 md:p-5">
-              <div className="flex justify-between items-start mb-2 md:mb-3">
-                <div className="p-1.5 md:p-2 bg-primary/10 rounded-[4px] transition-colors text-primary">
-                  <kpi.icon className="w-4 h-4 md:w-5 md:h-5" />
+          {kpis.map((kpi, idx) => {
+            const isKpiToday = (kpi as any).isToday;
+            return (
+              <Card 
+                key={idx} 
+                className={`relative overflow-hidden group transition-all duration-300 p-4 md:p-5 ${
+                  isKpiToday 
+                    ? "border-primary/60 shadow-[0_0_15px_rgba(212,168,67,0.1)] hover:border-primary" 
+                    : "hover:border-primary/50"
+                }`}
+              >
+                {isKpiToday && (
+                  <span className="absolute top-2 right-2 md:top-3 md:right-3 flex items-center gap-1 bg-primary/10 text-[7px] md:text-[8px] font-bold px-1 py-0.5 md:px-1.5 md:py-0.5 rounded-[3px] border border-primary/20 tracking-widest select-none">
+                    <span className="w-1 h-1 rounded-full bg-primary animate-pulse" />
+                    <span className="text-primary font-semibold">HOJE</span>
+                  </span>
+                )}
+                <div className="flex justify-between items-start mb-2 md:mb-3">
+                  <div className="p-1.5 md:p-2 rounded-[4px] transition-colors bg-primary/10 text-primary">
+                    <kpi.icon className="w-4 h-4 md:w-5 md:h-5" />
+                  </div>
                 </div>
-              </div>
-              <div>
-                <p className="text-[10px] md:text-[0.75rem] font-medium text-text-label uppercase tracking-[0.05em] mb-0.5 md:mb-1">{kpi.title}</p>
-                <h3 className="text-[1.25rem] md:text-[1.5rem] font-bold tabular-nums tracking-tight whitespace-nowrap">{kpi.value}</h3>
-                <p className="text-[10px] md:text-xs text-text-muted mt-0.5 md:mt-1">{kpi.trend}</p>
-              </div>
-              <div className="absolute -right-6 -bottom-6 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity text-primary">
-                <kpi.icon className="w-24 h-24" />
-              </div>
-            </Card>
-          ))}
+                <div>
+                  <p className="text-[10px] md:text-[0.75rem] font-medium uppercase tracking-[0.05em] mb-0.5 md:mb-1 text-text-label">
+                    {kpi.title}
+                  </p>
+                  <h3 className="text-[1.25rem] md:text-[1.5rem] font-bold tabular-nums tracking-tight whitespace-nowrap text-text-primary">
+                    {kpi.value}
+                  </h3>
+                  <p className="text-[10px] md:text-xs mt-0.5 md:mt-1 text-text-muted">
+                    {kpi.trend}
+                  </p>
+                </div>
+                <div className="absolute -right-6 -bottom-6 transition-opacity text-primary opacity-[0.03] group-hover:opacity-[0.05]">
+                  <kpi.icon className="w-24 h-24" />
+                </div>
+              </Card>
+            );
+          })}
         </div>
 
         {/* Insights de Distribuição */}
@@ -1995,7 +2287,11 @@ export default function App() {
 
         {/* Combined Section for Top Clientes and Payment Methods */}
         {dataStatus === 'success' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+          <div className={`grid grid-cols-1 ${
+            selectedCompanyId === 'cultura' && channelData.leadsSourcePieData && channelData.leadsSourcePieData.length > 0
+              ? 'lg:grid-cols-3'
+              : 'lg:grid-cols-2'
+          } gap-6 mt-8`}>
             {/* Top 5 Clientes */}
             {channelData.topCustomers && channelData.topCustomers.length > 0 && (
               <Card className="h-full">
@@ -2012,6 +2308,60 @@ export default function App() {
                           <p className="text-xs text-primary font-mono font-bold">R$ {c.rev.toLocaleString('pt-BR')}</p>
                       </div>
                   ))}
+                </div>
+              </Card>
+            )}
+
+            {/* Fontes de cadastro */}
+            {selectedCompanyId === 'cultura' && channelData.leadsSourcePieData && channelData.leadsSourcePieData.length > 0 && (
+              <Card className="p-6 h-full flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
+                        <Activity className="w-4 h-4 text-primary" /> Fontes de cadastros
+                      </h4>
+                      <p className="text-[11px] text-text-secondary mt-1">Distribuição de Cadastros</p>
+                    </div>
+                  </div>
+                  <div className="h-[180px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={channelData.leadsSourcePieData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={55}
+                          outerRadius={80}
+                          paddingAngle={8}
+                          dataKey="value"
+                        >
+                          {channelData.leadsSourcePieData.map((_: any, index: number) => (
+                            <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} stroke="none" />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip content={<CustomTooltip isCurrency={false} />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div className="space-y-3 mt-6">
+                  {channelData.leadsSourcePieData.map((lead: any, i: number) => {
+                    const totalLeads = channelData.leadsSourcePieData.reduce((acc: number, curr: any) => acc + curr.value, 0);
+                    const pct = totalLeads > 0 ? ((lead.value / totalLeads) * 100).toFixed(1) : '0';
+                    return (
+                      <div key={i} className="flex items-center justify-between group">
+                        <div className="flex items-center gap-3">
+                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
+                          <span className="text-[11px] text-text-secondary group-hover:text-text-primary transition-colors">{lead.name}</span>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[11px] font-mono font-bold text-text-primary">{lead.value} cadastros</p>
+                          <p className="text-[10px] text-text-secondary">{pct}%</p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </Card>
             )}
@@ -2132,7 +2482,7 @@ export default function App() {
                <div className="space-y-6">
                   {[
                     selectedCompanyId !== 'cultura' && { label: 'Sessões Totais', value: channelData.total.sessions, color: 'bg-white/10', icon: Activity },
-                    { label: 'Criação de Leads', value: channelData.total.leads, color: 'bg-primary/20', icon: Users, pct: (selectedCompanyId !== 'cultura' && channelData.total.sessions > 0) ? (channelData.total.leads / channelData.total.sessions * 100).toFixed(1) : undefined },
+                    { label: 'Criação de Cadastros', value: channelData.total.leads, color: 'bg-primary/20', icon: Users, pct: (selectedCompanyId !== 'cultura' && channelData.total.sessions > 0) ? (channelData.total.leads / channelData.total.sessions * 100).toFixed(1) : undefined },
                     { label: 'Vendas Realizadas', value: channelData.total.sales, color: 'bg-primary/20', icon: ShoppingCart, pct: channelData.total.leads > 0 ? (channelData.total.sales / channelData.total.leads * 100).toFixed(1) : 0 },
                   ].filter(Boolean).map((step: any, i, arr) => (
                     <div key={i} className="relative">
@@ -2180,23 +2530,19 @@ export default function App() {
         {dataStatus === 'success' && (
           <div className="grid grid-cols-1 gap-6">
              {selectedCompanyId === 'cultura' ? (
-                <>
-                  <CampaignGroupTable 
-                    title="Campanhas de Distribuição" 
-                    data={channelData.distCampaigns || []} 
-                    icon={<Zap className="w-4 h-4 text-primary" />} 
-                  />
-                  <CampaignGroupTable 
-                    title="Campanhas de Captação" 
-                    data={channelData.capCampaigns || []} 
-                    icon={<Target className="w-4 h-4 text-primary" />} 
-                  />
-                  <CampaignGroupTable 
-                    title="Campanhas de Venda" 
-                    data={channelData.venCampaigns || []} 
-                    icon={<Award className="w-4 h-4 text-primary" />} 
-                  />
-                </>
+                <div className="mt-4 mb-2">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-border/40 pb-3 mb-6">
+                    <div>
+                      <h3 className="text-base md:text-lg font-bold text-text-primary tracking-tight">Campanhas Ativas</h3>
+                      <p className="text-[11px] text-text-secondary mt-1">Status atual das campanhas em veiculação (dados em tempo real não afetados pelo seletor de data).</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 self-start md:self-auto bg-primary/10 border border-primary/20 rounded-[3px] px-2 py-0.5 text-[9px] font-bold text-primary select-none font-mono">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>LIVE STATUS</span>
+                    </div>
+                  </div>
+                  <ActiveCampaignsTree data={supabaseCampanhasAtivas} />
+                </div>
              ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Winning Ads Table */}
@@ -2297,58 +2643,7 @@ export default function App() {
           </div>
         )}
 
-        {/* RESUMO HOJE - PERFORMANCE EM TEMPO REAL */}
-        {selectedCompanyId === 'cultura' && dataStatus === 'success' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-            <Card className="p-6">
-              <div className="flex items-center justify-between mb-8">
-                <h4 className="text-sm font-medium text-text-secondary flex items-center gap-2">
-                  <Activity className="w-4 h-4" /> Vendas de Hoje ({vendasHojeTotal})
-                </h4>
-              </div>
-              <div className="h-[250px] w-full">
-                {todayPieData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={todayPieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="value"
-                        labelLine={false}
-                        label={PieChartLabel}
-                      >
-                        {todayPieData.map((entry: any, index: number) => (
-                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} stroke="none" />
-                        ))}
-                      </Pie>
-                      <RechartsTooltip content={<CustomTooltip isCurrency={false} />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-sm text-text-secondary italic">
-                    Nenhuma venda registrada ainda hoje.
-                  </div>
-                )}
-              </div>
-            </Card>
 
-            <Card className="p-6 flex flex-col items-center justify-center">
-              <div className="text-center">
-                <h4 className="text-[0.8125rem] font-semibold text-text-secondary uppercase tracking-[0.06em] mb-4 flex items-center gap-2 justify-center">
-                  <Users className="w-4 h-4" /> Cadastros de Hoje
-                </h4>
-                <div className="text-[3rem] font-bold tabular-nums text-primary">
-                  {cadastrosHojeTotal}
-                </div>
-                <p className="text-xs text-text-secondary mt-2 uppercase tracking-wide">Novos Leads Captados</p>
-              </div>
-            </Card>
-          </div>
-        )}
 
         {/* LIVE ACTIVITY FEED - Somente para Cultura */}
         {selectedCompanyId === 'cultura' && dataStatus === 'success' && (
@@ -2477,40 +2772,7 @@ export default function App() {
              {renderCheckoutCard(checkoutsRecusados, "Recusas Recentes", 30, <AlertCircle className="w-4 h-4 text-orange-500" />, 'declines')}
           </div>
 
-          <div className="grid grid-cols-1 gap-6 mt-8">
-             <Card className="p-5">
-               <h4 className="text-sm font-medium mb-6 text-[#A1A1AA] flex items-center gap-2">
-                 <Activity className="w-4 h-4" /> Fontes de cadastros
-               </h4>
-               <div className="h-[300px]">
-                 {channelData.leadsSourcePieData && channelData.leadsSourcePieData.length > 0 ? (
-                   <ResponsiveContainer width="100%" height="100%">
-                     <PieChart>
-                       <Pie
-                         data={channelData.leadsSourcePieData}
-                         cx="50%"
-                         cy="50%"
-                         innerRadius={55}
-                         outerRadius={90}
-                         paddingAngle={5}
-                         dataKey="value"
-                         label={PieChartLabel}
-                       >
-                         {channelData.leadsSourcePieData.map((entry: any, index: number) => (
-                           <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} stroke="none" />
-                         ))}
-                       </Pie>
-                       <RechartsTooltip content={<CustomTooltip isCurrency={false} />} />
-                     </PieChart>
-                   </ResponsiveContainer>
-                 ) : (
-                   <div className="w-full h-full flex items-center justify-center text-sm text-text-secondary italic">
-                     Não há dados de fonte de cadastro.
-                   </div>
-                 )}
-               </div>
-             </Card>
-          </div>
+
           </>
         )}
 
@@ -2567,7 +2829,7 @@ export default function App() {
                         </div>
                       ) : (
                         <div className="p-3 flex flex-col">
-                          <span className="text-[0.7rem] font-medium text-text-label uppercase tracking-wider mb-1">{selectedCompanyId === 'cultura' ? 'Leads' : 'Custo'}</span>
+                          <span className="text-[0.7rem] font-medium text-text-label uppercase tracking-wider mb-1">{selectedCompanyId === 'cultura' ? 'Cadastros' : 'Custo'}</span>
                           <span className="text-lg font-bold text-primary">{selectedCompanyId === 'cultura' ? data.leads : `R$ ${data.cost.toLocaleString('pt-BR')}`}</span>
                         </div>
                       )}
