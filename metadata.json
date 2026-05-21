@@ -1,6 +1,8 @@
 {
-  "name": "Dashboard CJ",
-  "description": "A high-performance marketing and conversion tracking dashboard focused on Meta Ads, Google Ads, and Organic traffic.",
+  "name": "Dashboard Cultura Jurídica",
+  "description": "Dashboard de performance de marketing e conversão focado em tráfego pago e orgânico para Cultura Jurídica.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

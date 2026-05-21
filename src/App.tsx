@@ -1582,6 +1582,49 @@ export default function App() {
                 return new Date(`${aa}-${ma}-${da}`).getTime() - new Date(`${ab}-${mb}-${db}`).getTime();
               });
 
+            // --- MONTHLY TREND DATA (Last 12 Months) ---
+            const monthlyTrendMap = new Map<string, { value: number, salesCount: number, leads: number, cost: number }>();
+            const nowBRL = new Date(); // Aproximado para o loop
+            for (let i = 11; i >= 0; i--) {
+              const d = new Date(nowBRL.getFullYear(), nowBRL.getMonth() - i, 1);
+              const monthLabel = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+              monthlyTrendMap.set(monthLabel, { value: 0, salesCount: 0, leads: 0, cost: 0 });
+            }
+
+            const monthsOrder = Array.from(monthlyTrendMap.keys());
+
+            metaCostsFull.forEach(c => {
+               const d = c.date;
+               const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+               if (monthlyTrendMap.has(label)) {
+                  monthlyTrendMap.get(label)!.cost += c.cost;
+               }
+            });
+
+            supabaseCheckoutsFull.forEach(c => {
+               if ((c.status || '').toLowerCase().trim() !== 'pago') return;
+               const d = getBRLDate(c.timestamp || c.created_at);
+               const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+               if (monthlyTrendMap.has(label)) {
+                  const data = monthlyTrendMap.get(label)!;
+                  data.value += Number(c.valor) || 0;
+                  data.salesCount += 1;
+               }
+            });
+
+            supabaseCadastros.forEach(l => {
+                const d = getBRLDate(l.data_cadastro);
+                const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+                if (monthlyTrendMap.has(label)) {
+                   monthlyTrendMap.get(label)!.leads += 1;
+                }
+            });
+
+            const monthlyTrendData = monthsOrder.map(label => ({
+                date: label,
+                ...monthlyTrendMap.get(label)!
+            }));
+
             // Atribuição de "Campanhas" (Winning Ads)
             const campaignMap = new Map();
             filteredData.forEach(c => {
@@ -1800,6 +1843,7 @@ export default function App() {
               total: channelMap.total,
               totalProducts: formatProducts(channelMap.total.products),
               trendData,
+              monthlyTrendData,
               winners,
               distCampaigns: Array.from(distCampaignMap.values()).sort((a, b) => b.cost - a.cost),
               capCampaigns: Array.from(capCampaignMap.values()).sort((a, b) => b.leads - a.leads),
@@ -2479,6 +2523,137 @@ export default function App() {
             costs={metaCostsFull} 
             cursos={supabaseCursos} 
           />
+        )}
+
+        {dataStatus === 'success' && channelData.monthlyTrendData && channelData.monthlyTrendData.length > 0 && (
+          <Card className="p-6 bg-gradient-to-br from-[#111113] to-[#0A0A0A]">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-[1.5rem] font-serif font-normal text-text-primary italic">Performance Mensal</h3>
+                <p className="text-[10px] text-text-secondary uppercase tracking-widest mt-1">Últimos 12 meses</p>
+              </div>
+              <div className="flex gap-4 text-right">
+                <div>
+                   <p className="text-[0.75rem] text-text-muted uppercase font-bold">Recorde Mensal</p>
+                   <p className="text-lg font-mono text-primary">R$ {Math.max(...channelData.monthlyTrendData.map((d: any) => d.value)).toLocaleString('pt-BR')}</p>
+                </div>
+              </div>
+            </div>
+            <div className="h-48 sm:h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={channelData.monthlyTrendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorRevMonthly" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#DCA61F" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#DCA61F" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#222225" vertical={false} />
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="#52525B" 
+                    fontSize={10} 
+                    tickLine={false} 
+                    axisLine={false} 
+                  />
+                  <YAxis 
+                    yAxisId="left"
+                    stroke="#52525B" 
+                    fontSize={10} 
+                    tickLine={false} 
+                    axisLine={false} 
+                    tickFormatter={(val) => `R$ ${Intl.NumberFormat('pt-BR', { notation: 'compact' }).format(val)}`}
+                  />
+                  <YAxis 
+                    yAxisId="right"
+                    orientation="right"
+                    stroke="#52525B" 
+                    fontSize={10} 
+                    tickLine={false} 
+                    axisLine={false}
+                  />
+                  
+                  <Area
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#DCA61F"
+                    strokeWidth={3}
+                    fillOpacity={1}
+                    fill="url(#colorRevMonthly)"
+                    name="Receita"
+                    dot={{ r: 3, strokeWidth: 1 }}
+                    activeDot={{ r: 5 }}
+                  />
+                  <Area
+                    yAxisId="left"
+                    type="monotone"
+                    dataKey="cost"
+                    stroke="#EF4444"
+                    strokeWidth={2}
+                    fill="transparent"
+                    name="Investimento"
+                    dot={{ r: 3, strokeWidth: 1 }}
+                  />
+                  <Area
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="leads"
+                    stroke="#6366f1"
+                    strokeWidth={2}
+                    fill="transparent"
+                    name="Cadastros"
+                    dot={{ r: 3, strokeWidth: 1 }}
+                  />
+                  <Area
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="salesCount"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    fill="transparent"
+                    name="Vendas"
+                    dot={{ r: 3, strokeWidth: 1 }}
+                  />
+                  <RechartsTooltip 
+                    content={({ active, payload, label }) => {
+                      if (active && payload && payload.length) {
+                        const data = payload[0].payload;
+                        return (
+                          <div className="bg-bg-card border border-border p-4 rounded-[4px] shadow-2xl text-[11px] min-w-[200px] backdrop-blur-sm bg-black/80">
+                            <p className="text-text-label mb-3 font-medium border-b border-white/5 pb-2">{label}</p>
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-center">
+                                <span className="text-text-label">Faturamento:</span>
+                                <span className="text-primary font-bold ml-4">R$ {Number(data.value || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-text-label text-red-400">Investimento Meta:</span>
+                                <span className="text-red-400 font-bold ml-4">R$ {Number(data.cost || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-emerald-400">ROAS:</span>
+                                <span className="text-emerald-400 font-bold ml-4">{(data.cost > 0 ? (data.value / data.cost).toFixed(2) : '0.00') + 'x'}</span>
+                              </div>
+                              <div className="flex justify-between items-center pt-1 border-t border-white/5">
+                                <span className="text-text-label text-emerald-500">Vendas:</span>
+                                <span className="text-emerald-500 font-bold ml-4">{data.salesCount}</span>
+                              </div>
+                              <div className="flex justify-between items-center">
+                                <span className="text-text-label text-indigo-400">Cadastros:</span>
+                                <span className="text-indigo-400 font-bold ml-4">{data.leads}</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
         )}
 
         {/* Insights de Distribuição */}
