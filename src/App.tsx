@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   TrendingUp, Users, DollarSign, Activity, Focus,
   ArrowUpRight, ArrowDownRight, Filter, CalendarDays, Loader2, KeyRound, ChevronDown, ChevronRight, PieChart as PieChartIcon, BarChart2,
@@ -495,6 +496,234 @@ const Card = ({ children, className = '', ...props }: React.HTMLAttributes<HTMLD
   </div>
 );
 
+const MonthlyClosingSection: React.FC<{ checkouts: any[], costs: any[], cursos: any[] }> = ({ checkouts, costs, cursos }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  
+  const getMonths = () => {
+    const months = [];
+    const now = new Date();
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({
+        month: d.getMonth(),
+        year: d.getFullYear(),
+        label: d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+      });
+    }
+    return months;
+  };
+
+  const monthsList = getMonths();
+  const selectedMonth = monthsList[currentIndex];
+
+  const calculateStats = (month: number, year: number) => {
+    // Definimos início e fim do mês em BRT (UTC-3)
+    const startOfMonth = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
+    const endOfMonth = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999));
+    
+    const filteredCheckouts = checkouts.filter(c => {
+      const d = getBRLDate(c.timestamp || c.created_at);
+      return d >= startOfMonth && d <= endOfMonth && (c.status || '').toLowerCase().trim() === 'pago';
+    });
+
+    const filteredCosts = costs.filter(c => {
+      const d = c.date; // Já está como BRL Date
+      return d >= startOfMonth && d <= endOfMonth;
+    });
+
+    const revenue = filteredCheckouts.reduce((acc, curr) => acc + Number(curr.valor), 0);
+    const sales = filteredCheckouts.length;
+    const cost = filteredCosts.reduce((acc, curr) => acc + curr.cost, 0);
+
+    const productMap = new Map();
+    filteredCheckouts.forEach(c => {
+      const curso = cursos.find(cur => cur.id_curso === c.id_curso);
+      const name = curso ? curso.nome : 'Produto #' + c.id_curso;
+      const existing = productMap.get(name) || { name, qty: 0, rev: 0 };
+      productMap.set(name, { ...existing, qty: existing.qty + 1, rev: existing.rev + Number(c.valor) });
+    });
+
+    return { 
+      revenue, 
+      sales, 
+      cost, 
+      products: Array.from(productMap.values()).sort((a, b) => b.rev - a.rev)
+    };
+  };
+
+  const currentStats = calculateStats(selectedMonth.month, selectedMonth.year);
+  
+  // Previous Month for comparison
+  const prevDate = new Date(selectedMonth.year, selectedMonth.month - 1, 1);
+  const prevStats = calculateStats(prevDate.getMonth(), prevDate.getFullYear());
+
+  const currentRoas = currentStats.cost > 0 ? currentStats.revenue / currentStats.cost : 0;
+  const prevRoas = prevStats.cost > 0 ? prevStats.revenue / prevStats.cost : 0;
+
+  const getDiff = (curr: number, prev: number) => {
+    if (prev === 0) return { diff: curr, percent: 100, isUp: true };
+    const diff = curr - prev;
+    const percent = (diff / prev) * 100;
+    return { diff, percent, isUp: diff >= 0 };
+  };
+
+  const revDiff = getDiff(currentStats.revenue, prevStats.revenue);
+  const salesDiff = getDiff(currentStats.sales, prevStats.sales);
+  const costDiff = getDiff(currentStats.cost, prevStats.cost);
+  const roasDiff = getDiff(currentRoas, prevRoas);
+
+  const formatDiff = (d: { diff: number, percent: number, isUp: boolean }, isCurrency = false) => {
+    const symbol = d.isUp ? '+' : '';
+    const color = d.isUp ? 'text-emerald-500' : 'text-red-500';
+    const val = isCurrency ? `R$ ${Math.abs(d.diff).toLocaleString('pt-BR')}` : Math.abs(d.diff);
+    return (
+      <span className={`text-[10px] font-bold ${color}`}>
+        {symbol}{val} ({symbol}{d.percent.toFixed(1)}%)
+      </span>
+    );
+  };
+
+  // Cost comparison is "good" if it goes down (usually, but for growth maybe up is expected)
+  // Let's stick to standard color: up green, down red for revenue/sales.
+  
+  return (
+    <Card className="p-0 border-primary/30 bg-black/40 backdrop-blur-sm overflow-hidden">
+      <div className="p-6 border-b border-border flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded bg-primary/10 text-primary">
+            <CalendarDays className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="text-xl font-serif font-bold italic text-white capitalize">{selectedMonth.label}</h3>
+            <p className="text-[10px] text-text-secondary uppercase tracking-widest mt-1">Fechamento do Mês</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button 
+            disabled={currentIndex === monthsList.length - 1}
+            onClick={() => setCurrentIndex(prev => prev + 1)}
+            className="p-2 rounded hover:bg-white/5 disabled:opacity-30 transition-colors"
+          >
+            <ChevronRight className="w-5 h-5 rotate-180" />
+          </button>
+          <div className="flex gap-1">
+            {monthsList.map((_, i) => (
+              <div key={i} className={`w-1.5 h-1.5 rounded-full transition-all ${i === currentIndex ? 'bg-primary w-4' : 'bg-white/10'}`} />
+            ))}
+          </div>
+          <button 
+            disabled={currentIndex === 0}
+            onClick={() => setCurrentIndex(prev => prev - 1)}
+            className="p-2 rounded hover:bg-white/5 disabled:opacity-30 transition-colors"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-border">
+        {/* Faturamento */}
+        <div className="p-6">
+          <p className="text-[10px] text-text-secondary uppercase font-bold tracking-wider mb-2">Faturamento Mensal</p>
+          <div className="flex items-baseline gap-3 mb-1">
+            <h4 className="text-3xl font-bold text-white">R$ {currentStats.revenue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</h4>
+          </div>
+          <div className="flex items-center gap-2">
+            {formatDiff(revDiff, true)}
+            <span className="text-[10px] text-[#52525B]">vs mês anterior</span>
+          </div>
+        </div>
+
+        {/* Vendas */}
+        <div className="p-6">
+          <p className="text-[10px] text-text-secondary uppercase font-bold tracking-wider mb-2">Quantidade de Vendas</p>
+          <div className="flex items-baseline gap-3 mb-1">
+            <h4 className="text-3xl font-bold text-white">{currentStats.sales} <span className="text-sm font-normal text-text-muted">transações</span></h4>
+          </div>
+          <div className="flex items-center gap-2">
+            {formatDiff(salesDiff)}
+            <span className="text-[10px] text-[#52525B]">vs mês anterior</span>
+          </div>
+        </div>
+
+        {/* Investimento */}
+        <div className="p-6">
+          <p className="text-[10px] text-text-secondary uppercase font-bold tracking-wider mb-2">Investimento em Anúncios</p>
+          <div className="flex items-baseline gap-3 mb-1">
+            <h4 className="text-3xl font-bold text-white">R$ {currentStats.cost.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</h4>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`text-[10px] font-bold ${costDiff.isUp ? 'text-red-500' : 'text-emerald-500'}`}>
+              {costDiff.isUp ? '+' : ''}{Math.abs(costDiff.diff).toLocaleString('pt-BR')} ({costDiff.isUp ? '+' : ''}{costDiff.percent.toFixed(1)}%)
+            </span>
+            <span className="text-[10px] text-[#52525B]">vs mês anterior</span>
+          </div>
+        </div>
+
+        {/* ROAS */}
+        <div className="p-6">
+          <p className="text-[10px] text-text-secondary uppercase font-bold tracking-wider mb-2">ROAS do Mês</p>
+          <div className="flex items-baseline gap-3 mb-1">
+            <h4 className="text-3xl font-bold text-white">{currentRoas.toFixed(2)}x</h4>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`text-[10px] font-bold ${roasDiff.isUp ? 'text-emerald-500' : 'text-red-500'}`}>
+              {roasDiff.isUp ? '+' : ''}{roasDiff.diff.toFixed(2)} ({roasDiff.isUp ? '+' : ''}{roasDiff.percent.toFixed(1)}%)
+            </span>
+            <span className="text-[10px] text-[#52525B]">vs mês anterior</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-0 border-t border-border bg-black/20">
+        <div className="px-6 py-4 border-b border-border/50">
+          <p className="text-[10px] text-text-secondary uppercase font-bold tracking-[0.2em]">Detalhamento por Produto</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-white/5">
+              <tr>
+                <th className="px-6 py-3 text-[10px] text-text-muted uppercase font-bold">Produto</th>
+                <th className="px-6 py-3 text-[10px] text-text-muted uppercase font-bold text-right">Quantidade</th>
+                <th className="px-6 py-3 text-[10px] text-text-muted uppercase font-bold text-right">Comparativo Qtd</th>
+                <th className="px-6 py-3 text-[10px] text-text-muted uppercase font-bold text-right">Faturamento</th>
+                <th className="px-6 py-3 text-[10px] text-text-muted uppercase font-bold text-right">Comparativo R$</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {currentStats.products.length > 0 ? currentStats.products.map((p, i) => {
+                const prevP = prevStats.products.find(pp => pp.name === p.name) || { qty: 0, rev: 0 };
+                const qDiff = getDiff(p.qty, prevP.qty);
+                const rDiff = getDiff(p.rev, prevP.rev);
+                
+                return (
+                  <tr key={i} className="hover:bg-white/5 transition-colors">
+                    <td className="px-6 py-4">
+                      <span className="text-sm font-serif font-normal italic text-white truncate max-w-[250px] tracking-wide" title={p.name}>{p.name}</span>
+                    </td>
+                    <td className="px-6 py-4 text-xs font-mono text-right text-text-primary">{p.qty}</td>
+                    <td className="px-6 py-4 text-right">
+                       {formatDiff(qDiff)}
+                    </td>
+                    <td className="px-6 py-4 text-xs font-mono text-right text-primary">R$ {p.rev.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</td>
+                    <td className="px-6 py-4 text-right">
+                       {formatDiff(rDiff, true)}
+                    </td>
+                  </tr>
+                );
+              }) : (
+                <tr>
+                  <td colSpan={5} className="px-6 py-8 text-center text-[#525252] italic text-xs">Sem dados para este período.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </Card>
+  );
+};
+
 const ProductRow: React.FC<{ p: any, isSupabase?: boolean }> = ({ p, isSupabase }) => {
   const [expanded, setExpanded] = useState(false);
   const roas = p.cost > 0 ? p.rev / p.cost : 0;
@@ -543,15 +772,84 @@ const ProductRow: React.FC<{ p: any, isSupabase?: boolean }> = ({ p, isSupabase 
   );
 };
 
+interface CulturaSplashScreenProps {
+  onComplete: () => void;
+}
+
+const CulturaSplashScreen: React.FC<CulturaSplashScreenProps> = ({ onComplete }) => {
+  const letters = "Cultura Jurídica".split("");
+
+  useEffect(() => {
+    const timer = setTimeout(onComplete, 2000); // Transitions exactly when animations finish
+    return () => clearTimeout(timer);
+  }, [onComplete]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.5, ease: "easeInOut" }}
+      className="fixed inset-0 z-[10000] bg-black flex flex-col items-center justify-center text-white select-none overflow-hidden"
+    >
+      <div className="flex flex-col items-center">
+        {/* Logo - EXACT Matching Dashboard Header Style */}
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+          className="mb-10 relative"
+        >
+          <img 
+            src="https://jndvesrtqewjqvarfaox.supabase.co/storage/v1/object/public/Logos/625949743_18077241884595017_7660496256666720708_n.jpg" 
+            alt="Cultura Jurídica" 
+            className="w-24 h-24 md:w-32 md:h-32 rounded-full border border-white/10 object-cover shadow-2xl" 
+            referrerPolicy="no-referrer"
+          />
+        </motion.div>
+        
+        {/* Cultura Jurídica Animado - Matching Dashboard Title EXACTLY (Now White) */}
+        <div className="flex overflow-hidden mb-6 h-12 md:h-20 items-center">
+          {letters.map((letter, i) => (
+            <motion.span
+              key={i}
+              initial={{ y: 50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ 
+                delay: 0.3 + i * 0.04, 
+                duration: 0.8, 
+                ease: [0.22, 1, 0.36, 1] 
+              }}
+              className="text-3xl md:text-5xl font-serif font-normal italic tracking-[0.08em] text-white"
+            >
+              {letter === " " ? "\u00A0" : letter}
+            </motion.span>
+          ))}
+        </div>
+        
+        {/* Subtítulo */}
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 0.4, y: 0 }}
+          transition={{ delay: 1.3, duration: 0.7 }}
+          className="text-[10px] md:text-xs font-light tracking-[0.3em] text-gray-400 uppercase"
+        >
+          Saiba mais. Saiba melhor. Saiba Direito.
+        </motion.p>
+      </div>
+    </motion.div>
+  );
+};
+
 export default function App() {
   const [dataStatus, setDataStatus] = useState<'loading' | 'needs_setup' | 'logged_out' | 'success' | 'error'>('loading');
+  const [showSplash, setShowSplash] = useState(true);
   const [channelData, setChannelData] = useState<any>({
     meta: { revenue: 0, sales: 0, leads: 0, sessions: 0, cost: 0, products: [] },
     google: { revenue: 0, sales: 0, leads: 0, sessions: 0, cost: 0, products: [] },
     organic: { revenue: 0, sales: 0, leads: 0, sessions: 0, cost: 0, products: [] },
     total: { revenue: 0, sales: 0, leads: 0, sessions: 0, cost: 0 }
   });
-  const [kpis, setKpis] = useState(mockKpis);
+  const [kpis, setKpis] = useState<any[]>([]);
   const [errorMessage, setErrorMessage] = useState('');
   const companies = [
     {
@@ -577,6 +875,8 @@ export default function App() {
   const [filteredCheckouts, setFilteredCheckouts] = useState<any[]>([]);
   const [sheetData, setSheetData] = useState<any[]>([]);
   const [metaCosts, setMetaCosts] = useState<any[]>([]);
+  const [metaCostsFull, setMetaCostsFull] = useState<any[]>([]);
+  const [supabaseCheckoutsFull, setSupabaseCheckoutsFull] = useState<any[]>([]);
   const [supabaseCampanhasAtivas, setSupabaseCampanhasAtivas] = useState<any[]>([]);
   const [distStats, setDistStats] = useState<any>({ cost: 0, revenue: 0, sales: 0, leads: 0 });
 
@@ -692,7 +992,8 @@ export default function App() {
             const { data: cadastros, error: err1 } = await supabase
               .from('cadastros')
               .select('*')
-              .order('data_cadastro', { ascending: false });
+              .order('data_cadastro', { ascending: false })
+              .limit(5000);
             if (err1) throw err1;
             setSupabaseCadastros(cadastros || []);
 
@@ -714,13 +1015,15 @@ export default function App() {
             const { data: checkoutsRaw, error: err4 } = await supabase
               .from('eventos_checkout')
               .select('*')
-              .order('timestamp', { ascending: false });
+              .order('timestamp', { ascending: false })
+              .limit(5000);
             if (err4) throw err4;
 
             // 5. Tráfego Meta Cultura (TUDO) do Supabase
             const { data: trafegoMeta, error: err5 } = await supabase
               .from('trafego_meta_cultura')
-              .select('*');
+              .select('*')
+              .limit(5000);
             if (err5) throw err5;
 
             // 6. Anúncios Ativos Cultura (TUDO) do Supabase
@@ -787,14 +1090,26 @@ export default function App() {
             }).filter(v => v !== null) as any[];
 
             setMetaCosts(metaCosts);
+            setMetaCostsFull(metaCosts);
 
             // Deduplicate exact purchases (same course, same user, same value)
-            // We keep the OLDEST occurrence (first purchase) and ignore subsequent ones (retries/webhooks)
             const uniquePurchases: any[] = [];
-            // Sort ascending for deduplication to keep the original purchase
-            const chronologicalCheckouts = [...(checkoutsRaw || [])].sort((a, b) => 
-               getBRLDate(a.timestamp || a.created_at).getTime() - getBRLDate(b.timestamp || b.created_at).getTime()
-            );
+            
+            // Prioritize 'pago' status during deduplication
+            const rawCheckouts = (checkoutsRaw || []);
+            const chronologicalCheckouts = [...rawCheckouts].sort((a, b) => {
+               const timeA = getBRLDate(a.timestamp || a.created_at).getTime();
+               const timeB = getBRLDate(b.timestamp || b.created_at).getTime();
+               
+               // If it's the same time, prioritize 'pago'
+               if (Math.abs(timeA - timeB) < 1000) {
+                 const statusA = (a.status || '').toLowerCase().trim();
+                 const statusB = (b.status || '').toLowerCase().trim();
+                 if (statusA === 'pago' && statusB !== 'pago') return -1;
+                 if (statusB === 'pago' && statusA !== 'pago') return 1;
+               }
+               return timeA - timeB;
+            });
 
             chronologicalCheckouts.forEach(c => {
                const dateVal = c.timestamp || c.created_at;
@@ -803,18 +1118,26 @@ export default function App() {
                  return;
                }
                const cTime = getBRLDate(dateVal).getTime();
+               const cStatus = (c.status || '').toLowerCase().trim();
                
-               const isDuplicate = uniquePurchases.some(existing => {
+               const existingIdx = uniquePurchases.findIndex(existing => {
                  if (existing.id_usuario === c.id_usuario && existing.id_curso === c.id_curso && existing.valor === c.valor) {
                     const eTime = getBRLDate(existing.timestamp || existing.created_at).getTime();
                     const diffDays = Math.abs(cTime - eTime) / (1000 * 60 * 60 * 24);
-                    return diffDays <= 30; // Within 30 days we consider it the same transaction/retry
+                    return diffDays <= 30;
                  }
                  return false;
                });
 
-               if (!isDuplicate) {
+               if (existingIdx === -1) {
                  uniquePurchases.push(c);
+               } else {
+                 // Optimization: If the new one is 'pago' and the existing one isn't, swap them!
+                 const existing = uniquePurchases[existingIdx];
+                 const eStatus = (existing.status || '').toLowerCase().trim();
+                 if (cStatus === 'pago' && eStatus !== 'pago') {
+                   uniquePurchases[existingIdx] = c;
+                 }
                }
             });
 
@@ -876,6 +1199,7 @@ export default function App() {
             });
 
             setSupabaseCheckouts(checkouts);
+            setSupabaseCheckoutsFull(checkouts);
 
             // Crossover de dados: Atribui os UTMs de cadastro (lead) para compras (checkouts) sem UTM
             checkouts.forEach((c: any) => {
@@ -1819,7 +2143,14 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-bg-page text-text-main font-sans selection:bg-primary selection:text-text-primary pb-12">
+    <>
+      <AnimatePresence mode="wait">
+        {showSplash && (
+          <CulturaSplashScreen onComplete={() => setShowSplash(false)} />
+        )}
+      </AnimatePresence>
+
+      <div className="min-h-screen bg-bg-page text-text-main font-sans selection:bg-primary selection:text-text-primary pb-12">
       {/* Decorative Top Bar */}
       <div className="h-1 w-full bg-gradient-to-r from-transparent via-primary to-transparent opacity-50" />
       {/* Top Navigation / Header */}
@@ -1931,13 +2262,31 @@ export default function App() {
         )}
 
         {dataStatus === 'loading' && (
-          <div className="flex items-center gap-2 mb-8">
-            <Loader2 className="w-5 h-5 animate-spin text-text-label" />
-            <span className="text-sm text-text-label">Carregando dados...</span>
+          <div className="space-y-8 animate-pulse">
+            <div className="flex items-center gap-2 mb-8">
+              <Loader2 className="w-5 h-5 animate-spin text-primary" />
+              <span className="text-sm text-text-label">Sincronizando dados com Supabase...</span>
+            </div>
+            
+            {/* Chart Skeleton */}
+            <div className="h-48 sm:h-80 bg-white/5 rounded-[4px] border border-white/5 w-full" />
+            
+            {/* KPI Grid Skeleton */}
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 md:gap-4">
+              {[...Array(10)].map((_, i) => (
+                <div key={i} className="h-32 bg-white/5 rounded-[4px] border border-white/5" />
+              ))}
+            </div>
+
+            {/* Bottom Sections Skeleton */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="h-[350px] bg-white/5 rounded-[4px] border border-white/5" />
+              <div className="h-[350px] bg-white/5 rounded-[4px] border border-white/5" />
+              <div className="h-[350px] bg-white/5 rounded-[4px] border border-white/5" />
+            </div>
           </div>
         )}
 
-        {/* GRÁFICO DE RECEITA TEMPORAL - Principal */}
         {dataStatus === 'success' && channelData.trendData && channelData.trendData.length > 0 && (
           <Card className="mb-8 p-6 bg-gradient-to-br from-[#111113] to-[#0A0A0A]">
             <div className="flex items-center justify-between mb-6">
@@ -2093,47 +2442,44 @@ export default function App() {
         )}
 
         {/* KPIs Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 md:gap-4">
-          {kpis.map((kpi, idx) => {
-            const isKpiToday = (kpi as any).isToday;
-            return (
-              <Card 
-                key={idx} 
-                className={`relative overflow-hidden group transition-all duration-300 p-4 md:p-5 ${
-                  isKpiToday 
-                    ? "border-primary/60 shadow-[0_0_15px_rgba(212,168,67,0.1)] hover:border-primary" 
-                    : "hover:border-primary/50"
-                }`}
-              >
-                {isKpiToday && (
-                  <span className="absolute top-2 right-2 md:top-3 md:right-3 flex items-center gap-1 bg-primary/10 text-[7px] md:text-[8px] font-bold px-1 py-0.5 md:px-1.5 md:py-0.5 rounded-[3px] border border-primary/20 tracking-widest select-none">
-                    <span className="w-1 h-1 rounded-full bg-primary animate-pulse" />
-                    <span className="text-primary font-semibold">HOJE</span>
-                  </span>
-                )}
-                <div className="flex justify-between items-start mb-2 md:mb-3">
-                  <div className="p-1.5 md:p-2 rounded-[4px] transition-colors bg-primary/10 text-primary">
-                    <kpi.icon className="w-4 h-4 md:w-5 md:h-5" />
+        {dataStatus === 'success' && (
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 md:gap-4">
+            {kpis.map((kpi, idx) => {
+              return (
+                <Card 
+                  key={idx} 
+                  className={`relative overflow-hidden group transition-all duration-300 p-4 md:p-6 flex flex-col items-center text-center hover:border-primary/50`}
+                >
+                  <div className="p-1.5 md:p-2.5 rounded-full transition-colors bg-primary/10 text-primary mb-3 md:mb-4">
+                    <kpi.icon className="w-4 h-4 md:w-6 md:h-6" />
                   </div>
-                </div>
-                <div>
-                  <p className="text-[10px] md:text-[0.75rem] font-medium uppercase tracking-[0.05em] mb-0.5 md:mb-1 text-text-label">
-                    {kpi.title}
-                  </p>
-                  <h3 className="text-[1.25rem] md:text-[1.5rem] font-bold tabular-nums tracking-tight whitespace-nowrap text-text-primary">
-                    {kpi.value}
-                  </h3>
-                  <p className="text-[10px] md:text-xs mt-0.5 md:mt-1 text-text-muted">
-                    {kpi.trend}
-                  </p>
-                </div>
-                <div className="absolute -right-6 -bottom-6 transition-opacity text-primary opacity-[0.03] group-hover:opacity-[0.05]">
-                  <kpi.icon className="w-24 h-24" />
-                </div>
-              </Card>
-            );
-          })}
-        </div>
+                  <div>
+                    <p className="text-[10px] md:text-[0.65rem] font-bold uppercase tracking-[0.1em] mb-1.5 md:mb-2 text-text-muted">
+                      {kpi.title}
+                    </p>
+                    <h3 className="text-[1.25rem] md:text-[1.75rem] font-bold tabular-nums tracking-tight whitespace-nowrap text-text-primary">
+                      {kpi.value}
+                    </h3>
+                    <p className="text-[10px] md:text-[0.7rem] mt-1 md:mt-2 text-[#71717A] font-medium">
+                      {kpi.trend}
+                    </p>
+                  </div>
+                  <div className="absolute -right-6 -bottom-6 transition-opacity text-primary opacity-[0.02] group-hover:opacity-[0.04]">
+                    <kpi.icon className="w-24 h-24" />
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+
+        {dataStatus === 'success' && (
+          <MonthlyClosingSection 
+            checkouts={supabaseCheckoutsFull} 
+            costs={metaCostsFull} 
+            cursos={supabaseCursos} 
+          />
+        )}
 
         {/* Insights de Distribuição */}
         {dataStatus === 'success' && (
@@ -2536,10 +2882,6 @@ export default function App() {
                       <h3 className="text-base md:text-lg font-bold text-text-primary tracking-tight">Campanhas Ativas</h3>
                       <p className="text-[11px] text-text-secondary mt-1">Status atual das campanhas em veiculação (dados em tempo real não afetados pelo seletor de data).</p>
                     </div>
-                    <div className="flex items-center gap-1.5 self-start md:self-auto bg-primary/10 border border-primary/20 rounded-[3px] px-2 py-0.5 text-[9px] font-bold text-primary select-none font-mono">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      <span>LIVE STATUS</span>
-                    </div>
                   </div>
                   <ActiveCampaignsTree data={supabaseCampanhasAtivas} />
                 </div>
@@ -2938,6 +3280,7 @@ export default function App() {
         )}
       </main>
     </div>
+    </>
   );
 }
 
