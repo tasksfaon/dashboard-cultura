@@ -99,8 +99,16 @@ const parseSupabaseDate = (dateVal: string | null | undefined): Date => {
 
 const getBRLDate = (val: string | Date | null | undefined): Date => {
   if (!val) return new Date();
-  const d = (val instanceof Date) ? val : parseSupabaseDate(val);
-  return new Date(d.getTime() - 3 * 3600 * 1000);
+  if (val instanceof Date) {
+    if ((val as any)._isBRL) return val;
+    const shifted = new Date(val.getTime() - 3 * 3600 * 1000);
+    (shifted as any)._isBRL = true;
+    return shifted;
+  }
+  const d = parseSupabaseDate(val);
+  const shifted = new Date(d.getTime() - 3 * 3600 * 1000);
+  (shifted as any)._isBRL = true;
+  return shifted;
 };
 
 const formatDateBRL = (val: string | Date | null | undefined): string => {
@@ -112,27 +120,80 @@ const formatDateBRL = (val: string | Date | null | undefined): string => {
   return `${day}/${month}/${year}`;
 };
 
+const normalizePaymentMethod = (raw: string | null | undefined): string => {
+  if (!raw) return 'Indefinido';
+  const val = String(raw).toLowerCase().trim();
+  if (val.includes('pix')) return 'Pix';
+  if (val.includes('boleto') || val.includes('slip') || val.includes('facture') || val.includes('billet')) return 'Boleto';
+  if (
+    val.includes('cartao') || 
+    val.includes('cartão') || 
+    val.includes('card') || 
+    val.includes('credito') || 
+    val.includes('crédito') || 
+    val.includes('cc') || 
+    val.includes('2cartao') || 
+    val.includes('2_cartoes') || 
+    val.includes('dois_cartoes') ||
+    val.includes('cartoes') ||
+    val.includes('cartões')
+  ) {
+    return 'Cartão de Crédito';
+  }
+  if (val.includes('paypal')) return 'PayPal';
+  if (val.includes('apple') || val.includes('pay')) return 'Carteira Digital';
+  return raw.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+};
+
 const PieChartLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, value, index, name, percent }: any) => {
   const RADIAN = Math.PI / 180;
-  const radius = outerRadius * 1.1;
+  const radius = outerRadius * 1.25;
   const x = cx + radius * Math.cos(-midAngle * RADIAN);
   const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
   if (value === 0) return null;
 
-  // Usa o percent do próprio Recharts (que é uma fração entre 0 e 1)
   const displayPercent = (percent * 100).toFixed(1);
+  const textAnchor = x > cx ? 'start' : 'end';
+
+  const maxLineLen = 14;
+  const words = name.split(' ');
+  const nameLines: string[] = [];
+  let currentLine = '';
+
+  words.forEach((word: string) => {
+    if (!currentLine) {
+      currentLine = word;
+    } else if (currentLine.length + 1 + word.length <= maxLineLen) {
+      currentLine += ' ' + word;
+    } else {
+      nameLines.push(currentLine);
+      currentLine = word;
+    }
+  });
+  if (currentLine) {
+    nameLines.push(currentLine);
+  }
+
+  const lines = [...nameLines, `(${displayPercent}%)`];
 
   return (
     <text
       x={x}
       y={y}
       fill="#8E9299"
-      textAnchor={x > cx ? 'start' : 'end'}
-      dominantBaseline="central"
+      textAnchor={textAnchor}
       className="text-[10px] font-medium"
     >
-      {`${name} (${displayPercent}%)`}
+      {lines.map((line, i) => {
+        const spacing = 12;
+        const dy = i === 0 ? -(lines.length - 1) * spacing / 2 : spacing;
+        return (
+          <tspan key={i} x={x} dy={dy} fill={i === lines.length - 1 ? "#A1A1AA" : "#8E9299"} className={i === lines.length - 1 ? "text-[9px] font-mono" : ""}>
+            {line}
+          </tspan>
+        );
+      })}
     </text>
   );
 };
@@ -261,105 +322,6 @@ export default function App() {
   const [sheetData, setSheetData] = useState<any[]>([]);
   const [metaCosts, setMetaCosts] = useState<any[]>([]);
   const [distStats, setDistStats] = useState<any>({ cost: 0, revenue: 0, sales: 0, leads: 0 });
-
-  useEffect(() => {
-    const fetchSheetData = async () => {
-      const url = 'https://docs.google.com/spreadsheets/d/13Jwi6tpiUR7opXYhYnkZd4ympKIrWVmfhcNOchans5I/gviz/tq?tqx=out:csv';
-      try {
-        const response = await fetch(url);
-        const csvText = await response.text();
-        const rows = csvText.split('\n');
-        // Assume first row is header
-        const headers = rows[0].split(',').map(h => h.replace(/"/g, ''));
-        const adNameIndex = headers.indexOf('Ad Name');
-        
-        const parsedData = rows.slice(1).map(row => {
-            const values = row.split(',').map(v => v.replace(/"/g, ''));
-            return adNameIndex !== -1 ? values[adNameIndex] : null;
-        }).filter(v => v !== null && v !== "");
-        
-        setSheetData(parsedData);
-        console.log('Ad Names extracted:', parsedData);
-      } catch (error) {
-        console.error('Error fetching sheet:', error);
-      }
-    };
-
-    const fetchMetaCosts = async () => {
-      const url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRipHb2qYPRUNldUPch9vewcpC4DI_hSzDw8yZmhx0R4UO_SgFPgd2jmCdRqhwhdeuek6x9lmiHDVQo/pub?output=csv';
-      try {
-        const response = await fetch(url);
-        const csvText = await response.text();
-        const rows = csvText.split('\n');
-        if (rows.length < 2) return;
-
-        const headers = rows[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase());
-        
-        // Detect indices for Date, Cost, Campaign, and Ad Name based on user specification
-        const dateIndex = headers.findIndex(h => h === 'day' || h === 'data' || h.includes('date') || h.includes('dia'));
-        const costIndex = headers.findIndex(h => h.includes('spent') || h.includes('gasto') || h.includes('cost') || h.includes('valor'));
-        const campaignIndex = headers.findIndex(h => h.includes('campaign') || h.includes('campanha'));
-        const adNameIndex = headers.findIndex(h => h.includes('ad name') || h.includes('nome do anúncio'));
-
-        if (dateIndex === -1 || costIndex === -1) {
-          console.error('Could not find Day or Amount spent columns in Meta Ads sheet. Headers found:', headers);
-          return;
-        }
-
-        const parsedCosts = rows.slice(1).map(row => {
-          // Robust CSV splitting to handle commas in values if they are quoted
-          const values: string[] = [];
-          let current = '';
-          let inQuotes = false;
-          for (let i = 0; i < row.length; i++) {
-            const char = row[i];
-            if (char === '"') inQuotes = !inQuotes;
-            else if (char === ',' && !inQuotes) {
-              values.push(current.trim());
-              current = '';
-            } else current += char;
-          }
-          values.push(current.trim());
-
-          const dateStr = values[dateIndex]?.replace(/"/g, '');
-          const costStr = values[costIndex]?.replace(/"/g, '').replace('R$', '').replace(/\./g, '').replace(',', '.').trim();
-          const campaign = campaignIndex !== -1 ? values[campaignIndex]?.replace(/"/g, '') : 'Desconhecido';
-          const adName = adNameIndex !== -1 ? values[adNameIndex]?.replace(/"/g, '') : 'Desconhecido';
-          const cost = parseFloat(costStr);
-
-          if (!dateStr || isNaN(cost)) return null;
-
-          // Normalize date format - explicit parsing to avoid timezone shifts
-          let dateObj: Date;
-          if (dateStr.includes('-')) {
-            // YYYY-MM-DD
-            const [y, m, d] = dateStr.split('-');
-            dateObj = new Date(Number(y), Number(m) - 1, Number(d));
-          } else if (dateStr.includes('/')) {
-            // DD/MM/YYYY
-            const [d, m, y] = dateStr.split('/');
-            dateObj = new Date(Number(y), Number(m) - 1, Number(d));
-          } else {
-            dateObj = new Date(dateStr);
-          }
-
-          // Ensure valid date and normalize to midnight
-          if (isNaN(dateObj.getTime())) return null;
-          dateObj.setHours(0, 0, 0, 0);
-
-          return { date: dateObj, cost, campaign, adName };
-        }).filter(v => v !== null);
-
-        setMetaCosts(parsedCosts as any[]);
-        console.log('Meta Ads Costs extracted:', (parsedCosts as any[]).length, 'records');
-      } catch (error) {
-        console.error('Error fetching Meta Costs sheet:', error);
-      }
-    };
-
-    fetchSheetData();
-    fetchMetaCosts();
-  }, []);
 
   const selectedCompany = companies.find(c => c.id === selectedCompanyId) || companies[0];
   const propertyId = selectedCompany.propertyId;
@@ -498,6 +460,64 @@ export default function App() {
               .order('timestamp', { ascending: false });
             if (err4) throw err4;
 
+            // 5. Tráfego Meta Cultura (TUDO) do Supabase
+            const { data: trafegoMeta, error: err5 } = await supabase
+              .from('trafego_meta_cultura')
+              .select('*');
+            if (err5) throw err5;
+
+            // Formata custo do Meta do Supabase conforme correspondências especificadas pelo usuário:
+            // - date -> day, data
+            // - spend -> spent, gasto, cost, valor
+            // - campaign_name -> campaign, campanha
+            // - ad_name -> ad name, nome do anuncio
+            const metaCosts = (trafegoMeta || []).map(row => {
+              const dateStr = String(row.date || '');
+              let cost = 0;
+              if (row.spend !== undefined && row.spend !== null) {
+                if (typeof row.spend === 'number') {
+                  cost = row.spend;
+                } else {
+                  const valStr = String(row.spend)
+                    .replace('R$', '')
+                    .replace(/\./g, '')
+                    .replace(',', '.')
+                    .trim();
+                  cost = parseFloat(valStr);
+                }
+              }
+              const campaign = row.campaign_name || 'Desconhecido';
+              const adName = row.ad_name || 'Desconhecido';
+
+              if (!dateStr || isNaN(cost)) return null;
+
+              let dateObj: Date;
+              if (dateStr.includes('-')) {
+                const cleanDateStr = dateStr.split(' ')[0];
+                const [y, m, d] = cleanDateStr.split('-');
+                dateObj = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d), 0, 0, 0, 0));
+              } else if (dateStr.includes('/')) {
+                const cleanDateStr = dateStr.split(' ')[0];
+                const [d, m, y] = cleanDateStr.split('/');
+                dateObj = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d), 0, 0, 0, 0));
+              } else {
+                dateObj = new Date(dateStr);
+              }
+
+              if (isNaN(dateObj.getTime())) return null;
+              if (dateStr.includes('-') || dateStr.includes('/')) {
+                (dateObj as any)._isBRL = true;
+              } else {
+                const shifted = new Date(dateObj.getTime() - 3 * 3600 * 1000);
+                (shifted as any)._isBRL = true;
+                dateObj = shifted;
+              }
+
+              return { date: dateObj, cost, campaign, adName };
+            }).filter(v => v !== null) as any[];
+
+            setMetaCosts(metaCosts);
+
             // Deduplicate exact purchases (same course, same user, same value)
             // We keep the OLDEST occurrence (first purchase) and ignore subsequent ones (retries/webhooks)
             const uniquePurchases: any[] = [];
@@ -587,50 +607,97 @@ export default function App() {
 
             setSupabaseCheckouts(checkouts);
 
+            // Crossover de dados: Atribui os UTMs de cadastro (lead) para compras (checkouts) sem UTM
+            checkouts.forEach((c: any) => {
+               const hasNoUtm = !c.utm_source || 
+                                c.utm_source.trim() === '' || 
+                                c.utm_source === 'null' || 
+                                c.utm_source === 'undefined' ||
+                                ['organico', 'direto', 'direct', 'organic', 'sem rastreio', 'busca orgânica / sem rastreio'].includes(c.utm_source.toLowerCase().trim());
+
+               if (hasNoUtm) {
+                  const lead = (cadastros || []).find((l: any) => {
+                     if (c.id_usuario) {
+                        const cId = String(c.id_usuario);
+                        if (String(l.id_usuario) === cId || String(l.id) === cId) return true;
+                     }
+                     const cEmail = String(c.email || c.email_cliente || c.customer_email || '').toLowerCase().trim();
+                     const lEmail = String(l.email || '').toLowerCase().trim();
+                     if (cEmail && lEmail && cEmail === lEmail) return true;
+                     return false;
+                  });
+
+                  if (lead && lead.utm_source_cadastro) {
+                     c.utm_source = lead.utm_source_cadastro;
+                     c.utm_medium = lead.utm_medium_cadastro || '';
+                     c.utm_campaign = lead.utm_campaign_cadastro || '';
+                     c.utm_content = lead.utm_content_cadastro || '';
+                     c.utm_crossed_from_cadastro = true;
+                  }
+               }
+            });
+
             // --- FILTRAGEM POR DATA (JS) ---
-            const now = new Date();
-            let startDate = new Date();
-            let endDate = new Date();
+            const nowUTC = new Date();
+            // Pegamos o horário atual de Brasília e representamos como UTC absoluto
+            const now = new Date(nowUTC.getTime() - 3 * 3600 * 1000);
+            (now as any)._isBRL = true;
+
+            let startDate = new Date(now.getTime());
+            let endDate = new Date(now.getTime());
             
             if (dateRange === '7days') { 
               startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); 
-              startDate.setHours(0,0,0,0); 
+              startDate.setUTCHours(0,0,0,0); 
+              endDate = new Date(now.getTime());
+              endDate.setUTCHours(23,59,59,999);
             }
             else if (dateRange === '14days') { 
               startDate = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000); 
-              startDate.setHours(0,0,0,0); 
+              startDate.setUTCHours(0,0,0,0); 
+              endDate = new Date(now.getTime());
+              endDate.setUTCHours(23,59,59,999);
             }
             else if (dateRange === '30days') { 
               startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); 
-              startDate.setHours(0,0,0,0); 
+              startDate.setUTCHours(0,0,0,0); 
+              endDate = new Date(now.getTime());
+              endDate.setUTCHours(23,59,59,999);
             }
             else if (dateRange === 'thisMonth') {
-              startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-              startDate.setHours(0,0,0,0);
+              startDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+              endDate = new Date(now.getTime());
+              endDate.setUTCHours(23,59,59,999);
             }
             else if (dateRange === 'yesterday') {
               startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-              startDate.setHours(0,0,0,0);
+              startDate.setUTCHours(0,0,0,0);
               endDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-              endDate.setHours(23,59,59,999);
+              endDate.setUTCHours(23,59,59,999);
             }
             else if (dateRange === 'today') {
-              startDate.setHours(0,0,0,0);
-              endDate.setHours(23,59,59,999);
+              startDate = new Date(now.getTime());
+              startDate.setUTCHours(0,0,0,0);
+              endDate = new Date(now.getTime());
+              endDate.setUTCHours(23,59,59,999);
             }
             else if (dateRange === 'custom' && appliedCustomDate.start) {
-              // Ensure we apply local timezone correctly to custom dates
               const [sy, sm, sd] = appliedCustomDate.start.split('-').map(Number);
-              startDate = new Date(sy, sm - 1, sd, 0, 0, 0, 0);
+              startDate = new Date(Date.UTC(sy, sm - 1, sd, 0, 0, 0, 0));
               if (appliedCustomDate.end) {
                 const [ey, em, ed] = appliedCustomDate.end.split('-').map(Number);
-                endDate = new Date(ey, em - 1, ed, 23, 59, 59, 999);
+                endDate = new Date(Date.UTC(ey, em - 1, ed, 23, 59, 59, 999));
               }
             }
             else { 
               startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000); 
-              startDate.setHours(0,0,0,0); 
+              startDate.setUTCHours(0,0,0,0); 
+              endDate = new Date(now.getTime());
+              endDate.setUTCHours(23,59,59,999);
             } // Default 1 ano
+
+            (startDate as any)._isBRL = true;
+            (endDate as any)._isBRL = true;
 
             const checkoutsNoPeriodo = (checkouts || []).filter((c: any) => {
               const dateVal = c.timestamp || c.created_at;
@@ -788,7 +855,8 @@ export default function App() {
               channelMap[cat].sales += 1;
 
               // Métodos de Pagamento
-              const pm = checkout.metodo_pagamento || checkout.payment_method || checkout.forma_pagamento || 'Outro';
+              const pmRaw = checkout.metodo_pagamento || checkout.payment_method || checkout.forma_pagamento || 'Outro';
+              const pm = normalizePaymentMethod(pmRaw);
               paymentMap.set(pm, (paymentMap.get(pm) || 0) + rev);
 
               // Produtos por canal
@@ -1194,16 +1262,32 @@ export default function App() {
             const taxaCancelamento = checkoutsNoPeriodo.length > 0 ? ((canceladosData.length / checkoutsNoPeriodo.length) * 100).toFixed(1) + '%' : '0%';
             const recusadosCount = recusadosData.length.toString();
 
+            const todayStr = formatDateBRL(new Date());
+            const checkoutsToday = checkouts.filter((c: any) => {
+              const dateVal = c.timestamp || c.created_at;
+              if (!dateVal || (c.status || '').toLowerCase().trim() !== 'pago') return false;
+              return formatDateBRL(dateVal) === todayStr;
+            });
+            const cadastrosToday = (cadastros || []).filter((c: any) => {
+              const dateVal = c.data_cadastro;
+              if (!dateVal) return false;
+              return formatDateBRL(dateVal) === todayStr;
+            });
+
+            const vendasHojeCount = checkoutsToday.length.toString();
+            const cadastrosHojeCount = cadastrosToday.length.toString();
+
             setKpis([
               { title: 'Receita Total', value: `R$ ${totalRevenue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, trend: 'Faturamento no Período', isUp: true, icon: DollarSign },
               { title: 'Investimento Total', value: `R$ ${periodMetaCost.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, trend: 'Valor Gasto no Período', isUp: true, icon: CreditCard },
               { title: 'ROAS Geral', value: blendedROAS, trend: 'Retorno do investimento', isUp: true, icon: Activity },
               { title: 'CPA Geral', value: blendedCPA, trend: 'Custo por Venda', isUp: true, icon: Target },
-              { title: 'Total Leads', value: leadsCount.toString(), trend: 'Novos Cadastros', isUp: true, icon: Users },
+              { title: 'Vendas hoje', value: vendasHojeCount, trend: 'Checkouts hoje', isUp: true, icon: ShoppingCart },
+              { title: 'Total de cadastros', value: leadsCount.toString(), trend: 'Novos Cadastros', isUp: true, icon: Users },
               { title: 'Vendas Totais', value: salesCount.toString(), trend: 'Checkouts realizados', isUp: true, icon: ShoppingCart },
-              { title: 'Tempo Médio', value: avgConvTime, trend: 'Cadastro até a compra', isUp: true, icon: Clock },
               { title: 'Taxa de Cancelamento', value: taxaCancelamento, trend: 'Pedidos Cancelados', isUp: false, icon: ArrowDownRight },
               { title: 'Cartão Recusado', value: recusadosCount, trend: 'Pagamentos Negados', isUp: false, icon: ArrowDownRight },
+              { title: 'Cadastros hoje', value: cadastrosHojeCount, trend: 'Contatos hoje', isUp: true, icon: Users },
             ]);
 
             setDataStatus('success');
@@ -1232,7 +1316,7 @@ export default function App() {
     };
 
     fetchAnalytics();
-  }, [tokens, propertyId, dateRange, appliedCustomDate.start, appliedCustomDate.end, metaCosts]);
+  }, [tokens, propertyId, dateRange, appliedCustomDate.start, appliedCustomDate.end]);
 
   const handleConnect = async () => {
     try {
@@ -1365,7 +1449,7 @@ export default function App() {
                                 return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
                               })()}
                             </p>
-                            <p className="text-[9px] text-[#525252] uppercase font-bold">{paymentMethod} / {checkout.status}</p>
+                            <p className="text-[9px] text-[#525252] uppercase font-bold">{normalizePaymentMethod(paymentMethod)} / {checkout.status}</p>
                          </div>
                          <div className="text-right">
                             <p className={`text-sm font-bold ${type === 'cancels' ? 'text-red-500' : type === 'declines' ? 'text-orange-500' : 'text-primary'}`}>R$ {Number(checkout.valor).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
@@ -1429,6 +1513,11 @@ export default function App() {
                                    <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                                    <span className="text-xs text-primary font-bold">
                                      {getFriendlyChannel(checkout.utm_source || lead?.utm_source_cadastro, checkout.utm_medium || lead?.utm_medium_cadastro, checkout.utm_campaign || lead?.utm_campaign_cadastro, checkout.utm_content || lead?.utm_content_cadastro)}
+                                     {checkout.utm_crossed_from_cadastro && (
+                                       <span className="block text-[8px] text-primary/80 uppercase font-bold tracking-wider mt-1.5 pt-1.5 border-t border-primary/20 animate-pulse select-none">
+                                         ✦ Atribuído via Cadastro (Lead)
+                                       </span>
+                                     )}
                                    </span>
                                  </div>
                                </div>
@@ -1636,6 +1725,8 @@ export default function App() {
                     fillOpacity={1}
                     fill="url(#colorRev)"
                     name="Receita"
+                    dot={{ r: 2, strokeWidth: 1 }}
+                    activeDot={{ r: 4 }}
                   />
                   <Area
                     yAxisId="left"
@@ -1645,6 +1736,8 @@ export default function App() {
                     strokeWidth={2}
                     fill="transparent"
                     name="Investimento"
+                    dot={{ r: 2, strokeWidth: 1 }}
+                    activeDot={{ r: 4 }}
                   />
                   <Area
                     yAxisId="right"
@@ -1654,6 +1747,8 @@ export default function App() {
                     strokeWidth={2}
                     fill="transparent"
                     name="Leads"
+                    dot={{ r: 2, strokeWidth: 1 }}
+                    activeDot={{ r: 4 }}
                   />
                   <Area
                     yAxisId="right"
@@ -1663,6 +1758,8 @@ export default function App() {
                     strokeWidth={2}
                     fill="transparent"
                     name="Vendas (Qtd)"
+                    dot={{ r: 2, strokeWidth: 1 }}
+                    activeDot={{ r: 4 }}
                   />
                   <RechartsTooltip 
                     content={({ active, payload, label }) => {
@@ -1726,7 +1823,7 @@ export default function App() {
         )}
 
         {/* KPIs Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-2 md:gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 md:gap-4">
           {kpis.map((kpi, idx) => (
             <Card key={idx} className="relative overflow-hidden group hover:border-primary/50 transition-colors p-4 md:p-5">
               <div className="flex justify-between items-start mb-2 md:mb-3">
@@ -1746,58 +1843,13 @@ export default function App() {
           ))}
         </div>
 
-        {/* Métricas de Distribuição - Campanhas de Distribuição de Conteúdo */}
-        <div className="mt-8">
-            <h2 className="text-xl font-bold mb-6 text-text-primary flex items-center gap-2">
-              <Zap className="w-5 h-5 text-primary" /> Campanhas de distribuição de conteúdo
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-               <Card className="p-5 bg-bg-card border-border flex items-center gap-4 hover:border-primary/30 transition-colors">
-                 <div className="p-3 bg-red-500/10 rounded-full text-red-500">
-                   <CreditCard className="w-5 h-5" />
-                 </div>
-                 <div>
-                   <p className="text-text-label text-xs uppercase font-medium tracking-wide">Investimento</p>
-                   <h3 className="text-xl font-bold tabular-nums">R$ {distStats.cost.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</h3>
-                 </div>
-               </Card>
-               <Card className="p-5 bg-bg-card border-border flex items-center gap-4 hover:border-primary/30 transition-colors">
-                 <div className="p-3 bg-primary/10 rounded-full text-primary">
-                   <DollarSign className="w-5 h-5" />
-                 </div>
-                 <div>
-                   <p className="text-text-label text-xs uppercase font-medium tracking-wide">Receita</p>
-                   <h3 className="text-xl font-bold tabular-nums">R$ {distStats.revenue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</h3>
-                 </div>
-               </Card>
-               <Card className="p-5 bg-bg-card border-border flex items-center gap-4 hover:border-primary/30 transition-colors">
-                 <div className="p-3 bg-emerald-500/10 rounded-full text-emerald-500">
-                   <ShoppingCart className="w-5 h-5" />
-                 </div>
-                 <div>
-                   <p className="text-text-label text-xs uppercase font-medium tracking-wide">Vendas</p>
-                   <h3 className="text-xl font-bold tabular-nums">{distStats.sales}</h3>
-                 </div>
-               </Card>
-               <Card className="p-5 bg-bg-card border-border flex items-center gap-4 hover:border-primary/30 transition-colors">
-                 <div className="p-3 bg-blue-500/10 rounded-full text-blue-500">
-                   <Users className="w-5 h-5" />
-                 </div>
-                 <div>
-                   <p className="text-text-label text-xs uppercase font-medium tracking-wide">Leads</p>
-                   <h3 className="text-xl font-bold tabular-nums">{distStats.leads}</h3>
-                 </div>
-               </Card>
-            </div>
-        </div>
-
         {/* Insights de Distribuição */}
         {dataStatus === 'success' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
             <Card className="p-6">
               <div className="flex items-center justify-between mb-8">
                 <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
-                  <Activity className="w-4 h-4" /> Proporção Status Checkout
+                  <Activity className="w-4 h-4" /> Status de pagamentos
                 </h4>
               </div>
               <div className="h-[300px] w-full">
@@ -1807,8 +1859,8 @@ export default function App() {
                       data={statusPieData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
+                      innerRadius={55}
+                      outerRadius={90}
                       paddingAngle={5}
                       dataKey="value"
                       labelLine={false}
@@ -1855,8 +1907,8 @@ export default function App() {
                       data={channelData.productPieData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
+                      innerRadius={55}
+                      outerRadius={90}
                       paddingAngle={5}
                       dataKey="value"
                       labelLine={false}
@@ -1875,7 +1927,7 @@ export default function App() {
             <Card className="p-6">
               <div className="flex items-center justify-between mb-8">
                 <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
-                  <Target className="w-4 h-4" /> Mix de Origem (Market Share Interno)
+                  <Target className="w-4 h-4" /> Distribuição dos canais de aquisição
                 </h4>
               </div>
               <div className="h-[300px] w-full">
@@ -1885,8 +1937,8 @@ export default function App() {
                       data={channelData.channelPieData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
+                      innerRadius={55}
+                      outerRadius={90}
                       paddingAngle={5}
                       dataKey="value"
                       labelLine={false}
@@ -1948,7 +2000,7 @@ export default function App() {
             {channelData.topCustomers && channelData.topCustomers.length > 0 && (
               <Card className="h-full">
                 <h3 className="text-sm font-medium text-[#A1A1AA] mb-4 flex items-center gap-2">
-                    <Award className="w-4 h-4 text-primary" /> Top 5 Clientes (LTV)
+                    <Award className="w-4 h-4 text-primary" /> Melhores clientes no período
                 </h3>
                 <div className="space-y-3">
                   {channelData.topCustomers.map((c: any, i: number) => (
@@ -2032,7 +2084,7 @@ export default function App() {
               <Card className="p-5 lg:col-span-2">
                 <div className="flex items-center justify-between mb-6">
                   <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
-                     <BarChart2 className="w-4 h-4" /> {selectedCompanyId === 'cultura' ? 'Receita por Canal (Atribuição Blended)' : 'Receita vs Custo por Canal'}
+                     <BarChart2 className="w-4 h-4" /> {selectedCompanyId === 'cultura' ? 'Receita por Canal' : 'Receita vs Custo por Canal'}
                   </h4>
                   {channelData.hasFallback && (
                     <div className="group relative flex items-center cursor-help">
@@ -2302,12 +2354,12 @@ export default function App() {
         {selectedCompanyId === 'cultura' && dataStatus === 'success' && (
           <>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-               {renderCheckoutCard(supabaseCheckouts, "Vendas Recentes (Checkouts)", 30, <CreditCard className="w-4 h-4" />, 'sales')}
+               {renderCheckoutCard(supabaseCheckouts, "Vendas Recentes", 30, <CreditCard className="w-4 h-4" />, 'sales')}
 
              <Card className="p-0 overflow-hidden border-primary/20">
                 <div className="p-5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between bg-white/5 gap-2">
                 <h4 className="text-[0.75rem] font-serif font-normal text-primary/80 uppercase tracking-[0.25em] flex items-center gap-2 shrink-0">
-                       <Users className="w-4 h-4" /> Novos Leads (Cadastros)
+                       <Users className="w-4 h-4" /> Cadastros recentes
                     </h4>
                  </div>
                 <div className="max-h-[400px] overflow-y-auto">
@@ -2438,8 +2490,8 @@ export default function App() {
                          data={channelData.leadsSourcePieData}
                          cx="50%"
                          cy="50%"
-                         innerRadius={60}
-                         outerRadius={100}
+                         innerRadius={55}
+                         outerRadius={90}
                          paddingAngle={5}
                          dataKey="value"
                          label={PieChartLabel}
