@@ -1584,45 +1584,48 @@ export default function App() {
 
             // --- MONTHLY TREND DATA (Last 12 Months) ---
             const monthlyTrendMap = new Map<string, { value: number, salesCount: number, leads: number, cost: number }>();
-            const nowBRL = new Date(); // Aproximado para o loop
+            const nowBRL = new Date();
+            
+            // Generate stable keys YYYY-MM and labels MMM/YY
+            const monthsToProcess: { key: string, label: string }[] = [];
             for (let i = 11; i >= 0; i--) {
               const d = new Date(nowBRL.getFullYear(), nowBRL.getMonth() - i, 1);
-              const monthLabel = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-              monthlyTrendMap.set(monthLabel, { value: 0, salesCount: 0, leads: 0, cost: 0 });
+              const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+              const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
+              monthlyTrendMap.set(key, { value: 0, salesCount: 0, leads: 0, cost: 0 });
+              monthsToProcess.push({ key, label });
             }
 
-            const monthsOrder = Array.from(monthlyTrendMap.keys());
-
-            metaCostsFull.forEach(c => {
+            metaCosts.forEach(c => {
                const d = c.date;
-               const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-               if (monthlyTrendMap.has(label)) {
-                  monthlyTrendMap.get(label)!.cost += c.cost;
+               const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+               if (monthlyTrendMap.has(key)) {
+                  monthlyTrendMap.get(key)!.cost += c.cost;
                }
             });
 
-            supabaseCheckoutsFull.forEach(c => {
+            checkouts.forEach(c => {
                if ((c.status || '').toLowerCase().trim() !== 'pago') return;
                const d = getBRLDate(c.timestamp || c.created_at);
-               const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-               if (monthlyTrendMap.has(label)) {
-                  const data = monthlyTrendMap.get(label)!;
+               const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+               if (monthlyTrendMap.has(key)) {
+                  const data = monthlyTrendMap.get(key)!;
                   data.value += Number(c.valor) || 0;
                   data.salesCount += 1;
                }
             });
 
-            supabaseCadastros.forEach(l => {
+            cadastros.forEach(l => {
                 const d = getBRLDate(l.data_cadastro);
-                const label = d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' });
-                if (monthlyTrendMap.has(label)) {
-                   monthlyTrendMap.get(label)!.leads += 1;
+                const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                if (monthlyTrendMap.has(key)) {
+                   monthlyTrendMap.get(key)!.leads += 1;
                 }
             });
 
-            const monthlyTrendData = monthsOrder.map(label => ({
-                date: label,
-                ...monthlyTrendMap.get(label)!
+            const monthlyTrendData = monthsToProcess.map(m => ({
+                date: m.label,
+                ...monthlyTrendMap.get(m.key)!
             }));
 
             // Atribuição de "Campanhas" (Winning Ads)
