@@ -3978,39 +3978,39 @@ export default function App() {
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {captacoesStatus.map((cap) => (
-                          <Card key={cap.id} className="p-5 flex flex-col gap-4 relative overflow-hidden group border border-border/50 bg-bg-card hover:bg-bg-sidebar transition-colors">
-                            <div className="flex items-center gap-2 mb-2">
+                          <Card key={cap.id} className="p-4 sm:p-5 flex flex-col gap-3 sm:gap-4 relative overflow-hidden group border border-border/50 bg-bg-card hover:bg-bg-sidebar transition-colors">
+                            <div className="flex items-center gap-2 mb-1 sm:mb-2">
                               <Target className="w-5 h-5 text-primary" />
                               <h4 className="text-sm font-bold text-text-primary uppercase tracking-wider">{cap.name}</h4>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="flex flex-col gap-1 p-4 bg-[#111113] rounded-md border border-border/30">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                              <div className="flex flex-col gap-1 p-3 sm:p-4 bg-[#111113] rounded-md border border-border/30">
                                 <span className="text-[10px] text-text-secondary uppercase font-semibold">Meta Ads</span>
                                 <div className="flex items-end gap-1 mt-1">
-                                  <span className="text-2xl font-mono font-bold text-text-primary leading-none">{cap.paid.leads}</span>
-                                  <span className="text-[10px] text-text-secondary mb-1">leads</span>
+                                  <span className="text-xl sm:text-2xl font-mono font-bold text-text-primary leading-none">{cap.paid.leads}</span>
+                                  <span className="text-[10px] text-text-secondary mb-0.5 sm:mb-1">leads</span>
                                 </div>
-                                <div className="flex justify-between items-center text-[11px] mt-4">
+                                <div className="flex justify-between items-center text-[10px] sm:text-[11px] mt-2 sm:mt-4">
                                   <span className="text-text-secondary">CPL:</span>
                                   <span className="font-mono text-primary font-bold">R$ {cap.paid.cpl.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                 </div>
-                                <div className="flex justify-between items-center text-[11px] mt-1">
+                                <div className="flex justify-between items-center text-[10px] sm:text-[11px] mt-1">
                                   <span className="text-text-secondary">Custo:</span>
                                   <span className="font-mono text-text-primary">R$ {cap.paid.investido.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                 </div>
                               </div>
                               
-                              <div className="flex flex-col gap-1 p-4 bg-[#111113] rounded-md border border-border/30">
+                              <div className="flex flex-col gap-1 p-3 sm:p-4 bg-[#111113] rounded-md border border-border/30">
                                 <span className="text-[10px] text-text-secondary uppercase font-semibold">Orgânico <span className="opacity-60">(LPs)</span></span>
                                 <div className="flex items-end gap-1 mt-1">
-                                  <span className="text-2xl font-mono font-bold text-text-primary leading-none">{cap.organic.leads}</span>
-                                  <span className="text-[10px] text-text-secondary mb-1">leads</span>
+                                  <span className="text-xl sm:text-2xl font-mono font-bold text-text-primary leading-none">{cap.organic.leads}</span>
+                                  <span className="text-[10px] text-text-secondary mb-0.5 sm:mb-1">leads</span>
                                 </div>
-                                <div className="flex justify-between items-center text-[11px] mt-4 border-t border-white/5 pt-2">
+                                <div className="flex justify-between items-center text-[10px] sm:text-[11px] mt-2 sm:mt-4 border-t border-white/5 pt-1 sm:pt-2">
                                   <span className="text-text-secondary">Puxado por:</span>
-                                  <span className="font-mono text-[10px] text-text-primary font-bold text-right line-clamp-2">Eventos DB</span>
+                                  <span className="font-mono text-[9px] sm:text-[10px] text-text-primary font-bold text-right line-clamp-2">Eventos DB</span>
                                 </div>
-                                <div className="flex justify-between items-center text-[11px] mt-1 text-primary">
+                                <div className="flex justify-between items-center text-[10px] sm:text-[11px] mt-1 text-primary">
                                   <span className="font-bold">TOTAL:</span>
                                   <span className="font-mono font-bold">{cap.paid.leads + cap.organic.leads} leads</span>
                                 </div>
