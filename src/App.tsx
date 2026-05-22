@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   TrendingUp, Users, DollarSign, Activity, Focus,
   ArrowUpRight, ArrowDownRight, Filter, CalendarDays, Loader2, KeyRound, ChevronDown, ChevronRight, PieChart as PieChartIcon, BarChart2,
-  Zap, Target, ShoppingCart, Award, CreditCard, Clock, AlertCircle, Database, Check, Copy, Trash2
+  Zap, Target, ShoppingCart, Award, CreditCard, Clock, AlertCircle, Database, Check, Copy, Trash2, Share2
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
@@ -1471,6 +1471,9 @@ export default function App() {
   const [metaCostsFull, setMetaCostsFull] = useState<any[]>([]);
   const [supabaseCheckoutsFull, setSupabaseCheckoutsFull] = useState<any[]>([]);
   const [supabaseCampanhasAtivas, setSupabaseCampanhasAtivas] = useState<any[]>([]);
+  const [supabaseEventosCadastros, setSupabaseEventosCadastros] = useState<any[]>([]);
+  const [supabaseEventos, setSupabaseEventos] = useState<any[]>([]);
+  const [filteredEventLeadsState, setFilteredEventLeadsState] = useState<any[]>([]);
   const [distStats, setDistStats] = useState<any>({ cost: 0, revenue: 0, sales: 0, leads: 0 });
 
   const selectedCompany = companies.find(c => c.id === selectedCompanyId) || companies[0];
@@ -1526,6 +1529,71 @@ export default function App() {
       return res;
     }
   };
+
+  const captacoesStatus = useMemo(() => {
+    if (selectedCompanyId !== 'cultura') return [];
+
+    return supabaseEventos.map(evento => {
+      // Filtragem por seletor de data na tabela eventos_cadastros_no_evento já está feita em filteredEventLeadsState
+      const filteredLeads = filteredEventLeadsState.filter(l => l.id_evento === evento.id_evento);
+
+      let metaAdsLeads = 0;
+      let organicLeads = 0;
+      let rdLeads = 0;
+      const sourceMap: Record<string, number> = {};
+
+      filteredLeads.forEach(l => {
+        const src = (l.utm_source_evento || '').toLowerCase();
+        const med = (l.utm_medium_evento || '').toLowerCase();
+        let sourceName = 'Outros';
+        
+        // Regra para identificar Meta Ads x Orgânico pelo UTM da tabela de cadastros
+        if (src.includes('fb') || src.includes('ig') || src.includes('meta') || src.includes('instagram') || src.includes('facebook')) {
+          metaAdsLeads++;
+          sourceName = 'Meta Ads';
+        } else if (src.includes('rd') || src.includes('rdstation')) {
+          rdLeads++;
+          organicLeads++; // Dependendo da regra da empresa, RD pode ser considerado organico
+          sourceName = 'RD Station';
+        } else if (src === 'unknown' || src === '(direct)' || src === '') {
+          organicLeads++;
+          sourceName = 'Orgânico/Direto';
+        } else {
+          organicLeads++; // Orgânico ou outras origens (direct, etc)
+          sourceName = src.charAt(0).toUpperCase() + src.slice(1);
+        }
+
+        sourceMap[sourceName] = (sourceMap[sourceName] || 0) + 1;
+      });
+
+      const pieData = Object.entries(sourceMap)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value);
+
+      // Puxando o Custo (apenas custo) da tabela de anúncios Meta (filtrada pela data)
+      // Tentativa de correlação pelo nome do evento. Como o nome da campanha Meta pode não ser igual, buscamos substring.
+      const eventNameLower = (evento.nome_evento || '').toLowerCase();
+      const paidCamps = filteredMetaCosts.filter(c => c.campaign.toLowerCase().includes(eventNameLower) && eventNameLower.length > 3);
+      const paidInvestido = paidCamps.reduce((acc, c) => acc + (c.cost || 0), 0);
+      const paidCpl = metaAdsLeads > 0 ? paidInvestido / metaAdsLeads : 0;
+
+      return {
+        id: evento.id_evento,
+        name: evento.nome_evento || `Evento #${evento.id_evento}`,
+        pieData,
+        paid: {
+          investido: paidInvestido,
+          leads: metaAdsLeads,
+          cpl: paidCpl,
+          activeCount: paidCamps.length
+        },
+        organic: {
+          leads: organicLeads,
+          rdLeads: rdLeads
+        }
+      };
+    });
+  }, [selectedCompanyId, supabaseEventos, filteredEventLeadsState, filteredMetaCosts]);
 
   const getFriendlyChannel = (source: any = '', medium: any = '', campaign: any = '', content: any = '') => {
     const src = (source || '').toLowerCase();
@@ -1654,6 +1722,22 @@ export default function App() {
             } catch (e) {
               console.warn("Aviso: Falha ao carregar anuncios_ativos_cultura", e);
             }
+
+            // 7. Eventos de Cadastro (Lead Capture)
+            const { data: eventLeads, error: err7 } = await supabase
+              .from('eventos_cadastros_no_evento')
+              .select('*, eventos(nome_evento)')
+              .order('data_cadastro_evento', { ascending: false })
+              .limit(5000);
+            if (err7) console.warn("Erro ao buscar eventos_cadastros_no_evento:", err7);
+            setSupabaseEventosCadastros(eventLeads || []);
+
+            // 7.5 Eventos (the events themselves)
+            const { data: eventosData, error: err75 } = await supabase
+              .from('eventos')
+              .select('*');
+            if (err75) console.warn("Erro ao buscar eventos:", err75);
+            setSupabaseEventos(eventosData || []);
 
             // Fallback robusto se a tabela estiver vazia
             if (activeCampsRaw.length === 0 && trafegoMeta && trafegoMeta.length > 0) {
@@ -2025,6 +2109,14 @@ export default function App() {
               const itemDate = getBRLDate(dateVal);
               return itemDate >= startDate && itemDate <= endDate;
             });
+
+            const filteredEventLeads = (eventLeads || []).filter((l: any) => {
+              const dateVal = l.data_cadastro_evento;
+              if (!dateVal) return false;
+              const itemDate = getBRLDate(dateVal);
+              return itemDate >= startDate && itemDate <= endDate;
+            });
+            setFilteredEventLeadsState(filteredEventLeads);
 
             // --- PROCESSAMENTO DE DADOS SUPABASE PARA O DASHBOARD ---
             const leadsCount = filteredCadastros.length;
@@ -2573,6 +2665,18 @@ export default function App() {
             .filter(c => c.value > 0)
             .sort((a, b) => b.value - a.value);
 
+            // Mix de Canais (Captação de Leads) via eventos_cadastros_no_evento
+            const eventLeadsMap: Record<string, number> = {};
+            filteredEventLeads.forEach((l: any) => {
+              const cat = getCategory(l.utm_source_evento || '', l.utm_medium_evento || '', l.utm_campaign_evento || '');
+              const friendlyName = channelDefinitions[cat]?.name || channelDefinitions.organic.name;
+              eventLeadsMap[friendlyName] = (eventLeadsMap[friendlyName] || 0) + 1;
+            });
+
+            const eventLeadsSourcePieData = Object.entries(eventLeadsMap).map(([name, value]) => ({
+              name, value
+            })).sort((a, b) => b.value - a.value);
+
             setChannelData({
               meta: { ...channelMap.meta, products: formatProducts(channelMap.meta.products), campaigns: [] },
               google: { ...channelMap.google, products: formatProducts(channelMap.google.products), campaigns: [] },
@@ -2596,6 +2700,7 @@ export default function App() {
               productPieData,
               channelPieData,
               leadsSourcePieData,
+              eventLeadsSourcePieData,
               hasFallback: fallbackCount > 0
             });
 
@@ -3554,9 +3659,7 @@ export default function App() {
         {/* Combined Section for Top Clientes and Payment Methods */}
         {dataStatus === 'success' && (
           <div className={`grid grid-cols-1 ${
-            selectedCompanyId === 'cultura' && channelData.leadsSourcePieData && channelData.leadsSourcePieData.length > 0
-              ? 'lg:grid-cols-3'
-              : 'lg:grid-cols-2'
+            selectedCompanyId === 'cultura' ? 'md:grid-cols-2 xl:grid-cols-4' : 'lg:grid-cols-2'
           } gap-6 mt-8`}>
             {/* Top 5 Clientes */}
             {channelData.topCustomers && channelData.topCustomers.length > 0 && (
@@ -3587,7 +3690,7 @@ export default function App() {
                       <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
                         <Activity className="w-4 h-4 text-primary" /> Fontes de cadastros
                       </h4>
-                      <p className="text-[11px] text-text-secondary mt-1">Distribuição de Cadastros</p>
+                      <p className="text-[11px] text-text-secondary mt-1">Plataforma (Checkout)</p>
                     </div>
                   </div>
                   <div className="h-[180px]">
@@ -3612,7 +3715,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="space-y-3 mt-6">
-                  {channelData.leadsSourcePieData.map((lead: any, i: number) => {
+                  {channelData.leadsSourcePieData.slice(0, 5).map((lead: any, i: number) => {
                     const totalLeads = channelData.leadsSourcePieData.reduce((acc: number, curr: any) => acc + curr.value, 0);
                     const pct = totalLeads > 0 ? ((lead.value / totalLeads) * 100).toFixed(1) : '0';
                     return (
@@ -3623,6 +3726,60 @@ export default function App() {
                         </div>
                         <div className="text-right">
                           <p className="text-[11px] font-mono font-bold text-text-primary">{lead.value} cadastros</p>
+                          <p className="text-[10px] text-text-secondary">{pct}%</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+            )}
+
+            {/* Mix de Canais (Captação de Leads) */}
+            {selectedCompanyId === 'cultura' && channelData.eventLeadsSourcePieData && channelData.eventLeadsSourcePieData.length > 0 && (
+              <Card className="p-6 h-full flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h4 className="text-sm font-medium text-[#A1A1AA] flex items-center gap-2">
+                        <Share2 className="w-4 h-4 text-primary" /> Mix de Canais
+                      </h4>
+                      <p className="text-[11px] text-text-secondary mt-1">Captação de Leads (LPs)</p>
+                    </div>
+                  </div>
+                  <div className="h-[180px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={channelData.eventLeadsSourcePieData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={55}
+                          outerRadius={80}
+                          paddingAngle={8}
+                          dataKey="value"
+                        >
+                          {channelData.eventLeadsSourcePieData.map((_: any, index: number) => (
+                            <Cell key={`cell_event-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} stroke="none" />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip content={<CustomTooltip isCurrency={false} />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+                <div className="space-y-3 mt-6">
+                  {channelData.eventLeadsSourcePieData.slice(0, 5).map((lead: any, i: number) => {
+                    const totalLeads = channelData.eventLeadsSourcePieData.reduce((acc: number, curr: any) => acc + curr.value, 0);
+                    const pct = totalLeads > 0 ? ((lead.value / totalLeads) * 100).toFixed(1) : '0';
+                    return (
+                      <div key={i} className="flex items-center justify-between group">
+                        <div className="flex items-center gap-3">
+                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
+                          <span className="text-[11px] text-text-secondary group-hover:text-text-primary transition-colors">{lead.name}</span>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[11px] font-mono font-bold text-text-primary">{lead.value} leads</p>
                           <p className="text-[10px] text-text-secondary">{pct}%</p>
                         </div>
                       </div>
@@ -3799,7 +3956,7 @@ export default function App() {
                 <div className="mt-4 mb-2">
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-border/40 pb-3 mb-6">
                     <div>
-                      <h3 className="text-base md:text-lg font-bold text-text-primary tracking-tight">Campanhas Ativas</h3>
+                      <h3 className="text-base md:text-lg font-bold text-text-primary tracking-tight">Campanhas Ativas (Meta Ads)</h3>
                       <p className="text-[11px] text-text-secondary mt-1">Status atual das campanhas em veiculação (dados em tempo real não afetados pelo seletor de data).</p>
                     </div>
                   </div>
@@ -3809,6 +3966,116 @@ export default function App() {
                     checkouts={filteredCheckouts} 
                     cursos={supabaseCursos}
                   />
+
+                  {/* Captação do Momento Section */}
+                  {captacoesStatus.length > 0 && (
+                    <div className="mt-12 mb-2">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-border/40 pb-3 mb-6">
+                        <div>
+                          <h3 className="text-base md:text-lg font-bold text-text-primary tracking-tight">Captação do Momento</h3>
+                          <p className="text-[11px] text-text-secondary mt-1">Volume de novos leads centralizando Orgânico e Meta Ads (dados em tempo real).</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {captacoesStatus.map((cap) => (
+                          <Card key={cap.id} className="p-5 flex flex-col gap-4 relative overflow-hidden group border border-border/50 bg-bg-card hover:bg-bg-sidebar transition-colors">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Target className="w-5 h-5 text-primary" />
+                              <h4 className="text-sm font-bold text-text-primary uppercase tracking-wider">{cap.name}</h4>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="flex flex-col gap-1 p-4 bg-[#111113] rounded-md border border-border/30">
+                                <span className="text-[10px] text-text-secondary uppercase font-semibold">Meta Ads</span>
+                                <div className="flex items-end gap-1 mt-1">
+                                  <span className="text-2xl font-mono font-bold text-text-primary leading-none">{cap.paid.leads}</span>
+                                  <span className="text-[10px] text-text-secondary mb-1">leads</span>
+                                </div>
+                                <div className="flex justify-between items-center text-[11px] mt-4">
+                                  <span className="text-text-secondary">CPL:</span>
+                                  <span className="font-mono text-primary font-bold">R$ {cap.paid.cpl.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-[11px] mt-1">
+                                  <span className="text-text-secondary">Custo:</span>
+                                  <span className="font-mono text-text-primary">R$ {cap.paid.investido.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                </div>
+                              </div>
+                              
+                              <div className="flex flex-col gap-1 p-4 bg-[#111113] rounded-md border border-border/30">
+                                <span className="text-[10px] text-text-secondary uppercase font-semibold">Orgânico <span className="opacity-60">(LPs)</span></span>
+                                <div className="flex items-end gap-1 mt-1">
+                                  <span className="text-2xl font-mono font-bold text-text-primary leading-none">{cap.organic.leads}</span>
+                                  <span className="text-[10px] text-text-secondary mb-1">leads</span>
+                                </div>
+                                <div className="flex justify-between items-center text-[11px] mt-4 border-t border-white/5 pt-2">
+                                  <span className="text-text-secondary">Puxado por:</span>
+                                  <span className="font-mono text-[10px] text-text-primary font-bold text-right line-clamp-2">Eventos DB</span>
+                                </div>
+                                <div className="flex justify-between items-center text-[11px] mt-1 text-primary">
+                                  <span className="font-bold">TOTAL:</span>
+                                  <span className="font-mono font-bold">{cap.paid.leads + cap.organic.leads} leads</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Gráfico de Origens */}
+                            {cap.pieData && cap.pieData.length > 0 && (
+                              <div className="mt-1 p-4 bg-[#111113] rounded-md border border-border/30">
+                                <h5 className="text-[10px] text-text-secondary uppercase font-semibold mb-3 border-b border-border/30 pb-2">Distribuição de Origens</h5>
+                                <div className="h-44 w-full relative">
+                                  <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                      <Pie
+                                        data={cap.pieData}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={45}
+                                        outerRadius={70}
+                                        paddingAngle={2}
+                                        dataKey="value"
+                                        stroke="none"
+                                      >
+                                        {cap.pieData.map((entry: any, index: number) => (
+                                          <Cell key={`cell-${index}`} fill={
+                                              entry.name === 'Meta Ads' ? COLORS.meta : 
+                                              entry.name === 'RD Station' ? '#2563eb' :
+                                              entry.name === 'Orgânico/Direto' ? '#10b981' : 
+                                              '#8b5cf6'
+                                          } />
+                                        ))}
+                                      </Pie>
+                                      <RechartsTooltip 
+                                         contentStyle={{ backgroundColor: '#1E1E1E', borderColor: '#333', fontSize: '12px', borderRadius: '6px' }}
+                                         itemStyle={{ color: '#fff' }}
+                                         formatter={(value: any, name: any) => [`${value} leads`, name]}
+                                      />
+                                    </PieChart>
+                                  </ResponsiveContainer>
+                                  <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
+                                    <span className="text-xl font-mono font-bold text-text-primary leading-none block">{cap.paid.leads + cap.organic.leads}</span>
+                                    <span className="text-[9px] text-text-secondary uppercase tracking-widest mt-1 block">Total</span>
+                                  </div>
+                                </div>
+                                <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-4">
+                                  {cap.pieData.map((entry: any, idx: number) => (
+                                     <div key={idx} className="flex items-center gap-1.5">
+                                       <div className="w-2 h-2 rounded-full shadow-sm" style={{ backgroundColor: 
+                                           entry.name === 'Meta Ads' ? COLORS.meta : 
+                                           entry.name === 'RD Station' ? '#2563eb' :
+                                           entry.name === 'Orgânico/Direto' ? '#10b981' : 
+                                           '#8b5cf6'
+                                        }}></div>
+                                       <span className="text-[10.5px] text-text-secondary font-medium">{entry.name} <span className="font-mono text-text-primary ml-0.5">{entry.value}</span></span>
+                                     </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                 </div>
              ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
