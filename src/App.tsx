@@ -561,7 +561,7 @@ const normalizePaymentMethod = (raw: string | null | undefined): string => {
 
 const PieChartLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, value, index, name, percent }: any) => {
   const RADIAN = Math.PI / 180;
-  const radius = outerRadius * 1.25;
+  const radius = outerRadius * 1.5;
   const x = cx + radius * Math.cos(-midAngle * RADIAN);
   const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
@@ -3542,8 +3542,8 @@ export default function App() {
                       data={statusPieData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={55}
-                      outerRadius={90}
+                      innerRadius={45}
+                      outerRadius={75}
                       paddingAngle={5}
                       dataKey="value"
                       labelLine={false}
@@ -3590,8 +3590,8 @@ export default function App() {
                       data={channelData.productPieData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={55}
-                      outerRadius={90}
+                      innerRadius={45}
+                      outerRadius={75}
                       paddingAngle={5}
                       dataKey="value"
                       labelLine={false}
@@ -3620,8 +3620,8 @@ export default function App() {
                       data={channelData.channelPieData}
                       cx="50%"
                       cy="50%"
-                      innerRadius={55}
-                      outerRadius={90}
+                      innerRadius={45}
+                      outerRadius={75}
                       paddingAngle={5}
                       dataKey="value"
                       labelLine={false}
