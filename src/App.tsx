@@ -1464,6 +1464,7 @@ export default function App() {
   const [checkoutsAllStatus, setCheckoutsAllStatus] = useState<any[]>([]);
   const [checkoutsCancelados, setCheckoutsCancelados] = useState<any[]>([]);
   const [checkoutsRecusados, setCheckoutsRecusados] = useState<any[]>([]);
+  const [checkoutsAguardando, setCheckoutsAguardando] = useState<any[]>([]);
   const [filteredCheckouts, setFilteredCheckouts] = useState<any[]>([]);
   const [sheetData, setSheetData] = useState<any[]>([]);
   const [metaCosts, setMetaCosts] = useState<any[]>([]);
@@ -1669,13 +1670,25 @@ export default function App() {
             setDataStatus('loading');
             
             // 1. Cadastros (Incluindo todos os campos para garantir que pegamos o 'id' se necessário)
-            const { data: cadastros, error: err1 } = await supabase
+            const { data: cadastrosRaw, error: err1 } = await supabase
               .from('cadastros')
               .select('*')
               .order('data_cadastro', { ascending: false })
               .limit(5000);
             if (err1) throw err1;
-            setSupabaseCadastros(cadastros || []);
+            
+            const cadastros = (cadastrosRaw || []).filter((c: any) => {
+              const src = (c.utm_source_cadastro || '').toLowerCase().trim();
+              const med = (c.utm_medium_cadastro || '').toLowerCase().trim();
+              const cam = (c.utm_campaign_cadastro || '').toLowerCase().trim();
+              
+              if (src === 'unknown' || med === 'unknown' || cam === 'unknown') {
+                return false;
+              }
+              return true;
+            });
+            
+            setSupabaseCadastros(cadastros);
 
             // 2. Categorias (Incluindo id_categoria)
             const { data: categorias, error: err2 } = await supabase
@@ -2094,6 +2107,10 @@ export default function App() {
                const st = (c.status || '').toLowerCase().trim();
                return st.includes('recusa') || st.includes('negad');
             });
+            const aguardandoData = checkoutsNoPeriodo.filter((c: any) => {
+               const st = (c.status || '').toLowerCase().trim();
+               return st.includes('aguardando');
+            });
             
             setFilteredCheckouts(filteredData);
             setFilteredMetaCosts(metaCosts.filter((m: any) => m.date >= startDate && m.date <= endDate));
@@ -2101,6 +2118,7 @@ export default function App() {
             setCheckoutsAllStatus(checkoutsNoPeriodo);
             setCheckoutsCancelados(canceladosData);
             setCheckoutsRecusados(recusadosData);
+            setCheckoutsAguardando(aguardandoData);
             
             const filteredCadastros = cadastros.filter(c => {
               const dateVal = c.data_cadastro;
@@ -2771,7 +2789,7 @@ export default function App() {
               { title: 'Vendas hoje', value: vendasHojeCount, trend: 'Checkouts hoje', isUp: true, icon: ShoppingCart, isToday: true },
               { title: 'Total de cadastros', value: leadsCount.toString(), trend: 'Novos Cadastros', isUp: true, icon: Users },
               { title: 'Vendas Totais', value: salesCount.toString(), trend: 'Checkouts realizados', isUp: true, icon: ShoppingCart },
-              { title: 'Taxa de Cancelamento', value: taxaCancelamento, trend: 'Pedidos Cancelados', isUp: false, icon: ArrowDownRight },
+              { title: 'Pix expirados', value: taxaCancelamento, trend: 'Pedidos expirados', isUp: false, icon: ArrowDownRight },
               { title: 'Cartão Recusado', value: recusadosCount, trend: 'Pagamentos Negados', isUp: false, icon: ArrowDownRight },
               { title: 'Cadastros hoje', value: cadastrosHojeCount, trend: 'Contatos hoje', isUp: true, icon: Users, isToday: true },
             ]);
@@ -2836,9 +2854,9 @@ export default function App() {
 
   const statusPieData = [
     { name: 'Pago', value: checkoutsAllStatus.filter(c => (c.status || '').toLowerCase().trim() === 'pago').length, color: '#DCA61F' },
-    { name: 'Aguardando', value: checkoutsAllStatus.filter(c => (c.status || '').toLowerCase().trim().includes('aguardando')).length, color: '#f59e0b' },
-    { name: 'Cancelado', value: checkoutsCancelados.length, color: '#ef4444' },
-    { name: 'Recusado/Negado', value: checkoutsRecusados.length, color: '#f97316' }
+    { name: 'Aguardando pix', value: checkoutsAllStatus.filter(c => (c.status || '').toLowerCase().trim().includes('aguardando')).length, color: '#f59e0b' },
+    { name: 'Pix expirado', value: checkoutsCancelados.length, color: '#ef4444' },
+    { name: 'Cartão recusado/negado', value: checkoutsRecusados.length, color: '#f97316' }
   ].filter(d => d.value > 0);
 
   const getTodayStats = () => {
@@ -2879,7 +2897,7 @@ export default function App() {
 
   const { todayPieData, vendasHojeTotal, cadastrosHojeTotal } = getTodayStats();
 
-  const renderCheckoutCard = (checkoutsToRender: any[], title: string, limit: number, iconComp: React.ReactNode, type: 'sales' | 'cancels' | 'declines') => {
+  const renderCheckoutCard = (checkoutsToRender: any[], title: string, limit: number, iconComp: React.ReactNode, type: 'sales' | 'cancels' | 'declines' | 'waiting') => {
     return (
       <Card className="p-0 overflow-hidden border-primary/20">
          <div className="p-5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between bg-white/5 gap-2">
@@ -2908,9 +2926,11 @@ export default function App() {
                 let IconMain = DollarSign;
                 if (type === 'cancels') IconMain = Target;
                 if (type === 'declines') IconMain = AlertCircle;
+                if (type === 'waiting') IconMain = Clock;
                 let bgIconClass = 'bg-primary/10 text-primary';
                 if (type === 'cancels') bgIconClass = 'bg-red-500/10 text-red-500';
                 if (type === 'declines') bgIconClass = 'bg-orange-500/10 text-orange-500';
+                if (type === 'waiting') bgIconClass = 'bg-amber-500/10 text-amber-500';
 
                 return (
                   <div key={i} className="flex flex-col">
@@ -2938,7 +2958,7 @@ export default function App() {
                             <p className="text-[9px] text-[#525252] uppercase font-bold">{normalizePaymentMethod(paymentMethod)} / {checkout.status}</p>
                          </div>
                          <div className="text-right">
-                            <p className={`text-sm font-bold ${type === 'cancels' ? 'text-red-500' : type === 'declines' ? 'text-orange-500' : 'text-primary'}`}>R$ {Number(checkout.valor).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                            <p className={`text-sm font-bold ${type === 'cancels' ? 'text-red-500' : type === 'declines' ? 'text-orange-500' : type === 'waiting' ? 'text-amber-500' : 'text-primary'}`}>R$ {Number(checkout.valor).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
                             <ChevronDown className={`w-3 h-3 text-[#525252] ml-auto transition-transform ${isExpanded ? 'rotate-180 text-[inherit]' : ''}`} />
                          </div>
                        </div>
@@ -4302,8 +4322,9 @@ export default function App() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-             {renderCheckoutCard(checkoutsCancelados, "Cancelamentos Recentes", 30, <Target className="w-4 h-4 text-red-500" />, 'cancels')}
-             {renderCheckoutCard(checkoutsRecusados, "Recusas Recentes", 30, <AlertCircle className="w-4 h-4 text-orange-500" />, 'declines')}
+             {renderCheckoutCard(checkoutsCancelados, "Pix expirados", 30, <Target className="w-4 h-4 text-red-500" />, 'cancels')}
+             {renderCheckoutCard(checkoutsRecusados, "Recusas Recentes de cartão", 30, <AlertCircle className="w-4 h-4 text-orange-500" />, 'declines')}
+             {renderCheckoutCard(checkoutsAguardando, "Aguardando pagamento do pix", 30, <Clock className="w-4 h-4 text-amber-500" />, 'waiting')}
           </div>
 
 
