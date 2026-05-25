@@ -1574,9 +1574,29 @@ export default function App() {
       // Puxando o Custo (apenas custo) da tabela de anúncios Meta (filtrada pela data)
       // Tentativa de correlação pelo nome do evento. Como o nome da campanha Meta pode não ser igual, buscamos substring.
       const eventNameLower = (evento.nome_evento || '').toLowerCase();
-      const paidCamps = filteredMetaCosts.filter(c => c.campaign.toLowerCase().includes(eventNameLower) && eventNameLower.length > 3);
+      
+      let activeCampaignNamesForEvent: string[] = [];
+      if (eventNameLower === 'garantismo-processual') {
+          activeCampaignNamesForEvent = supabaseCampanhasAtivas
+            .filter(ca => ca.campaign_name && ca.campaign_name.toLowerCase().includes('gar26'))
+            .map(ca => ca.campaign_name);
+      } else if (eventNameLower === 'captacao-clube-processualistas') {
+          activeCampaignNamesForEvent = supabaseCampanhasAtivas
+            .filter(ca => ca.campaign_name && ca.campaign_name.toLowerCase().includes('pro26'))
+            .map(ca => ca.campaign_name);
+      } else {
+          activeCampaignNamesForEvent = supabaseCampanhasAtivas
+            .filter(ca => ca.campaign_name && eventNameLower.length > 3 && ca.campaign_name.toLowerCase().includes(eventNameLower))
+            .map(ca => ca.campaign_name);
+      }
+
+      // Unique campaign names
+      const uniqueActiveCamps = [...new Set(activeCampaignNamesForEvent)];
+
+      const paidCamps = filteredMetaCosts.filter(c => uniqueActiveCamps.includes(c.campaign));
       const paidInvestido = paidCamps.reduce((acc, c) => acc + (c.cost || 0), 0);
-      const paidCpl = metaAdsLeads > 0 ? paidInvestido / metaAdsLeads : 0;
+      const paidMetaDataLeads = paidCamps.reduce((acc, c) => acc + (c.leads || 0), 0);
+      const paidCpl = paidMetaDataLeads > 0 ? paidInvestido / paidMetaDataLeads : 0;
 
       return {
         id: evento.id_evento,
@@ -1584,7 +1604,7 @@ export default function App() {
         pieData,
         paid: {
           investido: paidInvestido,
-          leads: metaAdsLeads,
+          leads: paidMetaDataLeads,
           cpl: paidCpl,
           activeCount: paidCamps.length
         },
@@ -2109,7 +2129,12 @@ export default function App() {
             });
             const aguardandoData = checkoutsNoPeriodo.filter((c: any) => {
                const st = (c.status || '').toLowerCase().trim();
-               return st.includes('aguardando');
+               if (!st.includes('aguardando')) return false;
+               
+               const orderDate = new Date(c.timestamp || c.created_at);
+               const now = new Date();
+               const diffHours = (now.getTime() - orderDate.getTime()) / (1000 * 60 * 60);
+               return diffHours <= 2;
             });
             
             setFilteredCheckouts(filteredData);
