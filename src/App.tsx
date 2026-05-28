@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   TrendingUp, Users, DollarSign, Activity, Focus,
   ArrowUpRight, ArrowDownRight, Filter, CalendarDays, Loader2, KeyRound, ChevronDown, ChevronRight, PieChart as PieChartIcon, BarChart2,
-  Zap, Target, ShoppingCart, Award, CreditCard, Clock, AlertCircle, Database, Check, Copy, Trash2, Share2
+  Zap, Target, ShoppingCart, Award, CreditCard, Clock, AlertCircle, Database, Check, Copy, Trash2, Share2, Search
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
@@ -99,6 +99,92 @@ const ActiveCampaignsTree: React.FC<{ data: any[], metaCosts?: any[], checkouts?
   };
 
   const getGroupedData = (rawRows: any[]) => {
+    const calculateAggregatedStats = (campaignName: string, adsetNameFilter?: string) => {
+      const stats = {
+        spend: 0,
+        purchases: 0,
+        revenue: 0,
+        leads: 0,
+        engagements: 0,
+        impressions: 0,
+        reach: 0,
+        cpmSum: 0,
+        cpmCount: 0
+      };
+
+      // 1. Sum up traffic stats from metaCosts
+      const matchingCosts = metaCosts.filter(m => {
+        const campaignMatch = (m.campaign || '').toLowerCase() === campaignName.toLowerCase();
+        if (!campaignMatch) return false;
+        if (adsetNameFilter) {
+          return (m.adsetName || '').toLowerCase() === adsetNameFilter.toLowerCase();
+        }
+        return true;
+      });
+
+      matchingCosts.forEach(m => {
+        stats.spend += m.cost || 0;
+        stats.purchases += Number(m.purchases) || 0;
+        stats.leads += Number(m.leads) || 0;
+        stats.engagements += (Number(m.post_engagement) || 0) + (Number(m.page_engagement) || 0);
+        stats.impressions += Number(m.impressions) || 0;
+        stats.reach += Number(m.reach) || 0;
+        if (m.cpm > 0) {
+          stats.cpmSum += m.cpm;
+          stats.cpmCount += 1;
+        }
+      });
+
+      // 2. Calculate revenue with UTM checkouts
+      const matchingCheckouts = checkouts.filter(c => {
+        const utmCamp = (c.utm_campaign || '').toLowerCase();
+        return utmCamp === campaignName.toLowerCase();
+      });
+
+      // Determine product price based on campaign / course name
+      let productPrice = 948; // default fallback
+      const combinedText = `${campaignName} ${adsetNameFilter || ''}`.toLowerCase();
+      
+      const isCiv = combinedText.includes('civ') || combinedText.includes('civilista');
+      const isPen = combinedText.includes('pen') || combinedText.includes('penalista');
+      const isAca = combinedText.includes('aca') || combinedText.includes('academia');
+      const isAgora = combinedText.includes('agora') || combinedText.includes('ágora');
+      
+      if (cursos && cursos.length > 0) {
+        if (isCiv && isPen) {
+          const match = cursos.find(c => c.id_curso === 10 || (c.nome.toLowerCase().includes('penalistas') && c.nome.toLowerCase().includes('civilistas')));
+          if (match) productPrice = match.preco;
+        } else if (isCiv) {
+          const match = cursos.find(c => c.id_curso === 11 || c.nome.toLowerCase().includes('civilistas'));
+          if (match) productPrice = match.preco;
+        } else if (isPen) {
+          const match = cursos.find(c => c.id_curso === 12 || c.nome.toLowerCase().includes('penalistas'));
+          if (match) productPrice = match.preco;
+        } else if (isAca) {
+          const match = cursos.find(c => c.id_curso === 9 || c.nome.toLowerCase().includes('academia'));
+          if (match) productPrice = match.preco;
+        } else if (isAgora) {
+          const match = cursos.find(c => c.id_curso === 8 || c.nome.toLowerCase().includes('ágora') || c.nome.toLowerCase().includes('agora'));
+          if (match) productPrice = match.preco;
+        }
+      } else {
+        if (isCiv && isPen) productPrice = 1656;
+        else if (isCiv) productPrice = 948;
+        else if (isPen) productPrice = 948;
+        else if (isAca) productPrice = 348;
+        else if (isAgora) productPrice = 900.6;
+      }
+
+      if (stats.purchases > 0) {
+        stats.revenue = stats.purchases * productPrice;
+      } else {
+        const utmRevenue = matchingCheckouts.reduce((acc: number, curr: any) => acc + (Number(curr.valor) || 0), 0);
+        stats.revenue = utmRevenue;
+      }
+
+      return stats;
+    };
+
     const categoriesMap: Record<string, any> = {
       venda: { id: 'venda', title: 'Campanhas de Venda Ativas', campaigns: {} },
       captacao: { id: 'captacao', title: 'Campanhas de Captação Ativas', campaigns: {} },
@@ -130,12 +216,12 @@ const ActiveCampaignsTree: React.FC<{ data: any[], metaCosts?: any[], checkouts?
 
       const cat = categoriesMap[categoryKey];
       if (!cat.campaigns[rawCampName]) {
-        cat.campaigns[rawCampName] = { name: rawCampName, adsets: {}, stats: { spend: 0, purchases: 0, revenue: 0, leads: 0, engagements: 0, impressions: 0, reach: 0, cpmSum: 0, cpmCount: 0 } };
+        cat.campaigns[rawCampName] = { name: rawCampName, adsets: {}, stats: calculateAggregatedStats(rawCampName) };
       }
 
       const campaignObj = cat.campaigns[rawCampName];
       if (!campaignObj.adsets[adsetName]) {
-        campaignObj.adsets[adsetName] = { name: adsetName, ads: [], stats: { spend: 0, purchases: 0, revenue: 0, leads: 0, engagements: 0, impressions: 0, reach: 0, cpmSum: 0, cpmCount: 0 } };
+        campaignObj.adsets[adsetName] = { name: adsetName, ads: [], stats: calculateAggregatedStats(rawCampName, adsetName) };
       }
 
       const adsetObj = campaignObj.adsets[adsetName];
@@ -215,28 +301,6 @@ const ActiveCampaignsTree: React.FC<{ data: any[], metaCosts?: any[], checkouts?
           const utmRevenue = matchingCheckouts.reduce((acc: number, curr: any) => acc + (Number(curr.valor) || 0), 0);
           adItem.stats.revenue = utmRevenue;
         }
-
-        // Rollup to Adset
-        adsetObj.stats.spend += adItem.stats.spend;
-        adsetObj.stats.purchases += adItem.stats.purchases;
-        adsetObj.stats.revenue += adItem.stats.revenue;
-        adsetObj.stats.leads += adItem.stats.leads;
-        adsetObj.stats.engagements += adItem.stats.engagements;
-        adsetObj.stats.impressions += adItem.stats.impressions;
-        adsetObj.stats.reach += adItem.stats.reach;
-        adsetObj.stats.cpmSum += adItem.stats.cpmSum;
-        adsetObj.stats.cpmCount += adItem.stats.cpmCount;
-
-        // Rollup to Campaign
-        campaignObj.stats.spend += adItem.stats.spend;
-        campaignObj.stats.purchases += adItem.stats.purchases;
-        campaignObj.stats.revenue += adItem.stats.revenue;
-        campaignObj.stats.leads += adItem.stats.leads;
-        campaignObj.stats.engagements += adItem.stats.engagements;
-        campaignObj.stats.impressions += adItem.stats.impressions;
-        campaignObj.stats.reach += adItem.stats.reach;
-        campaignObj.stats.cpmSum += adItem.stats.cpmSum;
-        campaignObj.stats.cpmCount += adItem.stats.cpmCount;
       }
     });
 
@@ -1488,6 +1552,22 @@ export default function App() {
   const [expandedCheckoutId, setExpandedCheckoutId] = useState<string | null>(null);
   const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null);
   const [selectedCustomerDetail, setSelectedCustomerDetail] = useState<any>(null);
+  
+  // Specific search and time states for each of the 5 categories
+  const [salesSearch, setSalesSearch] = useState('');
+  const [salesTime, setSalesTime] = useState('all');
+
+  const [cancelsSearch, setCancelsSearch] = useState('');
+  const [cancelsTime, setCancelsTime] = useState('all');
+
+  const [declinesSearch, setDeclinesSearch] = useState('');
+  const [declinesTime, setDeclinesTime] = useState('all');
+
+  const [waitingSearch, setWaitingSearch] = useState('');
+  const [waitingTime, setWaitingTime] = useState('all');
+
+  const [cadastrosSearch, setCadastrosSearch] = useState('');
+  const [cadastrosTime, setCadastrosTime] = useState('all');
 
   const formatTimeDiff = (startStr: string, endStr: string) => {
     const start = new Date(startStr);
@@ -1567,10 +1647,6 @@ export default function App() {
         sourceMap[sourceName] = (sourceMap[sourceName] || 0) + 1;
       });
 
-      const pieData = Object.entries(sourceMap)
-        .map(([name, value]) => ({ name, value }))
-        .sort((a, b) => b.value - a.value);
-
       // Puxando o Custo (apenas custo) da tabela de anúncios Meta (filtrada pela data)
       // Tentativa de correlação pelo nome do evento. Como o nome da campanha Meta pode não ser igual, buscamos substring.
       const eventNameLower = (evento.nome_evento || '').toLowerCase();
@@ -1598,13 +1674,26 @@ export default function App() {
       const paidMetaDataLeads = paidCamps.reduce((acc, c) => acc + (c.leads || 0), 0);
       const paidCpl = paidMetaDataLeads > 0 ? paidInvestido / paidMetaDataLeads : 0;
 
+      // Ensure Meta Ads in the pie chart considers the API data
+      const finalMetaAdsLeads = Math.max(metaAdsLeads, paidMetaDataLeads);
+      sourceMap['Meta Ads'] = finalMetaAdsLeads;
+
+      // Remove 0 values just in case
+      if (sourceMap['Meta Ads'] === 0) {
+        delete sourceMap['Meta Ads'];
+      }
+
+      const pieData = Object.entries(sourceMap)
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value);
+
       return {
         id: evento.id_evento,
         name: evento.nome_evento || `Evento #${evento.id_evento}`,
         pieData,
         paid: {
           investido: paidInvestido,
-          leads: paidMetaDataLeads,
+          leads: finalMetaAdsLeads,
           cpl: paidCpl,
           activeCount: paidCamps.length
         },
@@ -2923,16 +3012,108 @@ export default function App() {
   const { todayPieData, vendasHojeTotal, cadastrosHojeTotal } = getTodayStats();
 
   const renderCheckoutCard = (checkoutsToRender: any[], title: string, limit: number, iconComp: React.ReactNode, type: 'sales' | 'cancels' | 'declines' | 'waiting') => {
+    let searchTerm = '';
+    let setSearchTerm = (val: string) => {};
+    let timeRange = 'all';
+    let setTimeRange = (val: string) => {};
+
+    if (type === 'sales') {
+      searchTerm = salesSearch;
+      setSearchTerm = setSalesSearch;
+      timeRange = salesTime;
+      setTimeRange = setSalesTime;
+    } else if (type === 'cancels') {
+      searchTerm = cancelsSearch;
+      setSearchTerm = setCancelsSearch;
+      timeRange = cancelsTime;
+      setTimeRange = setCancelsTime;
+    } else if (type === 'declines') {
+      searchTerm = declinesSearch;
+      setSearchTerm = setDeclinesSearch;
+      timeRange = declinesTime;
+      setTimeRange = setDeclinesTime;
+    } else if (type === 'waiting') {
+      searchTerm = waitingSearch;
+      setSearchTerm = setWaitingSearch;
+      timeRange = waitingTime;
+      setTimeRange = setWaitingTime;
+    }
+
+    const filteredItems = checkoutsToRender.filter(checkout => {
+      // 1. Time range filtering
+      if (timeRange !== 'all') {
+        const itemDate = parseSupabaseDate(checkout.timestamp || checkout.created_at);
+        const now = new Date();
+        const diffMs = now.getTime() - itemDate.getTime();
+        let maxMs = 0;
+        if (timeRange === '24h') maxMs = 24 * 60 * 60 * 1000;
+        else if (timeRange === '7d') maxMs = 7 * 24 * 60 * 60 * 1000;
+        else if (timeRange === '30d') maxMs = 30 * 24 * 60 * 60 * 1000;
+
+        if (diffMs > maxMs) return false;
+      }
+
+      // 2. Search term filtering
+      if (searchTerm.trim()) {
+        const term = searchTerm.toLowerCase();
+        const lead = supabaseCadastros.find(l => {
+          const cId = String(checkout.id_usuario);
+          return String(l.id_usuario) === cId || String(l.id) === cId;
+        });
+        const curso = supabaseCursos.find(c => c.id_curso === checkout.id_curso);
+        const name = (lead?.nome || '').toLowerCase();
+        const email = (lead?.email || '').toLowerCase();
+        const phone = (lead?.telefone || '').toLowerCase();
+        const cursoName = (curso?.nome || '').toLowerCase();
+        const pMethod = (checkout.metodo_pagamento || '').toLowerCase();
+        const chkId = String(checkout.id_usuario).toLowerCase();
+
+        return name.includes(term) || email.includes(term) || phone.includes(term) || cursoName.includes(term) || pMethod.includes(term) || chkId.includes(term);
+      }
+
+      return true;
+    });
     return (
       <Card className="p-0 overflow-hidden border-primary/20">
-         <div className="p-5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between bg-white/5 gap-2">
+         <div className="p-4 border-b border-border flex flex-col md:flex-row md:items-center justify-between bg-white/5 gap-3 font-medium">
          <h4 className="text-[0.75rem] font-serif font-normal text-primary/80 uppercase tracking-[0.25em] flex items-center gap-2 shrink-0">
                {iconComp} {title}
             </h4>
+
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+               <div className="relative flex-1 md:w-48">
+                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary" />
+                 <input
+                   type="text"
+                   placeholder="Pesquisar..."
+                   value={searchTerm}
+                   onChange={(e) => setSearchTerm(e.target.value)}
+                   className="w-full bg-bg-input border border-border text-text-primary pl-8 pr-6 py-1 rounded-[4px] text-[11px] focus:outline-none focus:border-primary placeholder:text-[#525252] font-medium"
+                 />
+                 {searchTerm && (
+                   <button
+                     onClick={() => setSearchTerm('')}
+                     className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-[#525252] hover:text-text-primary font-bold"
+                   >
+                     ✕
+                   </button>
+                 )}
+               </div>
+               <select
+                 value={timeRange}
+                 onChange={(e) => setTimeRange(e.target.value)}
+                 className="bg-bg-input border border-border text-text-primary py-1 px-2 rounded-[4px] text-[11px] focus:outline-none focus:border-[#dca61f] min-w-[105px] font-medium cursor-pointer"
+               >
+                 <option value="all">Todo período</option>
+                 <option value="24h">Últimas 24h</option>
+                 <option value="7d">Últimos 7 dias</option>
+                 <option value="30d">Últimos 30 dias</option>
+               </select>
+            </div>
          </div>
           <div className="max-h-[500px] overflow-y-auto">
             <div className="divide-y divide-white/5">
-              {checkoutsToRender.slice(0, limit).map((checkout, i) => {
+              {filteredItems.slice(0, limit).map((checkout, i) => {
                  const lead = supabaseCadastros.find(l => {
                    const cId = String(checkout.id_usuario);
                    return String(l.id_usuario) === cId || String(l.id) === cId;
@@ -3078,6 +3259,51 @@ export default function App() {
       </Card>
     );
   };
+
+  // Filter helper functions for Activity lists based on name/email/phone in supabaseCadastros or checkout/course info
+  const filteredSalesCheckouts = useMemo(() => {
+    return supabaseCheckoutsFull.filter((c: any) => (c.status || '').toLowerCase().trim() === 'pago');
+  }, [supabaseCheckoutsFull]);
+
+  const filteredCadastros = useMemo(() => {
+    let list = supabaseCadastros;
+    
+    // 1. Time range filter
+    if (cadastrosTime !== 'all') {
+      const now = new Date();
+      list = list.filter(lead => {
+        const itemDate = parseSupabaseDate(lead.data_cadastro);
+        const diffMs = now.getTime() - itemDate.getTime();
+        let maxMs = 0;
+        if (cadastrosTime === '24h') maxMs = 24 * 60 * 60 * 1000;
+        else if (cadastrosTime === '7d') maxMs = 7 * 24 * 60 * 60 * 1000;
+        else if (cadastrosTime === '30d') maxMs = 30 * 24 * 60 * 60 * 1000;
+        return diffMs <= maxMs;
+      });
+    }
+
+    // 2. Search term filter
+    if (cadastrosSearch.trim()) {
+      const term = cadastrosSearch.toLowerCase();
+      list = list.filter(lead => {
+        const name = (lead.nome || '').toLowerCase();
+        const email = (lead.email || '').toLowerCase();
+        const phone = (lead.telefone || '').toLowerCase();
+        const city = (lead.cidade || '').toLowerCase();
+        const state = (lead.estado || '').toLowerCase();
+        const source = (lead.utm_source_cadastro || '').toLowerCase();
+        const medium = (lead.utm_medium_cadastro || '').toLowerCase();
+        const campaign = (lead.utm_campaign_cadastro || '').toLowerCase();
+        return name.includes(term) || email.includes(term) || phone.includes(term) || city.includes(term) || state.includes(term) || source.includes(term) || medium.includes(term) || campaign.includes(term);
+      });
+    }
+
+    return list;
+  }, [supabaseCadastros, cadastrosSearch, cadastrosTime]);
+
+  const filteredCancelsCheckouts = checkoutsCancelados;
+  const filteredDeclinesCheckouts = checkoutsRecusados;
+  const filteredWaitingCheckouts = checkoutsAguardando;
 
   return (
     <>
@@ -3328,20 +3554,20 @@ export default function App() {
                             <p className="text-text-label mb-3 font-medium border-b border-white/5 pb-2">{label}</p>
                             <div className="space-y-2 mb-3">
                               <div className="flex justify-between items-center">
-                                <span className="text-text-label">Faturamento:</span>
-                                <span className="text-primary font-bold ml-4">R$ {Number(data.value || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                <span className="text-[#DCA61F] font-medium">Faturamento:</span>
+                                <span className="text-[#DCA61F] font-bold ml-4">R$ {Number(data.value || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                               </div>
                               <div className="flex justify-between items-center">
-                                <span className="text-text-label text-red-400">Investimento Meta:</span>
-                                <span className="text-red-400 font-bold ml-4">R$ {Number(data.cost || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                <span className="text-[#EF4444] font-medium">Investimento Meta:</span>
+                                <span className="text-[#EF4444] font-bold ml-4">R$ {Number(data.cost || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                               </div>
                               <div className="flex justify-between items-center">
-                                <span className="text-text-label text-emerald-400">ROAS:</span>
+                                <span className="text-emerald-400">ROAS:</span>
                                 <span className="text-emerald-400 font-bold ml-4">{(data.cost > 0 ? (data.value / data.cost).toFixed(2) : '0.00') + 'x'}</span>
                               </div>
                               <div className="flex justify-between items-center pt-1 border-t border-white/5">
-                                <span className="text-text-label">Vendas (Pagas):</span>
-                                <span className="text-primary font-bold ml-4">{data.salesCount}</span>
+                                <span className="text-[#10b981] font-medium">Vendas (Pagas):</span>
+                                <span className="text-[#10b981] font-bold ml-4">{data.salesCount}</span>
                               </div>
                               <div className="flex justify-between items-center">
                                 <span className="text-red-400">Cancelados:</span>
@@ -3352,8 +3578,8 @@ export default function App() {
                                 <span className="text-orange-400 font-bold ml-4">{data.declinesCount || 0}</span>
                               </div>
                               <div className="flex justify-between items-center">
-                                <span className="text-text-label">Novos Cadastros:</span>
-                                <span className="text-primary font-bold ml-4">{data.leads}</span>
+                                <span className="text-[#6366f1] font-medium">Novos Cadastros:</span>
+                                <span className="text-[#6366f1] font-bold ml-4">{data.leads}</span>
                               </div>
                             </div>
                             
@@ -3376,6 +3602,26 @@ export default function App() {
                   />
                 </AreaChart>
               </ResponsiveContainer>
+            </div>
+
+            {/* Custom Responsive Legend */}
+            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 mt-4 pt-4 border-t border-white/5">
+              <div className="flex items-center gap-2">
+                <div className="w-3.5 h-1 md:w-5 md:h-1.5 rounded-full" style={{ backgroundColor: '#DCA61F' }} />
+                <span className="text-[11px] md:text-xs text-text-secondary font-medium">Receita (Faturamento)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3.5 h-1 md:w-5 md:h-1.5 rounded-full" style={{ backgroundColor: '#EF4444' }} />
+                <span className="text-[11px] md:text-xs text-text-secondary font-medium">Investimento Meta</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3.5 h-1 md:w-5 md:h-1.5 rounded-full" style={{ backgroundColor: '#6366f1' }} />
+                <span className="text-[11px] md:text-xs text-text-secondary font-medium">Novos Cadastros</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3.5 h-1 md:w-5 md:h-1.5 rounded-full" style={{ backgroundColor: '#10b981' }} />
+                <span className="text-[11px] md:text-xs text-[#10b981] font-medium">Vendas (Pagas)</span>
+              </div>
             </div>
           </Card>
         )}
@@ -3519,24 +3765,24 @@ export default function App() {
                             <p className="text-text-label mb-3 font-medium border-b border-white/5 pb-2">{label}</p>
                             <div className="space-y-2">
                               <div className="flex justify-between items-center">
-                                <span className="text-text-label">Faturamento:</span>
-                                <span className="text-primary font-bold ml-4">R$ {Number(data.value || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                <span className="text-[#DCA61F] font-medium">Faturamento:</span>
+                                <span className="text-[#DCA61F] font-bold ml-4">R$ {Number(data.value || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                               </div>
                               <div className="flex justify-between items-center">
-                                <span className="text-text-label text-red-400">Investimento Meta:</span>
-                                <span className="text-red-400 font-bold ml-4">R$ {Number(data.cost || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                <span className="text-[#EF4444] font-medium">Investimento Meta:</span>
+                                <span className="text-[#EF4444] font-bold ml-4">R$ {Number(data.cost || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                               </div>
                               <div className="flex justify-between items-center">
                                 <span className="text-emerald-400">ROAS:</span>
                                 <span className="text-emerald-400 font-bold ml-4">{(data.cost > 0 ? (data.value / data.cost).toFixed(2) : '0.00') + 'x'}</span>
                               </div>
                               <div className="flex justify-between items-center pt-1 border-t border-white/5">
-                                <span className="text-text-label text-emerald-500">Vendas:</span>
-                                <span className="text-emerald-500 font-bold ml-4">{data.salesCount}</span>
+                                <span className="text-[#10b981] font-medium">Vendas (Pagas):</span>
+                                <span className="text-[#10b981] font-bold ml-4">{data.salesCount}</span>
                               </div>
                               <div className="flex justify-between items-center">
-                                <span className="text-text-label text-indigo-400">Cadastros:</span>
-                                <span className="text-indigo-400 font-bold ml-4">{data.leads}</span>
+                                <span className="text-[#6366f1] font-medium">Novos Cadastros:</span>
+                                <span className="text-[#6366f1] font-bold ml-4">{data.leads}</span>
                               </div>
                             </div>
                           </div>
@@ -3547,6 +3793,26 @@ export default function App() {
                   />
                 </AreaChart>
               </ResponsiveContainer>
+            </div>
+
+            {/* Custom Responsive Legend for Monthly Chart */}
+            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 mt-4 pt-4 border-t border-white/5">
+              <div className="flex items-center gap-2">
+                <div className="w-3.5 h-1 md:w-5 md:h-1.5 rounded-full" style={{ backgroundColor: '#DCA61F' }} />
+                <span className="text-[11px] md:text-xs text-text-secondary font-medium">Receita (Faturamento)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3.5 h-1 md:w-5 md:h-1.5 rounded-full" style={{ backgroundColor: '#EF4444' }} />
+                <span className="text-[11px] md:text-xs text-text-secondary font-medium">Investimento Meta</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3.5 h-1 md:w-5 md:h-1.5 rounded-full" style={{ backgroundColor: '#6366f1' }} />
+                <span className="text-[11px] md:text-xs text-text-secondary font-medium">Novos Cadastros</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3.5 h-1 md:w-5 md:h-1.5 rounded-full" style={{ backgroundColor: '#10b981' }} />
+                <span className="text-[11px] md:text-xs text-[#10b981] font-medium">Vendas (Pagas)</span>
+              </div>
             </div>
           </Card>
         )}
@@ -4213,32 +4479,59 @@ export default function App() {
                            {(channelData.totalProducts || [])
                              .map((p: any, i: number) => (
                                 <ProductRow key={i} p={p} isSupabase={selectedCompanyId === 'cultura'} />
-                             ))}
-                         </tbody>
-                       </table>
-                   </div>
-                </Card>
-             )}
-          </div>
+                              ))}
+                          </tbody>
+                        </table>
+                    </div>
+                 </Card>
+              )}
+           </div>
         )}
-
-
-
-        {/* LIVE ACTIVITY FEED - Somente para Cultura */}
         {selectedCompanyId === 'cultura' && dataStatus === 'success' && (
           <>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-               {renderCheckoutCard(supabaseCheckouts, "Vendas Recentes", 30, <CreditCard className="w-4 h-4" />, 'sales')}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+               {renderCheckoutCard(filteredSalesCheckouts, "Vendas Recentes", 100, <CreditCard className="w-4 h-4" />, 'sales')}
 
              <Card className="p-0 overflow-hidden border-primary/20">
                 <div className="p-5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between bg-white/5 gap-2">
-                <h4 className="text-[0.75rem] font-serif font-normal text-primary/80 uppercase tracking-[0.25em] flex items-center gap-2 shrink-0">
+               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto mt-2 sm:mt-0 order-2">
+               <div className="relative flex-1 md:w-48">
+                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-secondary" />
+                 <input
+                   type="text"
+                   placeholder="Pesquisar..."
+                   value={cadastrosSearch}
+                   onChange={(e) => setCadastrosSearch(e.target.value)}
+                   className="w-full bg-bg-input border border-border text-text-primary pl-8 pr-6 py-1 rounded-[4px] text-[11px] focus:outline-none focus:border-primary placeholder:text-[#525252] font-medium"
+                 />
+                 {cadastrosSearch && (
+                   <button
+                     onClick={() => setCadastrosSearch('')}
+                     className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-[#525252] hover:text-text-primary font-bold"
+                   >
+                     ✕
+                   </button>
+                 )}
+               </div>
+               <select
+                 value={cadastrosTime}
+                 onChange={(e) => setCadastrosTime(e.target.value)}
+                 className="bg-bg-input border border-border text-text-primary py-1 px-2 rounded-[4px] text-[11px] focus:outline-none focus:border-[#dca61f] min-w-[105px] font-medium cursor-pointer"
+               >
+                 <option value="all">Todo período</option>
+                 <option value="24h">Últimas 24h</option>
+                 <option value="7d">Últimos 7 dias</option>
+                 <option value="30d">Últimos 30 dias</option>
+               </select>
+             </div>
+             <h4 className="text-[0.75rem] font-serif font-normal text-primary/80 uppercase tracking-[0.25em] flex items-center gap-2 shrink-0 order-1">
                        <Users className="w-4 h-4" /> Cadastros recentes
-                    </h4>
+                     </h4>
                  </div>
                 <div className="max-h-[400px] overflow-y-auto">
                   <div className="divide-y divide-white/5">
-                    {supabaseCadastros.slice(0, 30).map((lead, i) => {
+                    {filteredCadastros.slice(0, 30).map((lead, i) => {
+
                       const hasPurchased = supabaseCheckouts.some(c => c.id_usuario === lead.id_usuario);
                       const leadId = lead.id_usuario || lead.email || i.toString();
                       const isExpanded = expandedLeadId === leadId;
@@ -4347,9 +4640,9 @@ export default function App() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-             {renderCheckoutCard(checkoutsCancelados, "Pix expirados", 30, <Target className="w-4 h-4 text-red-500" />, 'cancels')}
-             {renderCheckoutCard(checkoutsRecusados, "Recusas Recentes de cartão", 30, <AlertCircle className="w-4 h-4 text-orange-500" />, 'declines')}
-             {renderCheckoutCard(checkoutsAguardando, "Aguardando pagamento do pix", 30, <Clock className="w-4 h-4 text-amber-500" />, 'waiting')}
+             {renderCheckoutCard(filteredCancelsCheckouts, "Pix expirados", 30, <Target className="w-4 h-4 text-red-500" />, 'cancels')}
+             {renderCheckoutCard(filteredDeclinesCheckouts, "Recusas Recentes de cartão", 30, <AlertCircle className="w-4 h-4 text-orange-500" />, 'declines')}
+             {renderCheckoutCard(filteredWaitingCheckouts, "Aguardando pagamento do pix", 30, <Clock className="w-4 h-4 text-amber-500" />, 'waiting')}
           </div>
 
 
