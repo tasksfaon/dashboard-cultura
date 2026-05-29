@@ -1786,16 +1786,7 @@ export default function App() {
               .limit(5000);
             if (err1) throw err1;
             
-            const cadastros = (cadastrosRaw || []).filter((c: any) => {
-              const src = (c.utm_source_cadastro || '').toLowerCase().trim();
-              const med = (c.utm_medium_cadastro || '').toLowerCase().trim();
-              const cam = (c.utm_campaign_cadastro || '').toLowerCase().trim();
-              
-              if (src === 'unknown' || med === 'unknown' || cam === 'unknown') {
-                return false;
-              }
-              return true;
-            });
+            const cadastros = (cadastrosRaw || []);
             
             setSupabaseCadastros(cadastros);
 
@@ -3149,7 +3140,7 @@ export default function App() {
                              <IconMain className="w-4 h-4" />
                          </div>
                          <div className="overflow-hidden">
-                             <p className="text-[11px] md:text-xs font-medium text-text-primary truncate">{lead?.nome || 'Usuário #' + checkout.id_usuario}</p>
+                             <p className="text-[11px] md:text-xs font-medium text-text-primary truncate">{lead?.nome || lead?.email || 'Usuário #' + checkout.id_usuario}</p>
                              <p className="text-[9px] md:text-[10px] text-text-secondary truncate">{curso?.nome || 'Curso #' + checkout.id_curso}</p>
                          </div>
                        </div>
@@ -3266,7 +3257,14 @@ export default function App() {
   }, [supabaseCheckoutsFull]);
 
   const filteredCadastros = useMemo(() => {
-    let list = supabaseCadastros.filter(lead => lead.nome || lead.email);
+    let list = supabaseCadastros.filter(lead => {
+      if (!lead.nome && !lead.email) return false;
+      const src = (lead.utm_source_cadastro || '').toLowerCase().trim();
+      const med = (lead.utm_medium_cadastro || '').toLowerCase().trim();
+      const cam = (lead.utm_campaign_cadastro || '').toLowerCase().trim();
+      if (src === 'unknown' || med === 'unknown' || cam === 'unknown') return false;
+      return true;
+    });
     
     // 1. Time range filter
     if (cadastrosTime !== 'all') {
