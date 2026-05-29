@@ -3266,7 +3266,7 @@ export default function App() {
   }, [supabaseCheckoutsFull]);
 
   const filteredCadastros = useMemo(() => {
-    let list = supabaseCadastros;
+    let list = supabaseCadastros.filter(lead => lead.nome || lead.email);
     
     // 1. Time range filter
     if (cadastrosTime !== 'all') {
@@ -4642,7 +4642,7 @@ export default function App() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
              {renderCheckoutCard(filteredCancelsCheckouts, "Pix expirados", 30, <Target className="w-4 h-4 text-red-500" />, 'cancels')}
              {renderCheckoutCard(filteredDeclinesCheckouts, "Recusas Recentes de cartão", 30, <AlertCircle className="w-4 h-4 text-orange-500" />, 'declines')}
-             {renderCheckoutCard(filteredWaitingCheckouts, "Aguardando pagamento do pix", 30, <Clock className="w-4 h-4 text-amber-500" />, 'waiting')}
+             {renderCheckoutCard(filteredWaitingCheckouts, "Aguardando pagamento do pix (validade 2h)", 30, <Clock className="w-4 h-4 text-amber-500" />, 'waiting')}
           </div>
 
 
