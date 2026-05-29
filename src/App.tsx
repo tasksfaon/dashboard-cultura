@@ -1522,6 +1522,7 @@ export default function App() {
   
   // Novos estados para os dados específicos da Cultura
   const [supabaseCadastros, setSupabaseCadastros] = useState<any[]>([]);
+  const [supabaseCadastrosSite, setSupabaseCadastrosSite] = useState<any[]>([]);
   const [supabaseCategorias, setSupabaseCategorias] = useState<any[]>([]);
   const [supabaseCursos, setSupabaseCursos] = useState<any[]>([]);
   const [supabaseCheckouts, setSupabaseCheckouts] = useState<any[]>([]);
@@ -1787,8 +1788,23 @@ export default function App() {
             if (err1) throw err1;
             
             const cadastros = (cadastrosRaw || []);
-            
             setSupabaseCadastros(cadastros);
+
+            const { data: cadastrosSiteRaw, error: err1b } = await supabase
+              .from('cadastros_site')
+              .select('*')
+              .order('data_cadastro', { ascending: false })
+              .limit(5000);
+            if (err1b) console.warn("Erro ao buscar cadastros_site:", err1b);
+            console.log("CADASTRoS_SITE_DEBUG", cadastrosSiteRaw && cadastrosSiteRaw[0]);
+            const cadastrosSite = (cadastrosSiteRaw || []).filter((c: any) => {
+              const src = (c.utm_source || c.utm_source_cadastro || '').toLowerCase().trim();
+              const med = (c.utm_medium || c.utm_medium_cadastro || '').toLowerCase().trim();
+              const cam = (c.utm_campaign || c.utm_campaign_cadastro || '').toLowerCase().trim();
+              if (src === 'unknown' || med === 'unknown' || cam === 'unknown') return false;
+              return true;
+            });
+            setSupabaseCadastrosSite(cadastrosSite);
 
             // 2. Categorias (Incluindo id_categoria)
             const { data: categorias, error: err2 } = await supabase
@@ -2225,8 +2241,8 @@ export default function App() {
             setCheckoutsRecusados(recusadosData);
             setCheckoutsAguardando(aguardandoData);
             
-            const filteredCadastros = cadastros.filter(c => {
-              const dateVal = c.data_cadastro;
+            const filteredCadastros = cadastrosSite.filter(c => {
+              const dateVal = c.data_cadastro || c.created_at;
               if (!dateVal) return false;
               
               const itemDate = getBRLDate(dateVal);
@@ -2426,9 +2442,9 @@ export default function App() {
 
             // Leads por canal (baseado nos UTMs do cadastro)
             filteredCadastros.forEach(lead => {
-              const source = lead.utm_source_cadastro || '';
-              const medium = lead.utm_medium_cadastro || '';
-              const campaign = lead.utm_campaign_cadastro || '';
+              const source = lead.utm_source || lead.utm_source_cadastro || '';
+              const medium = lead.utm_medium || lead.utm_medium_cadastro || '';
+              const campaign = lead.utm_campaign || lead.utm_campaign_cadastro || '';
               const cat = getCategory(source, medium, campaign);
               channelMap[cat].leads += 1;
             });
@@ -2486,7 +2502,7 @@ export default function App() {
 
             // Mesclar com cadastros (leads)
             filteredCadastros.forEach(lead => {
-              const dateStr = formatDateBRL(lead.data_cadastro);
+              const dateStr = formatDateBRL(lead.data_cadastro || lead.created_at || new Date());
               if (!trendMap.has(dateStr)) {
                 trendMap.set(dateStr, { value: 0, salesCount: 0, leads: 0, cost: 0, cancelsCount: 0, declinesCount: 0, products: new Map() });
               }
@@ -2672,9 +2688,9 @@ export default function App() {
 
             // 3. Processar Leads (Supabase)
             filteredCadastros.forEach(l => {
-                const rawCamp = (l.utm_campaign_cadastro || '').toUpperCase();
+                const rawCamp = (l.utm_campaign || l.utm_campaign_cadastro || '').toUpperCase();
                 if (!rawCamp) return;
-                const utmCampaign = l.utm_campaign_cadastro || rawCamp;
+                const utmCampaign = l.utm_campaign || l.utm_campaign_cadastro || rawCamp;
 
                 let objective = 'OUTROS';
                 if (rawCamp.includes('DIST') || rawCamp.includes('ACE') || rawCamp.includes('ENG')) objective = 'DIST';
@@ -2877,8 +2893,8 @@ export default function App() {
               if (!dateVal || (c.status || '').toLowerCase().trim() !== 'pago') return false;
               return formatDateBRL(dateVal) === todayStr;
             });
-            const cadastrosToday = (cadastros || []).filter((c: any) => {
-              const dateVal = c.data_cadastro;
+            const cadastrosToday = (cadastrosSite || []).filter((c: any) => {
+              const dateVal = c.data_cadastro || c.created_at;
               if (!dateVal) return false;
               return formatDateBRL(dateVal) === todayStr;
             });
@@ -2892,7 +2908,7 @@ export default function App() {
               { title: 'ROAS Geral', value: blendedROAS, trend: 'Retorno do investimento', isUp: true, icon: Activity },
               { title: 'CPA Geral', value: blendedCPA, trend: 'Custo por Venda', isUp: true, icon: Target },
               { title: 'Vendas hoje', value: vendasHojeCount, trend: 'Checkouts hoje', isUp: true, icon: ShoppingCart, isToday: true },
-              { title: 'Total de cadastros', value: leadsCount.toString(), trend: 'Novos Cadastros', isUp: true, icon: Users },
+              { title: 'Total de cadastros', value: leadsCount.toString(), trend: 'Cadastros no site', isUp: true, icon: Users },
               { title: 'Vendas Totais', value: salesCount.toString(), trend: 'Checkouts realizados', isUp: true, icon: ShoppingCart },
               { title: 'Pix expirados', value: taxaCancelamento, trend: 'Pedidos expirados', isUp: false, icon: ArrowDownRight },
               { title: 'Cartão Recusado', value: recusadosCount, trend: 'Pagamentos Negados', isUp: false, icon: ArrowDownRight },
@@ -2987,8 +3003,8 @@ export default function App() {
       .sort((a, b) => b.value - a.value);
 
     // Cadastros Today
-    const cadastrosToday = supabaseCadastros.filter(c => {
-      const dateVal = c.data_cadastro;
+    const cadastrosToday = supabaseCadastrosSite.filter(c => {
+      const dateVal = c.data_cadastro || c.created_at;
       if (!dateVal) return false;
       return formatDateBRL(dateVal) === todayStr;
     });
@@ -3257,11 +3273,10 @@ export default function App() {
   }, [supabaseCheckoutsFull]);
 
   const filteredCadastros = useMemo(() => {
-    let list = supabaseCadastros.filter(lead => {
-      if (!lead.nome && !lead.email) return false;
-      const src = (lead.utm_source_cadastro || '').toLowerCase().trim();
-      const med = (lead.utm_medium_cadastro || '').toLowerCase().trim();
-      const cam = (lead.utm_campaign_cadastro || '').toLowerCase().trim();
+    let list = supabaseCadastrosSite.filter(lead => {
+      const src = (lead.utm_source || lead.utm_source_cadastro || '').toLowerCase().trim();
+      const med = (lead.utm_medium || lead.utm_medium_cadastro || '').toLowerCase().trim();
+      const cam = (lead.utm_campaign || lead.utm_campaign_cadastro || '').toLowerCase().trim();
       if (src === 'unknown' || med === 'unknown' || cam === 'unknown') return false;
       return true;
     });
@@ -3270,7 +3285,9 @@ export default function App() {
     if (cadastrosTime !== 'all') {
       const now = new Date();
       list = list.filter(lead => {
-        const itemDate = parseSupabaseDate(lead.data_cadastro);
+        const dateStr = lead.data_cadastro || lead.created_at;
+        if (!dateStr) return true;
+        const itemDate = parseSupabaseDate(dateStr);
         const diffMs = now.getTime() - itemDate.getTime();
         let maxMs = 0;
         if (cadastrosTime === '24h') maxMs = 24 * 60 * 60 * 1000;
@@ -3284,14 +3301,14 @@ export default function App() {
     if (cadastrosSearch.trim()) {
       const term = cadastrosSearch.toLowerCase();
       list = list.filter(lead => {
-        const name = (lead.nome || '').toLowerCase();
+        const name = (lead.nome || lead.name || '').toLowerCase();
         const email = (lead.email || '').toLowerCase();
-        const phone = (lead.telefone || '').toLowerCase();
-        const city = (lead.cidade || '').toLowerCase();
-        const state = (lead.estado || '').toLowerCase();
-        const source = (lead.utm_source_cadastro || '').toLowerCase();
-        const medium = (lead.utm_medium_cadastro || '').toLowerCase();
-        const campaign = (lead.utm_campaign_cadastro || '').toLowerCase();
+        const phone = (lead.telefone || lead.phone || '').toLowerCase();
+        const city = (lead.cidade || lead.city || '').toLowerCase();
+        const state = (lead.estado || lead.state || '').toLowerCase();
+        const source = (lead.utm_source || lead.utm_source_cadastro || '').toLowerCase();
+        const medium = (lead.utm_medium || lead.utm_medium_cadastro || '').toLowerCase();
+        const campaign = (lead.utm_campaign || lead.utm_campaign_cadastro || '').toLowerCase();
         return name.includes(term) || email.includes(term) || phone.includes(term) || city.includes(term) || state.includes(term) || source.includes(term) || medium.includes(term) || campaign.includes(term);
       });
     }
@@ -3576,7 +3593,7 @@ export default function App() {
                                 <span className="text-orange-400 font-bold ml-4">{data.declinesCount || 0}</span>
                               </div>
                               <div className="flex justify-between items-center">
-                                <span className="text-[#6366f1] font-medium">Novos Cadastros:</span>
+                                <span className="text-[#6366f1] font-medium">Cadastros no site:</span>
                                 <span className="text-[#6366f1] font-bold ml-4">{data.leads}</span>
                               </div>
                             </div>
@@ -3614,7 +3631,7 @@ export default function App() {
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3.5 h-1 md:w-5 md:h-1.5 rounded-full" style={{ backgroundColor: '#6366f1' }} />
-                <span className="text-[11px] md:text-xs text-text-secondary font-medium">Novos Cadastros</span>
+                <span className="text-[11px] md:text-xs text-text-secondary font-medium">Cadastros no site</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3.5 h-1 md:w-5 md:h-1.5 rounded-full" style={{ backgroundColor: '#10b981' }} />
@@ -3779,7 +3796,7 @@ export default function App() {
                                 <span className="text-[#10b981] font-bold ml-4">{data.salesCount}</span>
                               </div>
                               <div className="flex justify-between items-center">
-                                <span className="text-[#6366f1] font-medium">Novos Cadastros:</span>
+                                <span className="text-[#6366f1] font-medium">Cadastros no site:</span>
                                 <span className="text-[#6366f1] font-bold ml-4">{data.leads}</span>
                               </div>
                             </div>
@@ -3805,7 +3822,7 @@ export default function App() {
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3.5 h-1 md:w-5 md:h-1.5 rounded-full" style={{ backgroundColor: '#6366f1' }} />
-                <span className="text-[11px] md:text-xs text-text-secondary font-medium">Novos Cadastros</span>
+                <span className="text-[11px] md:text-xs text-text-secondary font-medium">Cadastros no site</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-3.5 h-1 md:w-5 md:h-1.5 rounded-full" style={{ backgroundColor: '#10b981' }} />
@@ -4536,10 +4553,10 @@ export default function App() {
 
                       const purchase = supabaseCheckouts.find(c => c.id_usuario === lead.id_usuario);
                       const origin = getFriendlyChannel(
-                        lead.utm_source_cadastro,
-                        lead.utm_medium_cadastro,
-                        lead.utm_campaign_cadastro,
-                        lead.utm_content_cadastro
+                        lead.utm_source || lead.utm_source_cadastro,
+                        lead.utm_medium || lead.utm_medium_cadastro,
+                        lead.utm_campaign || lead.utm_campaign_cadastro,
+                        lead.utm_content || lead.utm_content_cadastro
                       );
 
                       return (
@@ -4554,7 +4571,7 @@ export default function App() {
                                </div>
                                <div className="overflow-hidden">
                                   <div className="flex flex-wrap items-center gap-1.5">
-                                    <p className="text-[11px] md:text-xs font-medium text-text-primary truncate max-w-[150px]">{lead.nome || lead.email || 'Lead #' + lead.id_usuario}</p>
+                                    <p className="text-[11px] md:text-xs font-medium text-text-primary truncate max-w-[150px]">{lead.nome || lead.name || lead.email || 'Lead #' + (lead.id_usuario || lead.id || i)}</p>
                                     {hasPurchased && (
                                       <span className="text-[8px] bg-primary/10 text-primary border border-primary/30 px-1.5 py-0.5 rounded-full font-black tracking-widest">
                                         CLIENTE
@@ -4568,7 +4585,9 @@ export default function App() {
                                <div className="text-right">
                                   <p className="text-[10px] text-text-secondary">
                                     {(() => {
-                                      const d = getBRLDate(lead.data_cadastro);
+                                      const dateStr = lead.data_cadastro || lead.created_at;
+                                      if (!dateStr) return 'Recente';
+                                      const d = getBRLDate(dateStr);
                                       return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
                                     })()}
                                   </p>
