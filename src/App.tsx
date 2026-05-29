@@ -4587,6 +4587,13 @@ export default function App() {
                                     {(() => {
                                       const dateStr = lead.data_cadastro || lead.created_at;
                                       if (!dateStr) return 'Recente';
+                                      
+                                      const hasTime = dateStr.includes(':') || dateStr.includes('T');
+                                      if (!hasTime) {
+                                          const [y, m, d] = dateStr.split('-').map(Number);
+                                          return `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y} 00:00`;
+                                      }
+
                                       const d = getBRLDate(dateStr);
                                       return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
                                     })()}
