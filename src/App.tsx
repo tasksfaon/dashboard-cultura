@@ -569,7 +569,11 @@ const ActiveCampaignsTree: React.FC<{ data: any[], metaCosts?: any[], checkouts?
 const parseSupabaseDate = (dateVal: string | null | undefined): Date => {
   if (!dateVal) return new Date();
   let str = dateVal.replace(' ', 'T');
-  if (!/(Z|[+-]\d{2}(:?\d{2})?)$/.test(str)) {
+  // Trunca microssegundos para milissegundos (Safari não aceita 6 casas decimais)
+  str = str.replace(/(\.\d{3})\d+/, '$1');
+  // Normaliza +HH sem minutos para +HH:00 (formato exigido pelo Safari)
+  str = str.replace(/([+-]\d{2})$/, '$1:00');
+  if (!/(Z|[+-]\d{2}:\d{2})$/.test(str)) {
     str += 'Z';
   }
   return new Date(str);
@@ -2069,7 +2073,7 @@ export default function App() {
                  return;
                }
                // Group by YYYY-MM-DD to handle webhook delays for the same transaction
-               const dayGroup = new Date(dateVal).toISOString().substring(0, 10);
+               const dayGroup = parseSupabaseDate(dateVal).toISOString().substring(0, 10);
                const key = `${c.id_usuario}_${dayGroup}_${c.valor}`;
                if (checkoutMap.has(key)) {
                   const existing = checkoutMap.get(key);
