@@ -2213,10 +2213,22 @@ export default function App() {
             const checkoutsNoPeriodo = (checkouts || []).filter((c: any) => {
               const dateVal = c.timestamp || c.created_at;
               if (!dateVal) return false;
-              
+
               const itemDate = getBRLDate(dateVal);
-              
-              return itemDate >= startDate && itemDate <= endDate;
+              const passes = itemDate >= startDate && itemDate <= endDate;
+
+              if (String(dateVal).startsWith('2026-05-30')) {
+                console.log('DEBUG FILTER MAY30:', {
+                  dateVal,
+                  itemDate_iso: isNaN(itemDate.getTime()) ? 'INVALID DATE' : itemDate.toISOString(),
+                  startDate_iso: startDate.toISOString(),
+                  endDate_iso: endDate.toISOString(),
+                  passes,
+                  status: c.status
+                });
+              }
+
+              return passes;
             });
             const filteredData = checkoutsNoPeriodo.filter((c: any) => (c.status || '').toLowerCase().trim() === 'pago');
             const canceladosData = checkoutsNoPeriodo.filter((c: any) => {
