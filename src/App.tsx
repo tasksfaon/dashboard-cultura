@@ -2210,6 +2210,17 @@ export default function App() {
             (startDate as any)._isBRL = true;
             (endDate as any)._isBRL = true;
 
+            // Debug: distribuição de datas no array checkouts
+            const dateDistrib: Record<string, number> = {};
+            (checkouts || []).forEach((c: any) => {
+              const dv = String(c.timestamp || c.created_at || '').substring(0, 10);
+              dateDistrib[dv] = (dateDistrib[dv] || 0) + 1;
+            });
+            console.log('DATAS NO CHECKOUTS:', JSON.stringify(dateDistrib));
+            console.log('PRIMEIROS 3:', JSON.stringify((checkouts || []).slice(0, 3).map((c: any) => ({
+              id: c.id_evento_checkout, ts: c.timestamp, status: c.status, usuario: c.id_usuario
+            }))));
+
             const checkoutsNoPeriodo = (checkouts || []).filter((c: any) => {
               const dateVal = c.timestamp || c.created_at;
               if (!dateVal) return false;
