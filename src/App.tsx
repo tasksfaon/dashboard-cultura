@@ -2149,97 +2149,74 @@ export default function App() {
             });
 
             // --- FILTRAGEM POR DATA (JS) ---
+            // Estratégia: comparar timestamps UTC brutos contra janela UTC correspondente ao dia BRL
+            // BRL = UTC-3, então meia-noite BRL = 03:00 UTC do mesmo dia
             const nowUTC = new Date();
-            // Pegamos o horário atual de Brasília e representamos como UTC absoluto
-            const now = new Date(nowUTC.getTime() - 3 * 3600 * 1000);
-            (now as any)._isBRL = true;
+            // Dia atual em BRL: subtrai 3h do UTC para obter a data BRL
+            const brlNow = new Date(nowUTC.getTime() - 3 * 3600 * 1000);
+            const brlY = brlNow.getUTCFullYear();
+            const brlM = brlNow.getUTCMonth();
+            const brlD = brlNow.getUTCDate();
 
-            let startDate = new Date(now.getTime());
-            let endDate = new Date(now.getTime());
-            
-            if (dateRange === '7days') { 
-              startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); 
-              startDate.setUTCHours(0,0,0,0); 
-              endDate = new Date(now.getTime());
-              endDate.setUTCHours(23,59,59,999);
-            }
-            else if (dateRange === '14days') { 
-              startDate = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000); 
-              startDate.setUTCHours(0,0,0,0); 
-              endDate = new Date(now.getTime());
-              endDate.setUTCHours(23,59,59,999);
-            }
-            else if (dateRange === '30days') { 
-              startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); 
-              startDate.setUTCHours(0,0,0,0); 
-              endDate = new Date(now.getTime());
-              endDate.setUTCHours(23,59,59,999);
-            }
-            else if (dateRange === 'thisMonth') {
-              startDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
-              endDate = new Date(now.getTime());
-              endDate.setUTCHours(23,59,59,999);
+            // Retorna janela UTC [início, fim] para N dias atrás em BRL
+            const brlDayStart = (daysAgo: number) =>
+              new Date(Date.UTC(brlY, brlM, brlD - daysAgo, 3, 0, 0, 0));
+            const brlDayEnd = (daysAgo: number) =>
+              new Date(Date.UTC(brlY, brlM, brlD - daysAgo + 1, 2, 59, 59, 999));
+
+            let startDate: Date;
+            let endDate: Date;
+
+            if (dateRange === 'today') {
+              startDate = brlDayStart(0);
+              endDate   = brlDayEnd(0);
             }
             else if (dateRange === 'yesterday') {
-              startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-              startDate.setUTCHours(0,0,0,0);
-              endDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-              endDate.setUTCHours(23,59,59,999);
+              startDate = brlDayStart(1);
+              endDate   = brlDayEnd(1);
             }
-            else if (dateRange === 'today') {
-              startDate = new Date(now.getTime());
-              startDate.setUTCHours(0,0,0,0);
-              endDate = new Date(now.getTime());
-              endDate.setUTCHours(23,59,59,999);
+            else if (dateRange === '7days') {
+              startDate = brlDayStart(6);
+              endDate   = brlDayEnd(0);
+            }
+            else if (dateRange === '14days') {
+              startDate = brlDayStart(13);
+              endDate   = brlDayEnd(0);
+            }
+            else if (dateRange === '30days') {
+              startDate = brlDayStart(29);
+              endDate   = brlDayEnd(0);
+            }
+            else if (dateRange === 'thisMonth') {
+              startDate = new Date(Date.UTC(brlY, brlM, 1, 3, 0, 0, 0));
+              endDate   = brlDayEnd(0);
             }
             else if (dateRange === 'custom' && appliedCustomDate.start) {
               const [sy, sm, sd] = appliedCustomDate.start.split('-').map(Number);
-              startDate = new Date(Date.UTC(sy, sm - 1, sd, 0, 0, 0, 0));
+              startDate = new Date(Date.UTC(sy, sm - 1, sd, 3, 0, 0, 0));
               if (appliedCustomDate.end) {
                 const [ey, em, ed] = appliedCustomDate.end.split('-').map(Number);
-                endDate = new Date(Date.UTC(ey, em - 1, ed, 23, 59, 59, 999));
+                endDate = new Date(Date.UTC(ey, em - 1, ed + 1, 2, 59, 59, 999));
+              } else {
+                endDate = new Date(Date.UTC(sy, sm - 1, sd + 1, 2, 59, 59, 999));
               }
             }
-            else { 
-              startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000); 
-              startDate.setUTCHours(0,0,0,0); 
-              endDate = new Date(now.getTime());
-              endDate.setUTCHours(23,59,59,999);
-            } // Default 1 ano
+            else {
+              startDate = new Date(Date.UTC(brlY, brlM, brlD - 364, 3, 0, 0, 0));
+              endDate   = brlDayEnd(0);
+            }
 
-            (startDate as any)._isBRL = true;
-            (endDate as any)._isBRL = true;
-
-            // Debug: distribuição de datas no array checkouts
-            const dateDistrib: Record<string, number> = {};
-            (checkouts || []).forEach((c: any) => {
-              const dv = String(c.timestamp || c.created_at || '').substring(0, 10);
-              dateDistrib[dv] = (dateDistrib[dv] || 0) + 1;
+            console.log('DEBUG CALCS DATE RANGE:', {
+              dateRange,
+              startDate_utc: startDate.toISOString(),
+              endDate_utc: endDate.toISOString()
             });
-            console.log('DATAS NO CHECKOUTS:', JSON.stringify(dateDistrib));
-            console.log('PRIMEIROS 3:', JSON.stringify((checkouts || []).slice(0, 3).map((c: any) => ({
-              id: c.id_evento_checkout, ts: c.timestamp, status: c.status, usuario: c.id_usuario
-            }))));
 
             const checkoutsNoPeriodo = (checkouts || []).filter((c: any) => {
               const dateVal = c.timestamp || c.created_at;
               if (!dateVal) return false;
-
-              const itemDate = getBRLDate(dateVal);
-              const passes = itemDate >= startDate && itemDate <= endDate;
-
-              if (String(dateVal).startsWith('2026-05-30')) {
-                console.log('DEBUG FILTER MAY30:', {
-                  dateVal,
-                  itemDate_iso: isNaN(itemDate.getTime()) ? 'INVALID DATE' : itemDate.toISOString(),
-                  startDate_iso: startDate.toISOString(),
-                  endDate_iso: endDate.toISOString(),
-                  passes,
-                  status: c.status
-                });
-              }
-
-              return passes;
+              const itemDate = parseSupabaseDate(dateVal);
+              return itemDate >= startDate && itemDate <= endDate;
             });
             const filteredData = checkoutsNoPeriodo.filter((c: any) => (c.status || '').toLowerCase().trim() === 'pago');
             const canceladosData = checkoutsNoPeriodo.filter((c: any) => {
