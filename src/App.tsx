@@ -868,12 +868,15 @@ const MonthlyClosingSection: React.FC<{ checkouts: any[], costs: any[], cursos: 
   };
 
   const calculateStats = (month: number, year: number) => {
-    // Definimos início e fim do mês em BRT (UTC-3)
-    const startOfMonth = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
-    const endOfMonth = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999));
-    
+    // Janela UTC para o mês em BRL: meia-noite BRL do dia 1 = 03:00 UTC
+    // Fim do mês BRL = dia 1 do mês seguinte às 02:59:59 UTC
+    const startOfMonth = new Date(Date.UTC(year, month, 1, 3, 0, 0, 0));
+    const endOfMonth   = new Date(Date.UTC(year, month + 1, 1, 2, 59, 59, 999));
+
     const filteredCheckouts = checkouts.filter(c => {
-      const d = getBRLDate(c.timestamp || c.created_at);
+      const dateVal = c.timestamp || c.created_at;
+      if (!dateVal) return false;
+      const d = parseSupabaseDate(dateVal);
       return d >= startOfMonth && d <= endOfMonth && (c.status || '').toLowerCase().trim() === 'pago';
     });
 
