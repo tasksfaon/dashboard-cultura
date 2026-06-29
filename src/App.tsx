@@ -1804,13 +1804,9 @@ export default function App() {
               .limit(5000);
             if (err1b) console.warn("Erro ao buscar cadastros_site:", err1b);
             console.log("CADASTRoS_SITE_DEBUG", cadastrosSiteRaw && cadastrosSiteRaw[0]);
-            const cadastrosSite = (cadastrosSiteRaw || []).filter((c: any) => {
-              const src = (c.utm_source || c.utm_source_cadastro || '').toLowerCase().trim();
-              const med = (c.utm_medium || c.utm_medium_cadastro || '').toLowerCase().trim();
-              const cam = (c.utm_campaign || c.utm_campaign_cadastro || '').toLowerCase().trim();
-              if (src === 'unknown' || med === 'unknown' || cam === 'unknown') return false;
-              return true;
-            });
+            // Lista COMPLETA de cadastros_site (sem nenhum filtro).
+            // Usada para os totais reais: "Total de cadastros" e "Cadastros hoje".
+            const cadastrosSite = (cadastrosSiteRaw || []);
             setSupabaseCadastrosSite(cadastrosSite);
 
             // 2. Categorias (Incluindo id_categoria)
@@ -2248,12 +2244,22 @@ export default function App() {
             setCheckoutsRecusados(recusadosData);
             setCheckoutsAguardando(aguardandoData);
             
-            const filteredCadastros = cadastrosSite.filter(c => {
+            // Total REAL de cadastros no período (tabela cadastros_site inteira,
+            // sem descartar registros com UTM "unknown"). Alimenta o KPI "Total de cadastros".
+            const filteredCadastrosAll = cadastrosSite.filter(c => {
               const dateVal = c.data_cadastro || c.created_at;
               if (!dateVal) return false;
-              
               const itemDate = getBRLDate(dateVal);
               return itemDate >= startDate && itemDate <= endDate;
+            });
+
+            // Lista filtrada (remove UTM "unknown") — usada APENAS na atribuição por canal,
+            // não para os totais dos KPI cards.
+            const filteredCadastros = filteredCadastrosAll.filter((c: any) => {
+              const src = (c.utm_source || c.utm_source_cadastro || '').toLowerCase().trim();
+              const med = (c.utm_medium || c.utm_medium_cadastro || '').toLowerCase().trim();
+              const cam = (c.utm_campaign || c.utm_campaign_cadastro || '').toLowerCase().trim();
+              return src !== 'unknown' && med !== 'unknown' && cam !== 'unknown';
             });
 
             const filteredEventLeads = (eventLeads || []).filter((l: any) => {
@@ -2265,7 +2271,7 @@ export default function App() {
             setFilteredEventLeadsState(filteredEventLeads);
 
             // --- PROCESSAMENTO DE DADOS SUPABASE PARA O DASHBOARD ---
-            const leadsCount = filteredCadastros.length;
+            const leadsCount = filteredCadastrosAll.length;
             const totalRevenue = filteredData.reduce((acc, curr) => acc + (Number(curr.valor) || 0), 0);
             const salesCount = filteredData.length;
             
@@ -2298,7 +2304,7 @@ export default function App() {
             Object.keys(channelDefinitions).forEach(key => {
               channelMap[key] = { revenue: 0, sales: 0, leads: 0, sessions: 0, cost: 0, products: new Map(), campaigns: new Map() };
             });
-            channelMap.total = { revenue: totalRevenue, sales: salesCount, leads: leadsCount, sessions: 0, cost: 0, products: new Map() };
+            channelMap.total = { revenue: totalRevenue, sales: salesCount, leads: filteredCadastros.length, sessions: 0, cost: 0, products: new Map() };
 
             // Integration of Meta Ads Costs from Spreadsheet
             const periodMetaCost = metaCosts.reduce((acc, curr) => {
