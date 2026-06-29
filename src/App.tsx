@@ -2246,9 +2246,20 @@ export default function App() {
             
             // Total REAL de cadastros no período (tabela cadastros_site inteira,
             // sem descartar registros com UTM "unknown"). Alimenta o KPI "Total de cadastros".
+            // data_cadastro vem como YYYY-MM-DD puro (sem hora): comparar como string para
+            // evitar que getBRLDate subtraia 3h e mova o registro para o dia anterior.
+            const cadastroToISODate = (d: Date) => {
+              const brl = new Date(d.getTime() - 3 * 3600 * 1000);
+              return `${brl.getUTCFullYear()}-${String(brl.getUTCMonth() + 1).padStart(2, '0')}-${String(brl.getUTCDate()).padStart(2, '0')}`;
+            };
+            const cadastroStartISO = cadastroToISODate(startDate);
+            const cadastroEndISO   = cadastroToISODate(endDate);
             const filteredCadastrosAll = cadastrosSite.filter(c => {
               const dateVal = c.data_cadastro || c.created_at;
               if (!dateVal) return false;
+              if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateVal)) {
+                return dateVal >= cadastroStartISO && dateVal <= cadastroEndISO;
+              }
               const itemDate = getBRLDate(dateVal);
               return itemDate >= startDate && itemDate <= endDate;
             });
@@ -2906,9 +2917,13 @@ export default function App() {
               if (!dateVal || (c.status || '').toLowerCase().trim() !== 'pago') return false;
               return formatDateBRL(dateVal) === todayStr;
             });
+            const todayBRL = `${brlY}-${String(brlM + 1).padStart(2, '0')}-${String(brlD).padStart(2, '0')}`;
             const cadastrosToday = (cadastrosSite || []).filter((c: any) => {
               const dateVal = c.data_cadastro || c.created_at;
               if (!dateVal) return false;
+              if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateVal)) {
+                return dateVal === todayBRL;
+              }
               return formatDateBRL(dateVal) === todayStr;
             });
 
@@ -3016,9 +3031,14 @@ export default function App() {
       .sort((a, b) => b.value - a.value);
 
     // Cadastros Today
+    const brlNowLocal = new Date(now.getTime() - 3 * 3600 * 1000);
+    const todayISO = `${brlNowLocal.getUTCFullYear()}-${String(brlNowLocal.getUTCMonth() + 1).padStart(2, '0')}-${String(brlNowLocal.getUTCDate()).padStart(2, '0')}`;
     const cadastrosToday = supabaseCadastrosSite.filter(c => {
       const dateVal = c.data_cadastro || c.created_at;
       if (!dateVal) return false;
+      if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateVal)) {
+        return dateVal === todayISO;
+      }
       return formatDateBRL(dateVal) === todayStr;
     });
 
