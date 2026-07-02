@@ -1829,11 +1829,22 @@ export default function App() {
               .order('data_cadastro', { ascending: false })
               .limit(5000);
             if (err1b) console.warn("Erro ao buscar cadastros_site:", err1b);
-            console.log("CADASTRoS_SITE_DEBUG", cadastrosSiteRaw && cadastrosSiteRaw[0]);
             // Lista COMPLETA de cadastros_site (sem nenhum filtro).
             // Usada para os totais reais: "Total de cadastros" e "Cadastros hoje".
             const cadastrosSite = (cadastrosSiteRaw || []);
             setSupabaseCadastrosSite(cadastrosSite);
+            {
+              const nowUTCDebug = new Date();
+              const brlNowDebug = new Date(nowUTCDebug.getTime() - 3 * 3600 * 1000);
+              const todayBRLDebug = `${brlNowDebug.getUTCFullYear()}-${String(brlNowDebug.getUTCMonth() + 1).padStart(2, '0')}-${String(brlNowDebug.getUTCDate()).padStart(2, '0')}`;
+              const alvo = cadastrosSite.find((c: any) => (c.email || '').toLowerCase().includes('murilocarva21'));
+              console.log("CADASTROS_SITE_DEBUG", {
+                totalRows: cadastrosSite.length,
+                todayBRLDebug,
+                registroMurilo: alvo,
+                dateKeyMurilo: alvo ? getCadastroDateKeyBRL(alvo.data_cadastro || alvo.created_at) : null,
+              });
+            }
 
             // 2. Categorias (Incluindo id_categoria)
             const { data: categorias, error: err2 } = await supabase
