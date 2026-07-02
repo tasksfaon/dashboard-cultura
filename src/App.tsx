@@ -602,6 +602,32 @@ const formatDateBRL = (val: string | Date | null | undefined): string => {
   return `${day}/${month}/${year}`;
 };
 
+// data_cadastro (cadastros_site) chega em 3 formatos possíveis:
+// 1) data pura "YYYY-MM-DD" (sem hora)              -> já é o dia BRL, usar direto
+// 2) timestamp com offset explícito ("...Z"/"+00:00") -> instante UTC real, converter p/ BRL (-3h)
+// 3) timestamp sem offset ("YYYY-MM-DD HH:MM:SS")    -> já é horário local BRL, NÃO deslocar
+// getBRLDate/formatDateBRL assumem sempre o caso 2, o que descola o registro para o dia
+// anterior quando o valor cai no caso 1 (com hora) ou 3. Esta função trata os 3 casos e
+// retorna a chave "YYYY-MM-DD" do dia BRL correspondente.
+const getCadastroDateKeyBRL = (val: string | Date | null | undefined): string | null => {
+  if (!val) return null;
+  const toKey = (d: Date) =>
+    `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+
+  if (val instanceof Date) {
+    return toKey(new Date(val.getTime() - 3 * 3600 * 1000));
+  }
+
+  const str = String(val).trim();
+  const hasExplicitOffset = /(Z|[+-]\d{2}:?\d{2})$/.test(str);
+  if (hasExplicitOffset) {
+    return toKey(getBRLDate(str));
+  }
+
+  const dateOnlyMatch = str.match(/^(\d{4}-\d{2}-\d{2})/);
+  return dateOnlyMatch ? dateOnlyMatch[1] : null;
+};
+
 const normalizePaymentMethod = (raw: string | null | undefined): string => {
   if (!raw) return 'Indefinido';
   const val = String(raw).toLowerCase().trim();
@@ -2246,8 +2272,8 @@ export default function App() {
             
             // Total REAL de cadastros no período (tabela cadastros_site inteira,
             // sem descartar registros com UTM "unknown"). Alimenta o KPI "Total de cadastros".
-            // data_cadastro vem como YYYY-MM-DD puro (sem hora): comparar como string para
-            // evitar que getBRLDate subtraia 3h e mova o registro para o dia anterior.
+            // Usa getCadastroDateKeyBRL para tratar corretamente data pura, timestamp com
+            // offset e timestamp sem offset (ver comentário da função, linha ~604).
             const cadastroToISODate = (d: Date) => {
               const brl = new Date(d.getTime() - 3 * 3600 * 1000);
               return `${brl.getUTCFullYear()}-${String(brl.getUTCMonth() + 1).padStart(2, '0')}-${String(brl.getUTCDate()).padStart(2, '0')}`;
@@ -2256,12 +2282,9 @@ export default function App() {
             const cadastroEndISO   = cadastroToISODate(endDate);
             const filteredCadastrosAll = cadastrosSite.filter(c => {
               const dateVal = c.data_cadastro || c.created_at;
-              if (!dateVal) return false;
-              if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateVal)) {
-                return dateVal >= cadastroStartISO && dateVal <= cadastroEndISO;
-              }
-              const itemDate = getBRLDate(dateVal);
-              return itemDate >= startDate && itemDate <= endDate;
+              const key = getCadastroDateKeyBRL(dateVal);
+              if (!key) return false;
+              return key >= cadastroStartISO && key <= cadastroEndISO;
             });
 
             // Lista filtrada (remove UTM "unknown") — usada APENAS na atribuição por canal,
@@ -2920,11 +2943,7 @@ export default function App() {
             const todayBRL = `${brlY}-${String(brlM + 1).padStart(2, '0')}-${String(brlD).padStart(2, '0')}`;
             const cadastrosToday = (cadastrosSite || []).filter((c: any) => {
               const dateVal = c.data_cadastro || c.created_at;
-              if (!dateVal) return false;
-              if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateVal)) {
-                return dateVal === todayBRL;
-              }
-              return formatDateBRL(dateVal) === todayStr;
+              return getCadastroDateKeyBRL(dateVal) === todayBRL;
             });
 
             const vendasHojeCount = checkoutsToday.length.toString();
@@ -3035,11 +3054,7 @@ export default function App() {
     const todayISO = `${brlNowLocal.getUTCFullYear()}-${String(brlNowLocal.getUTCMonth() + 1).padStart(2, '0')}-${String(brlNowLocal.getUTCDate()).padStart(2, '0')}`;
     const cadastrosToday = supabaseCadastrosSite.filter(c => {
       const dateVal = c.data_cadastro || c.created_at;
-      if (!dateVal) return false;
-      if (typeof dateVal === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateVal)) {
-        return dateVal === todayISO;
-      }
-      return formatDateBRL(dateVal) === todayStr;
+      return getCadastroDateKeyBRL(dateVal) === todayISO;
     });
 
     return { 
